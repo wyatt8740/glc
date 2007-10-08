@@ -186,4 +186,6 @@ clean:
 	      $(BUILD)/libglc-capture.so.$(VERSION) \
 	      $(BUILD)/libglc-capture.so \
 	      $(BUILD)/play.o \
-	      $(BUILD)/glc-play
+	      $(BUILD)/glc-play \
+	      $(BUILD)/capture.o \
+	      $(BUILD)/glc-capture
