@@ -248,18 +248,20 @@ int main(int argc, char *argv[])
 
 usage:
 	printf("%s [FILE] [OPTION]...\n", argv[0]);
-	printf("  -i LEVEL         show stream information, LEVEL must be greater than 0\n");
-	printf("  -a NUM           save audio stream NUM in wav format\n");
-	printf("  -p NUM           save pictures as bmp files (use -o pic-%%010d.bmp f.ex.)\n");
-	printf("  -y NUM           save video stream NUM in yuv4mpeg format\n");
-	printf("  -o FILE          write to FILE\n");
-	printf("  -f FPS           save images or video at FPS\n");
-	printf("  -c SIZE          compressed stream buffer size in MiB, default is 10\n");
-	printf("  -u SIZE          uncompressed stream buffer size in MiB, default is 10\n");
-	printf("  -s VAL           show stream summary value, possible values are:\n");
-	printf("                       signature, version, flags, fps, pid, name, date\n");
-	printf("  -t               show stream statistics\n");
-	printf("  -h               show help\n");
+	printf("  -i, --info=LEVEL         show stream information, LEVEL must be\n"
+	       "                             greater than 0\n"
+	       "  -a, --wav=NUM            save audio stream NUM in wav format\n"
+	       "  -p, --bmp=NUM            save pictures as bmp files\n"
+	       "                             (use -o pic-%%010d.bmp f.ex.)\n"
+	       "  -y, --yuv4mpeg=NUM       save video stream NUM in yuv4mpeg format\n"
+	       "  -o, --out=FILE           write to FILE\n"
+	       "  -f, --fps=FPS            save images or video at FPS\n"
+	       "  -c, --compressed=SIZE    compressed stream buffer size in MiB, default is 10\n"
+	       "  -u, --uncompressed=SIZE  uncompressed stream buffer size in MiB, default is 10\n"
+	       "  -s, --show=VAL           show stream summary value, possible values are:\n"
+	       "                             signature, version, flags, fps, pid, name, date\n"
+	       "  -t, --statistics         show stream statistics\n"
+	       "  -h, --help               show help\n");
 	
 	return EXIT_FAILURE;
 }

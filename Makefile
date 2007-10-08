@@ -15,7 +15,7 @@ STREAM = $(SRC)/stream
 SCRIPTS = scripts
 
 VERSION=0
-RELEASE=$(VERSION).2.8
+RELEASE=$(VERSION).2.9
 
 #MINILZO = ../minilzo/
 #LZO_OBJ = build/minilzo.o
@@ -61,7 +61,7 @@ CAPT_OBJS = $(BUILD)/main.o \
             $(BUILD)/opengl.o \
             $(BUILD)/x11.o
 
-all: $(BUILD) $(BUILD)/libglc-capture.so.$(RELEASE) $(BUILD)/glc-play
+all: $(BUILD) $(BUILD)/libglc-capture.so.$(RELEASE) $(BUILD)/glc-play $(BUILD)/glc-capture
 
 $(BUILD):
 	mkdir $(BUILD)
@@ -91,6 +91,14 @@ $(BUILD)/glc-play: $(BUILD)/play.o $(BUILD)/libglc.so.$(RELEASE)
 
 $(BUILD)/play.o: $(SRC)/play.c $(HEADERS)
 	$(CC) $(CFLAGS) -o $(BUILD)/play.o -c $(SRC)/play.c
+
+
+# capture app
+$(BUILD)/glc-capture: $(BUILD)/capture.o
+	$(LD) $(LDFLAGS) -o $(BUILD)/glc-capture $(BUILD)/capture.o
+
+$(BUILD)/capture.o: $(SRC)/capture.c
+	$(CC) $(CFLAGS) -o $(BUILD)/capture.o -c $(SRC)/capture.c
 
 
 # libglc
@@ -166,6 +174,7 @@ install-libs: $(BUILD)/libglc.so $(BUILD)/libglc-capture.so
 
 install: install-libs $(BUILD)/glc-play
 	install -Dm 0755 $(BUILD)/glc-play $(DESTDIR)/usr/bin/glc-play
+	install -Dm 0755 $(BUILD)/glc-capture $(DESTDIR)/usr/bin/glc-capture
 
 clean:
 	rm -f $(LIB_OBJS) \
@@ -177,4 +186,6 @@ clean:
 	      $(BUILD)/libglc-capture.so.$(VERSION) \
 	      $(BUILD)/libglc-capture.so \
 	      $(BUILD)/play.o \
-	      $(BUILD)/glc-play
+	      $(BUILD)/glc-play \
+	      $(BUILD)/capture.o \
+	      $(BUILD)/glc-capture

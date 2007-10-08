@@ -1,3 +1,8 @@
+0.2.9 (2007/10/08)
+   Use getopt_long() in glc-play, should make it much more accessible.
+   New glc-capture application which sets correct environment variables
+     based on nice list of command line arguments.
+
 0.2.8 (2007/10/07)
    some code documentation (will someone really dare to look at this
     code...)
