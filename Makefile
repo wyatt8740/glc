@@ -159,9 +159,9 @@ $(LZO_OBJ): $(MINILZO)minilzo.c $(MINILZO)lzoconf.h $(MINILZO)lzodefs.h $(MINILZ
 
 
 install-scripts: $(SCRIPTS)/glc-encode $(SCRIPTS)/glc-capture
-	install -Dm 0644 $(SCRIPTS)/glc-encode $(DESTDIR)/usr/share/glc/glc-encode
-	install -Dm 0644 $(SCRIPTS)/glc-capture $(DESTDIR)/usr/share/glc/glc-capture
-	install -Dm 0644 $(SCRIPTS)/glc-play-mplayer $(DESTDIR)/usr/share/glc/glc-play-mplayer
+	install -Dm 0644 $(SCRIPTS)/encode.sh $(DESTDIR)/usr/share/glc/encode.sh
+	install -Dm 0644 $(SCRIPTS)/capture.sh $(DESTDIR)/usr/share/glc/capture.sh
+	install -Dm 0644 $(SCRIPTS)/play.sh $(DESTDIR)/usr/share/glc/play.sh
 
 install-libs: $(BUILD)/libglc.so $(BUILD)/libglc-capture.so 
 	install -Dm 0755 $(BUILD)/libglc.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc.so.$(RELEASE)
