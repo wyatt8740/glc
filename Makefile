@@ -22,11 +22,6 @@ RELEASE=$(VERSION).2.8
 #USE_LZO = -D__MINILZO -I$(MINILZO)
 LZO_LIB = -llzo2
 
-#DESTDIR = /home/pyry/Documents/projects/glc
-#CFLAGS = -O2 -march=nocona -msse3 -fomit-frame-pointer -Wall
-#LDFLAGS = -Wall -Wl,-O1
-
-
 LIBS = -lpthread -lpacketstream -lGL -ldl -lelfhacks -lasound $(LZO_LIB)
 
 HEADERS = $(COMMON)/glc.h \
