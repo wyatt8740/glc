@@ -134,14 +134,15 @@ int main(int argc, char *argv[])
 	if (ld_preload_old != NULL) {
 		ld_preload_len = strlen(ld_preload_old) + strlen(library) + 2;
 		ld_preload = malloc(ld_preload_len);
-		ld_preload[ld_preload_len-1] = '\0';
+		
 		memcpy(ld_preload, ld_preload_old, strlen(ld_preload_old));
-		ld_preload[strlen(ld_preload_old)] = ':';
 		memcpy(&ld_preload[strlen(ld_preload_old)+1], library, strlen(library));
+		
+		ld_preload[strlen(ld_preload_old)] = ':';
+		ld_preload[ld_preload_len-1] = '\0';
 	} else
 		ld_preload = (char *) library;
 	
-	/*printf("LD_PRELOAD=%s\n", ld_preload);*/
 	setenv("LD_PRELOAD", ld_preload, 1);
 
 	if (optind >= argc)
