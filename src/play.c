@@ -275,7 +275,7 @@ usage:
 	       "  -o, --out=FILE          write to FILE\n"
 	       "  -f, --fps=FPS           save images or video at FPS\n"
 	       "  -c, --compressed=SIZE   compressed stream buffer size in MiB, default is 10\n"
-	       "  -u, -uncompressed=SIZE  uncompressed stream buffer size in MiB, default is 10\n"
+	       "  -u, --uncompressed=SIZE  uncompressed stream buffer size in MiB, default is 10\n"
 	       "  -s, --show=VAL          show stream summary value, possible values are:\n"
 	       "                            signature, version, flags, fps, pid, name, date\n"
 	       "  -t, --statistics        show stream statistics\n"
