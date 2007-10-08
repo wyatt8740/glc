@@ -266,20 +266,20 @@ int main(int argc, char *argv[])
 
 usage:
 	printf("%s [FILE] [OPTION]...\n", argv[0]);
-	printf("  -i, --info=LEVEL        show stream information, LEVEL must be\n"
-	       "                            greater than 0\n"
-	       "  -a, --wav=NUM           save audio stream NUM in wav format\n"
-	       "  -p, --bmp=NUM           save pictures as bmp files\n"
-	       "                            (use -o pic-%%010d.bmp f.ex.)\n"
-	       "  -y, --yuv4mpeg=NUM      save video stream NUM in yuv4mpeg format\n"
-	       "  -o, --out=FILE          write to FILE\n"
-	       "  -f, --fps=FPS           save images or video at FPS\n"
-	       "  -c, --compressed=SIZE   compressed stream buffer size in MiB, default is 10\n"
+	printf("  -i, --info=LEVEL         show stream information, LEVEL must be\n"
+	       "                             greater than 0\n"
+	       "  -a, --wav=NUM            save audio stream NUM in wav format\n"
+	       "  -p, --bmp=NUM            save pictures as bmp files\n"
+	       "                             (use -o pic-%%010d.bmp f.ex.)\n"
+	       "  -y, --yuv4mpeg=NUM       save video stream NUM in yuv4mpeg format\n"
+	       "  -o, --out=FILE           write to FILE\n"
+	       "  -f, --fps=FPS            save images or video at FPS\n"
+	       "  -c, --compressed=SIZE    compressed stream buffer size in MiB, default is 10\n"
 	       "  -u, --uncompressed=SIZE  uncompressed stream buffer size in MiB, default is 10\n"
-	       "  -s, --show=VAL          show stream summary value, possible values are:\n"
-	       "                            signature, version, flags, fps, pid, name, date\n"
-	       "  -t, --statistics        show stream statistics\n"
-	       "  -h, --help              show help\n");
+	       "  -s, --show=VAL           show stream summary value, possible values are:\n"
+	       "                             signature, version, flags, fps, pid, name, date\n"
+	       "  -t, --statistics         show stream statistics\n"
+	       "  -h, --help               show help\n");
 	
 	return EXIT_FAILURE;
 }
