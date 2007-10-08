@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <string.h>
 
 /**
  * \defgroup capture capture utility
@@ -26,7 +27,14 @@
 int main(int argc, char *argv[])
 {
 	char opt;
+	int ret = 0;
 	int option_index = 0;
+	char *program = NULL;
+	char **program_args = NULL;
+	const char *ld_preload_old = NULL;
+	const char *library = "libglc-capture.so";
+	char *ld_preload;
+	size_t ld_preload_len;
 
 	struct option long_options[] = {
 		{"out",			1, NULL, 'o'},
@@ -121,10 +129,35 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	printf("would execute \"");
-	while (optind < argc)
-		printf("%s ", argv[optind++]);
-	printf("\"\n");
+	ld_preload_old = getenv("LD_PRELOAD");
+
+	if (ld_preload_old != NULL) {
+		ld_preload_len = strlen(ld_preload_old) + strlen(library) + 2;
+		ld_preload = malloc(ld_preload_len);
+		ld_preload[ld_preload_len-1] = '\0';
+		memcpy(ld_preload, ld_preload_old, strlen(ld_preload_old));
+		ld_preload[strlen(ld_preload_old)] = ':';
+		memcpy(&ld_preload[strlen(ld_preload_old)+1], library, strlen(library));
+	} else
+		ld_preload = (char *) library;
+	
+	/*printf("LD_PRELOAD=%s\n", ld_preload);*/
+	setenv("LD_PRELOAD", ld_preload, 1);
+
+	if (optind >= argc)
+		goto usage;
+
+	program = argv[optind];
+	program_args = &argv[optind];
+	
+	if ((ret = execvp(program, program_args))) {
+		fprintf(stderr, "can't execute \"%s", program);
+		while (optind < argc)
+			fprintf(stderr, " %s", argv[optind++]);
+		fprintf(stderr, "\"\n");
+		fprintf(stderr, "%s (%d)\n", strerror(ret), ret);
+		return ret;
+	}
 
 	return EXIT_SUCCESS;
 usage:
