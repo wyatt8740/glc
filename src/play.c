@@ -46,6 +46,23 @@ int main(int argc, char *argv[])
 	ps_buffer_t *uncompressed, *compressed, *picture, *audio, *ycbcr, *rgb;
 	size_t uncompressed_size, compressed_size;
 
+	/* wtf? git fails :/ */
+	struct option long_options[] = {
+		{"info",		1, NULL, 'i'},
+		{"wav",			1, NULL, 'a'},
+		{"bmp",			1, NULL, 'p'},
+		{"yuv4mpeg",		1, NULL, 'y'},
+		{"out",			1, NULL, 'o'},
+		{"fps",			1, NULL, 'f'},
+		{"compressed",		1, NULL, 'c'},
+		{"uncompressed",	1, NULL, 'u'},
+		{"show",		1, NULL, 's'},
+		{"statistics",		0, NULL, 't'},
+		{"help",		0, NULL, 'h'},
+		{0, 0, 0, 0}
+	};
+	option_index = 0;
+
 	img = info = wav = 0;
 	picture = audio = ycbcr = rgb = NULL;
 	play = 1;
