@@ -14,7 +14,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <semaphore.h>
-#include <getopt.h>
 
 #include "common/glc.h"
 #include "common/util.h"
@@ -43,25 +42,9 @@ int main(int argc, char *argv[])
 	ps_stats_t stats;
 	ps_bufferattr_t attr;
 	const char *summary_val = NULL;
-	int play, opt, option_index, img, info, show_stats, wav, yuv4mpeg;
+	int play, opt, img, info, show_stats, wav, yuv4mpeg;
 	ps_buffer_t *uncompressed, *compressed, *picture, *audio, *ycbcr, *rgb;
 	size_t uncompressed_size, compressed_size;
-	
-	struct option long_options[] = {
-		{"info",		1, NULL, 'i'},
-		{"wav",			1, NULL, 'a'},
-		{"bmp",			1, NULL, 'p'},
-		{"yuv4mpeg",		1, NULL, 'y'},
-		{"out",			1, NULL, 'o'},
-		{"fps",			1, NULL, 'f'},
-		{"compressed",		1, NULL, 'c'},
-		{"uncompressed",	1, NULL, 'u'},
-		{"show",		1, NULL, 's'},
-		{"statistics",		0, NULL, 't'},
-		{"help",		0, NULL, 'h'},
-		{0, 0, 0, 0}
-	};
-	option_index = 0;
 
 	img = info = wav = 0;
 	picture = audio = ycbcr = rgb = NULL;
@@ -76,8 +59,7 @@ int main(int argc, char *argv[])
 	compressed_size = 10 * 1024 * 1024;
 	uncompressed_size = 10 * 1024 * 1024;
 	
-	while ((opt = getopt_long(argc, argv, "i:a:p:y:o:f:c:u:s:th",
-				  long_options, &optind)) != -1) {
+	while ((opt = getopt(argc, argv, "i:a:p:y:o:f:c:u:s:th")) != -1) {
 		switch (opt) {
 		case 'i':
 			glc->info_level = atoi(optarg);
@@ -266,20 +248,18 @@ int main(int argc, char *argv[])
 
 usage:
 	printf("%s [FILE] [OPTION]...\n", argv[0]);
-	printf("  -i, --info=LEVEL        show stream information, LEVEL must be\n"
-	       "                            greater than 0\n"
-	       "  -a, --wav=NUM           save audio stream NUM in wav format\n"
-	       "  -p, --bmp=NUM           save pictures as bmp files\n"
-	       "                            (use -o pic-%%010d.bmp f.ex.)\n"
-	       "  -y, --yuv4mpeg=NUM      save video stream NUM in yuv4mpeg format\n"
-	       "  -o, --out=FILE          write to FILE\n"
-	       "  -f, --fps=FPS           save images or video at FPS\n"
-	       "  -c, --compressed=SIZE   compressed stream buffer size in MiB, default is 10\n"
-	       "  -u, -uncompressed=SIZE  uncompressed stream buffer size in MiB, default is 10\n"
-	       "  -s, --show=VAL          show stream summary value, possible values are:\n"
-	       "                            signature, version, flags, fps, pid, name, date\n"
-	       "  -t, --statistics        show stream statistics\n"
-	       "  -h, --help              show help\n");
+	printf("  -i LEVEL         show stream information, LEVEL must be greater than 0\n");
+	printf("  -a NUM           save audio stream NUM in wav format\n");
+	printf("  -p NUM           save pictures as bmp files (use -o pic-%%010d.bmp f.ex.)\n");
+	printf("  -y NUM           save video stream NUM in yuv4mpeg format\n");
+	printf("  -o FILE          write to FILE\n");
+	printf("  -f FPS           save images or video at FPS\n");
+	printf("  -c SIZE          compressed stream buffer size in MiB, default is 10\n");
+	printf("  -u SIZE          uncompressed stream buffer size in MiB, default is 10\n");
+	printf("  -s VAL           show stream summary value, possible values are:\n");
+	printf("                       signature, version, flags, fps, pid, name, date\n");
+	printf("  -t               show stream statistics\n");
+	printf("  -h               show help\n");
 	
 	return EXIT_FAILURE;
 }
