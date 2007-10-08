@@ -29,6 +29,7 @@ int main(int argc, char *argv[])
 	char opt;
 	int ret = 0;
 	int option_index = 0;
+	int posixly_correct_was_set = 0;
 	char *program = NULL;
 	char **program_args = NULL;
 	const char *ld_preload_old = NULL;
@@ -59,6 +60,9 @@ int main(int argc, char *argv[])
 		{"help",		0, NULL, 'h'},
 		{0, 0, 0, 0}
 	};
+
+	if (getenv("POSIXLY_CORRECT"))
+		posixly_correct_was_set = 1;
 
 	/* force getopt_long() to stop when non-option argument
 	   is encountered. */
@@ -150,6 +154,9 @@ int main(int argc, char *argv[])
 
 	program = argv[optind];
 	program_args = &argv[optind];
+
+	if (!posixly_correct_was_set)
+		unsetenv("POSIXLY_CORRECT");
 	
 	if ((ret = execvp(program, program_args))) {
 		fprintf(stderr, "can't execute \"%s", program);
