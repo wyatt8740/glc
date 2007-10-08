@@ -46,7 +46,8 @@ int main(int argc, char *argv[])
 	int play, opt, option_index, img, info, show_stats, wav, yuv4mpeg;
 	ps_buffer_t *uncompressed, *compressed, *picture, *audio, *ycbcr, *rgb;
 	size_t uncompressed_size, compressed_size;
-	
+
+	/* wtf? git fails :/ */
 	struct option long_options[] = {
 		{"info",		1, NULL, 'i'},
 		{"wav",			1, NULL, 'a'},
