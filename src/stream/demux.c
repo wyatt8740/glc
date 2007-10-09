@@ -124,8 +124,13 @@ finish:
 	ps_packet_destroy(&audio);
 	ps_packet_destroy(&picture);
 	
-	if (demux->glc->flags & GLC_CANCEL)
+	if (demux->glc->flags & GLC_CANCEL) {
 		ps_buffer_cancel(demux->from);
+
+		/* make sure both 'clients' finish */
+		ps_buffer_cancel(demux->audio);
+		ps_buffer_cancel(demux->picture);
+	}
 
 	demux_close(demux);
 	return NULL;
