@@ -152,24 +152,27 @@ int opengl_start(ps_buffer_t *buffer)
 
 int opengl_close()
 {
+	int ret;
 	if (!opengl.started)
 		return 0;
 	
 	gl_capture_close(opengl.gl);
 	
 	if (opengl.glc->flags & GLC_SCALE) {
-		if (lib.running)
-			util_write_end_of_stream(opengl.glc, opengl.unscaled);
-		else
+		if (lib.running) {
+			if ((ret = util_write_end_of_stream(opengl.glc, opengl.unscaled)))
+				return ret;
+		} else
 			ps_buffer_cancel(opengl.unscaled);
 		
 		if (opengl.glc->flags & GLC_CONVERT_420JPEG)
 			sem_wait(&opengl.glc->signal[GLC_SIGNAL_YCBCR_FINISHED]);
 		else
 			sem_wait(&opengl.glc->signal[GLC_SIGNAL_SCALE_FINISHED]);
-	} else if (lib.running)
-		util_write_end_of_stream(opengl.glc, opengl.buffer);
-	else
+	} else if (lib.running) {
+		if ((ret = util_write_end_of_stream(opengl.glc, opengl.buffer)))
+			return ret;
+	} else
 		ps_buffer_cancel(opengl.buffer);
 
 	if (opengl.glc->flags & GLC_SCALE) {

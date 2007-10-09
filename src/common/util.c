@@ -320,8 +320,8 @@ int util_write_end_of_stream(glc_t *glc, ps_buffer_t *to)
 
 	return 0;
 err:
-	fprintf(stderr, "glc: can't write end of stream: %s (%d)\n", strerror(ret), ret);
-	return 0;
+	/*fprintf(stderr, "glc: can't write end of stream: %s (%d)\n", strerror(ret), ret);*/
+	return ret;
 }
 
 /**  \} */
