@@ -63,7 +63,7 @@ struct gl_ctx_s {
 	unsigned int w, h;
 	ps_packet_t packet;
 	glc_ctx_i ctx_i;
-	glc_utime_t last;
+	glc_utime_t last, pbo_timestamp;
 	int unsupported;
 	int created;
 	float zoom;
@@ -635,21 +635,23 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 	size_t pic_size;
 	
 	gl_get_ctx_capture(gl, &ctx, dpy, drawable);
+
+	if ((gl->use_pbo) && (!ctx->pbo_active)) {
+		ret = gl_start_pbo(gl, ctx);
+		ctx->pbo_timestamp = util_timestamp(gl->glc);
+		goto finish;
+	}
 	
 	msg.type = GLC_MESSAGE_PICTURE;
 	pic.ctx = ctx->ctx_i;
-	pic.timestamp = util_timestamp(gl->glc);
 	pic_size = ctx->w * ctx->h * gl->bpp;
 
-	if ((gl->use_pbo) && (pic.timestamp > gl->fps))
-		pic.timestamp -= gl->fps;
+	if (gl->use_pbo)
+		pic.timestamp = ctx->pbo_timestamp;
+	else
+		pic.timestamp = util_timestamp(gl->glc);
 	
 	if (pic.timestamp - ctx->last >= gl->fps) {
-		if ((gl->use_pbo) && (!ctx->pbo_active)) { /* just start */
-			ret = gl_start_pbo(gl, ctx);   /* TODO move somewhere else? */
-			goto finish;
-		}
-		
 		if (ps_packet_open(&ctx->packet, PS_PACKET_WRITE | PS_PACKET_TRY))
 			goto finish;
 		if ((ret = ps_packet_write(&ctx->packet, &msg, GLC_MESSAGE_HEADER_SIZE)))
@@ -661,9 +663,10 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 
 		if (gl->use_pbo) {
 			gl_read_pbo(gl, ctx, dma);
-			gl_start_pbo(gl, ctx);
+			ret = gl_start_pbo(gl, ctx);
+			ctx->pbo_timestamp = util_timestamp(gl->glc);
 		} else
-			gl_get_pixels(gl, ctx, dma);
+			ret = gl_get_pixels(gl, ctx, dma);
 		ctx->last += gl->fps;
 
 		ps_packet_close(&ctx->packet);
