@@ -630,7 +630,6 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 	struct gl_ctx_s *ctx;
 	glc_message_header_t msg;
 	glc_picture_header_t pic;
-	glc_utime_t time;
 	char *dma;
 	int ret = 0;
 	size_t pic_size;
@@ -647,14 +646,12 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 	pic.ctx = ctx->ctx_i;
 	pic_size = ctx->w * ctx->h * gl->bpp;
 
-	time = util_timestamp(gl->glc);
-
 	if (gl->use_pbo)
 		pic.timestamp = ctx->pbo_timestamp;
 	else
-		pic.timestamp = time;
+		pic.timestamp = util_timestamp(gl->glc);
 	
-	if (time - ctx->last >= gl->fps) {
+	if (pic.timestamp - ctx->last >= gl->fps) {
 		if (ps_packet_open(&ctx->packet, PS_PACKET_WRITE | PS_PACKET_TRY))
 			goto finish;
 		if ((ret = ps_packet_write(&ctx->packet, &msg, GLC_MESSAGE_HEADER_SIZE)))
