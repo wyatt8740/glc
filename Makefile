@@ -27,7 +27,8 @@ LIBS = -lpthread -lpacketstream -lGL -ldl -lelfhacks -lasound $(LZO_LIB)
 HEADERS = $(COMMON)/glc.h \
 	  $(COMMON)/util.h \
 	  $(COMMON)/thread.h \
-	  $(STREAM)/gl.h \
+	  $(STREAM)/gl_capture.h \
+	  $(STREAM)/gl_play.h \
 	  $(STREAM)/pack.h \
 	  $(STREAM)/file.h \
 	  $(STREAM)/img.h \
@@ -40,7 +41,8 @@ HEADERS = $(COMMON)/glc.h \
 	  $(STREAM)/yuv4mpeg.h \
 	  $(STREAM)/rgb.h
 
-LIB_OBJS = $(BUILD)/gl.o \
+LIB_OBJS = $(BUILD)/gl_capture.o \
+           $(BUILD)/gl_play.o \
            $(BUILD)/util.o \
            $(BUILD)/pack.o \
            $(BUILD)/file.o \
@@ -118,8 +120,11 @@ $(BUILD)/thread.o: $(COMMON)/thread.c $(HEADERS)
 
 
 # stream processor objects
-$(BUILD)/gl.o: $(STREAM)/gl.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/gl.o -c $(STREAM)/gl.c
+$(BUILD)/gl_capture.o: $(STREAM)/gl_capture.c $(HEADERS)
+	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/gl_capture.o -c $(STREAM)/gl_capture.c
+
+$(BUILD)/gl_play.o: $(STREAM)/gl_play.c $(HEADERS)
+	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/gl_play.o -c $(STREAM)/gl_play.c
 
 $(BUILD)/pack.o: $(STREAM)/pack.c $(HEADERS)
 	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/pack.o -c $(STREAM)/pack.c $(USE_LZO)

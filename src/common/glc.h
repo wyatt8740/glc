@@ -48,12 +48,12 @@
 
 /** stream version */
 #define GLC_STREAM_VERSION              0x1
-/** file signature = "GLC\0" */
+/** file signature = "GLC" */
 #define GLC_SIGNATURE            0x00434c47
 
 /* TODO better signal framework */
-/** gl capture/playback has finished */
-#define GLC_SIGNAL_GL_FINISHED            0
+/** gl capture has finished */
+#define GLC_SIGNAL_GL_CAPTURE_FINISHED    0
 /** pack/unpack has finished */
 #define GLC_SIGNAL_PACK_FINISHED          1
 /** file has finished */
@@ -76,8 +76,10 @@
 #define GLC_SIGNAL_YUV4MPEG_FINISHED     10
 /** rgb has finished */
 #define GLC_SIGNAL_RGB_FINISHED          11
+/** gl playback has finished */
+#define GLC_SIGNAL_GL_PLAY_FINISHED      12
 /** number of signals */
-#define GLC_SIGNALS                      12
+#define GLC_SIGNALS                      13
 
 /** unsigned time in microseconds */
 typedef u_int64_t glc_utime_t;

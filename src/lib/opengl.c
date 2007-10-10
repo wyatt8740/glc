@@ -17,7 +17,7 @@
 
 #include "../common/glc.h"
 #include "../common/util.h"
-#include "../stream/gl.h"
+#include "../stream/gl_capture.h"
 #include "../stream/scale.h"
 #include "../stream/ycbcr.h"
 #include "lib.h"
@@ -28,7 +28,7 @@
  */
 
 /**
- * \defgroup opengl opengl wrapper
+ * \defgroup opengl OpenGL wrapper
  *  \{
  */
 

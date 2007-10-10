@@ -20,7 +20,7 @@
 #include "common/util.h"
 #include "stream/file.h"
 #include "stream/pack.h"
-#include "stream/gl.h"
+#include "stream/gl_play.h"
 #include "stream/img.h"
 #include "stream/info.h"
 #include "stream/wav.h"
@@ -201,7 +201,7 @@ int main(int argc, char *argv[])
 		demux_init(glc, uncompressed, audio, picture);
 		rgb_init(glc, picture, rgb);
 		audio_playback_init(glc, audio);
-		gl_show_init(glc, rgb);
+		gl_play_init(glc, rgb);
 	}
 	
 	unpack_init(glc, compressed, uncompressed);
@@ -224,7 +224,7 @@ int main(int argc, char *argv[])
 		sem_wait(&glc->signal[GLC_SIGNAL_DEMUX_FINISHED]);
 		sem_wait(&glc->signal[GLC_SIGNAL_RGB_FINISHED]);
 		sem_wait(&glc->signal[GLC_SIGNAL_AUDIO_FINISHED]);
-		sem_wait(&glc->signal[GLC_SIGNAL_GL_FINISHED]);
+		sem_wait(&glc->signal[GLC_SIGNAL_GL_PLAY_FINISHED]);
 	}
 	sem_wait(&glc->signal[GLC_SIGNAL_PACK_FINISHED]);
 	
