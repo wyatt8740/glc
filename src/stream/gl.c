@@ -275,7 +275,7 @@ int gl_put_pixels(struct gl_private_s *gl, struct gl_ctx_s *ctx, char *from)
 	
 	glDrawPixels(ctx->w, ctx->h, GL_BGR, GL_UNSIGNED_BYTE, from);
 	glXSwapBuffers(ctx->dpy, ctx->drawable);
-	
+
 	return 0;
 }
 
@@ -449,6 +449,8 @@ int gl_get_ctx_capture(struct gl_private_s *gl, struct gl_ctx_s **ctx, Display *
 	
 	if (fctx == NULL) {
 		fctx = (struct gl_ctx_s *) malloc(sizeof(struct gl_ctx_s));
+		memset(fctx, 0, sizeof(struct gl_ctx_s));
+		
 		fctx->drawable = drawable;
 		
 		ps_packet_init(&fctx->packet, gl->to);
@@ -464,8 +466,6 @@ int gl_get_ctx_capture(struct gl_private_s *gl, struct gl_ctx_s **ctx, Display *
 			gl->try_pbo = 0;
 		}
 		pthread_rwlock_unlock(&gl->ctxlist_lock);
-		
-		fctx->last = 0;
 		
 		gl_get_geometry(gl, dpy, drawable, &fctx->w, &fctx->h);
 		
@@ -591,6 +591,8 @@ int gl_show_update_ctx(struct gl_private_s *gl, struct gl_ctx_s *ctx)
 	snprintf(ctx->name, sizeof(ctx->name) - 1, "glc-play (ctx %d)", ctx->ctx_i);
 	
 	ctx->zoom = 1;
+
+	XUnmapWindow(ctx->dpy, ctx->drawable);
 	
 	sizehints.x = 0;
 	sizehints.y = 0;
@@ -630,9 +632,9 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 	struct gl_ctx_s *ctx;
 	glc_message_header_t msg;
 	glc_picture_header_t pic;
+	glc_utime_t now;
 	char *dma;
 	int ret = 0;
-	size_t pic_size;
 	
 	gl_get_ctx_capture(gl, &ctx, dpy, drawable);
 
@@ -644,29 +646,31 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 	
 	msg.type = GLC_MESSAGE_PICTURE;
 	pic.ctx = ctx->ctx_i;
-	pic_size = ctx->w * ctx->h * gl->bpp;
 
+	now = util_timestamp(gl->glc);
 	if (gl->use_pbo)
 		pic.timestamp = ctx->pbo_timestamp;
 	else
-		pic.timestamp = util_timestamp(gl->glc);
+		pic.timestamp = now;
 	
-	if (pic.timestamp - ctx->last >= gl->fps) {
+	if (now - ctx->last >= gl->fps) {
 		if (ps_packet_open(&ctx->packet, PS_PACKET_WRITE | PS_PACKET_TRY))
 			goto finish;
 		if ((ret = ps_packet_write(&ctx->packet, &msg, GLC_MESSAGE_HEADER_SIZE)))
 			goto cancel;
 		if ((ret = ps_packet_write(&ctx->packet, &pic, GLC_PICTURE_HEADER_SIZE)))
 			goto cancel;
-		if ((ret = ps_packet_dma(&ctx->packet, (void *) &dma, pic_size, PS_ACCEPT_FAKE_DMA)))
+		if ((ret = ps_packet_dma(&ctx->packet, (void *) &dma,
+					 ctx->w * ctx->h * gl->bpp, PS_ACCEPT_FAKE_DMA)))
 			goto cancel;
 
 		if (gl->use_pbo) {
 			gl_read_pbo(gl, ctx, dma);
 			ret = gl_start_pbo(gl, ctx);
-			ctx->pbo_timestamp = util_timestamp(gl->glc);
+			ctx->pbo_timestamp = now;
 		} else
 			ret = gl_get_pixels(gl, ctx, dma);
+		
 		ctx->last += gl->fps;
 
 		ps_packet_close(&ctx->packet);
@@ -780,10 +784,10 @@ int gl_show_read_callback(glc_thread_state_t *state)
 			usleep(pic_hdr->timestamp - time);
 		else if (time > pic_hdr->timestamp + gl->fps)
 			return 0;
-		
+
 		gl_put_pixels(gl, ctx, &state->read_data[GLC_PICTURE_HEADER_SIZE]);
 	}
-	
+
 	return 0;
 }
 
