@@ -220,10 +220,11 @@ void rgb_get_ctx(struct rgb_private_s *rgb, glc_ctx_i ctx_i,
 	if (*ctx == NULL) {
 		*ctx = malloc(sizeof(struct rgb_ctx_s));
 		memset(*ctx, 0, sizeof(struct rgb_ctx_s));
-
+		
 		(*ctx)->next = rgb->ctx;
 		rgb->ctx = *ctx;
 		(*ctx)->ctx_i = ctx_i;
+		pthread_rwlock_init(&(*ctx)->update, NULL);
 	}
 }
 
