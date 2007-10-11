@@ -15,16 +15,17 @@
 #include <unistd.h>
 #include <semaphore.h>
 #include <getopt.h>
+#include <string.h>
 
 #include "common/glc.h"
 #include "common/util.h"
 #include "stream/file.h"
 #include "stream/pack.h"
-#include "stream/gl.h"
+#include "stream/gl_play.h"
 #include "stream/img.h"
 #include "stream/info.h"
 #include "stream/wav.h"
-#include "stream/audio.h"
+#include "stream/audio_play.h"
 #include "stream/demux.h"
 #include "stream/ycbcr.h"
 #include "stream/yuv4mpeg.h"
@@ -34,7 +35,7 @@
  * \defgroup play stream player
  *  \{
  */
- 
+
 int show_info_value(glc_t *glc, const char *value);
 
 int main(int argc, char *argv[])
@@ -66,7 +67,7 @@ int main(int argc, char *argv[])
 	img = info = wav = 0;
 	picture = audio = ycbcr = rgb = NULL;
 	play = 1;
-	
+
 	img = info = show_stats = yuv4mpeg = 0;
 	glc_create(&glc);
 	glc->scale = 1;
@@ -139,7 +140,7 @@ int main(int argc, char *argv[])
 			goto usage;
 		}
 	}
-	
+
 	if (optind >= argc)
 		goto usage;
 	glc->stream_file = argv[optind];
@@ -200,8 +201,8 @@ int main(int argc, char *argv[])
 	} else { /* play */
 		demux_init(glc, uncompressed, audio, picture);
 		rgb_init(glc, picture, rgb);
-		audio_playback_init(glc, audio);
-		gl_show_init(glc, rgb);
+		audio_play_init(glc, audio);
+		gl_play_init(glc, rgb);
 	}
 	
 	unpack_init(glc, compressed, uncompressed);
@@ -224,7 +225,7 @@ int main(int argc, char *argv[])
 		sem_wait(&glc->signal[GLC_SIGNAL_DEMUX_FINISHED]);
 		sem_wait(&glc->signal[GLC_SIGNAL_RGB_FINISHED]);
 		sem_wait(&glc->signal[GLC_SIGNAL_AUDIO_FINISHED]);
-		sem_wait(&glc->signal[GLC_SIGNAL_GL_FINISHED]);
+		sem_wait(&glc->signal[GLC_SIGNAL_GL_PLAY_FINISHED]);
 	}
 	sem_wait(&glc->signal[GLC_SIGNAL_PACK_FINISHED]);
 	
@@ -304,6 +305,5 @@ int show_info_value(glc_t *glc, const char *value)
 		return EXIT_FAILURE;
 	return EXIT_SUCCESS;
 }
-
 
 /**  \} */

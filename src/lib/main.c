@@ -192,10 +192,13 @@ void signal_handler(int signum)
 
 void lib_close()
 {
+	int ret;
 	mpriv.glc->flags &= ~GLC_CAPTURE; /* disable capturing */
 
-	alsa_close();
-	opengl_close();
+	if ((ret = alsa_close()))
+		goto err;
+	if ((ret = opengl_close()))
+		goto err;
 
 	if (lib.running) {
 		if (mpriv.compress)
@@ -216,6 +219,10 @@ void lib_close()
 	
 	free(mpriv.glc->stream_file);
 	glc_destroy(mpriv.glc);
+	return;
+err:
+	fprintf(stderr, "glc: cleanup and finish failed\n%s (%d)\n", strerror(ret), ret);
+	return;
 }
 
 int load_environ()

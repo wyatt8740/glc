@@ -89,7 +89,7 @@ void *demux_thread(void *argptr)
 		data_size -= GLC_MESSAGE_HEADER_SIZE;
 		if ((ret = ps_packet_dma(&read, (void *) &data, data_size, PS_ACCEPT_FAKE_DMA)))
 			goto err;
-		
+
 		if ((msg_hdr.type == GLC_MESSAGE_CLOSE) |
 		    (msg_hdr.type == GLC_MESSAGE_PICTURE) |
 		    (msg_hdr.type == GLC_MESSAGE_CTX)) {
@@ -118,14 +118,19 @@ void *demux_thread(void *argptr)
 
 		ps_packet_close(&read);
 	} while ((!(demux->glc->flags & GLC_CANCEL)) && (msg_hdr.type != GLC_MESSAGE_CLOSE));
-	
+
 finish:
 	ps_packet_destroy(&read);
 	ps_packet_destroy(&audio);
 	ps_packet_destroy(&picture);
 	
-	if (demux->glc->flags & GLC_CANCEL)
+	if (demux->glc->flags & GLC_CANCEL) {
 		ps_buffer_cancel(demux->from);
+
+		/* make sure both 'clients' finish */
+		ps_buffer_cancel(demux->audio);
+		ps_buffer_cancel(demux->picture);
+	}
 
 	demux_close(demux);
 	return NULL;
