@@ -15,6 +15,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <packetstream.h>
+#include <pthread.h>
 
 #include "../common/glc.h"
 #include "../common/thread.h"
@@ -79,6 +80,7 @@ struct ycbcr_ctx_s {
 
 	YCbCrConvertProc convert;
 
+	pthread_rwlock_t update;
 	struct ycbcr_ctx_s *next;
 };
 
@@ -139,6 +141,7 @@ void ycbcr_finish_callback(void *ptr, int err)
 		if (del->factor)
 			free(del->factor);
 
+		pthread_rwlock_destroy(&del->update);
 		free(del);
 	}
 
@@ -159,7 +162,9 @@ int ycbcr_read_callback(glc_thread_state_t *state)
 		pic_hdr = (glc_picture_header_t *) state->read_data;
 		ycbcr_get_ctx(ycbcr, pic_hdr->ctx, &ctx);
 		state->threadptr = ctx;
-		
+
+		pthread_rwlock_rdlock(&ctx->update);
+
 		if (ctx->convert != NULL)
 			state->write_size = GLC_PICTURE_HEADER_SIZE + ctx->size;
 		else
@@ -177,6 +182,7 @@ int ycbcr_write_callback(glc_thread_state_t *state)
 
 	if (state->header.type == GLC_MESSAGE_PICTURE) {
 		if (ctx->convert == NULL) {
+			pthread_rwlock_unlock(&ctx->update);
 			memcpy(state->write_data, state->read_data, state->write_size);
 			return 0;
 		}
@@ -185,6 +191,7 @@ int ycbcr_write_callback(glc_thread_state_t *state)
 		ctx->convert(ycbcr, ctx,
 			     (unsigned char *) &state->read_data[GLC_PICTURE_HEADER_SIZE],
 			     (unsigned char *) &state->write_data[GLC_PICTURE_HEADER_SIZE]);
+		pthread_rwlock_unlock(&ctx->update);
 	} else
 		memcpy(state->write_data, state->read_data, state->write_size);
 
@@ -208,6 +215,7 @@ void ycbcr_get_ctx(struct ycbcr_private_s *ycbcr, glc_ctx_i ctx_i, struct ycbcr_
 		(*ctx)->next = ycbcr->ctx;
 		ycbcr->ctx = *ctx;
 		(*ctx)->ctx_i = ctx_i;
+		pthread_rwlock_init(&(*ctx)->update, NULL);
 	}
 }
 
@@ -382,6 +390,7 @@ int ycbcr_ctx_msg(struct ycbcr_private_s *ycbcr, glc_ctx_message_t *ctx_msg)
 	struct ycbcr_ctx_s *ctx;
 	
 	ycbcr_get_ctx(ycbcr, ctx_msg->ctx, &ctx);
+	pthread_rwlock_wrlock(&ctx->update);
 
 	if (ctx_msg->flags & GLC_CTX_BGRA)
 		ctx->bpp = 4;
@@ -389,6 +398,7 @@ int ycbcr_ctx_msg(struct ycbcr_private_s *ycbcr, glc_ctx_message_t *ctx_msg)
 		ctx->bpp = 3;
 	else {
 		ctx->convert = NULL;
+		pthread_rwlock_unlock(&ctx->update);
 		return 0;
 	}
 
@@ -420,6 +430,7 @@ int ycbcr_ctx_msg(struct ycbcr_private_s *ycbcr, glc_ctx_message_t *ctx_msg)
 
 	ctx->size = ctx->yw * ctx->yh + 2 * (ctx->cw * ctx->ch);
 
+	pthread_rwlock_unlock(&ctx->update);
 	return 0;
 }
 
