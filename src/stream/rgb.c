@@ -175,10 +175,8 @@ int rgb_read_callback(glc_thread_state_t *state)
 
 		if (ctx->convert)
 			state->write_size = GLC_PICTURE_HEADER_SIZE + ctx->size;
-		else {
-			pthread_rwlock_unlock(&ctx->update);
+		else
 			state->write_size = state->read_size;
-		}
 	} else
 		state->write_size = state->read_size;
 
@@ -191,8 +189,10 @@ int rgb_write_callback(glc_thread_state_t *state)
 	struct rgb_ctx_s *ctx = state->threadptr;
 
 	if (state->header.type == GLC_MESSAGE_PICTURE) {
-		if (!ctx->convert)
+		if (!ctx->convert) {
+			pthread_rwlock_unlock(&ctx->update);
 			goto copy;
+		}
 
 		memcpy(state->write_data, state->read_data, GLC_PICTURE_HEADER_SIZE);
 		rgb_convert_lookup(rgb, ctx,
