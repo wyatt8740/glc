@@ -141,8 +141,8 @@ void *glc_thread(void *argptr)
 		}
 		
 		if ((thread->flags & GLC_THREAD_WRITE) && (thread->flags & GLC_THREAD_READ)) {
-			has_locked = 1;
 			pthread_mutex_lock(&private->open); /* preserve packet order */
+			has_locked = 1;
 		}
 		
 		if ((thread->flags & GLC_THREAD_READ) && (!(state->flags & GLC_THREAD_STATE_SKIP_READ))) {
@@ -170,18 +170,13 @@ void *glc_thread(void *argptr)
 			}
 		}
 
-		if ((thread->flags & GLC_THREAD_WRITE) &&
-		    (thread->flags & GLC_THREAD_READ) &&
-		    (state->flags & GLC_THREAD_STATE_SKIP_WRITE))
-			pthread_mutex_unlock(&private->open);
-		
 		if ((thread->flags & GLC_THREAD_WRITE) && (!(state->flags & GLC_THREAD_STATE_SKIP_WRITE))) {
 			if ((ret = ps_packet_open(&write, PS_PACKET_WRITE)))
 				goto err;
 
 			if (has_locked) {
-				pthread_mutex_unlock(&private->open);
 				has_locked = 0;
+				pthread_mutex_unlock(&private->open);
 			}
 			
 			if ((ret = ps_packet_write(&write, &state->header, GLC_MESSAGE_HEADER_SIZE)))
@@ -214,8 +209,8 @@ void *glc_thread(void *argptr)
 
 		/* in case of we skipped writing */
 		if (has_locked) {
-			pthread_mutex_unlock(&private->open);
 			has_locked = 0;
+			pthread_mutex_unlock(&private->open);
 		}
 		
 		if ((thread->flags & GLC_THREAD_READ) && (!(state->flags & GLC_THREAD_STATE_SKIP_READ))) {

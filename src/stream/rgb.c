@@ -19,6 +19,7 @@
 
 #include "../common/glc.h"
 #include "../common/thread.h"
+#include "../common/util.h"
 #include "rgb.h"
 
 /**
@@ -83,6 +84,8 @@ struct rgb_ctx_s {
 	unsigned int w, h;
 	int convert;
 	size_t size;
+	
+	pthread_rwlock_t update;
 	struct rgb_ctx_s *next;
 };
 
@@ -125,7 +128,7 @@ int rgb_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 	rgb->thread.write_callback = &rgb_write_callback;
 	rgb->thread.finish_callback = &rgb_finish_callback;
 	rgb->thread.ptr = rgb;
-	rgb->thread.threads = 2;
+	rgb->thread.threads = util_cpus();
 
 	return glc_thread_create(glc, &rgb->thread, from, to);
 }
@@ -142,11 +145,13 @@ void rgb_finish_callback(void *ptr, int err)
 		del = rgb->ctx;
 		rgb->ctx = rgb->ctx->next;
 
+		pthread_rwlock_destroy(&del->update);
 		free(del);
 	}
 
 	if (rgb->lookup_table)
 		free(rgb->lookup_table);
+
 
 	sem_post(&rgb->glc->signal[GLC_SIGNAL_RGB_FINISHED]);
 	free(rgb);
@@ -158,7 +163,6 @@ int rgb_read_callback(glc_thread_state_t *state)
 	struct rgb_ctx_s *ctx;
 	glc_picture_header_t *pic_hdr;
 
-	/* we don't need mutexes, since paralleism takes place at write time */
 	if (state->header.type == GLC_MESSAGE_CTX)
 		rgb_ctx_msg(rgb, (glc_ctx_message_t *) state->read_data);
 
@@ -167,10 +171,14 @@ int rgb_read_callback(glc_thread_state_t *state)
 		rgb_get_ctx(rgb, pic_hdr->ctx, &ctx);
 		state->threadptr = ctx;
 
+		pthread_rwlock_rdlock(&ctx->update);
+
 		if (ctx->convert)
 			state->write_size = GLC_PICTURE_HEADER_SIZE + ctx->size;
-		else
+		else {
+			pthread_rwlock_unlock(&ctx->update);
 			state->write_size = state->read_size;
+		}
 	} else
 		state->write_size = state->read_size;
 
@@ -190,6 +198,7 @@ int rgb_write_callback(glc_thread_state_t *state)
 		rgb_convert_lookup(rgb, ctx,
 			    (unsigned char *) &state->read_data[GLC_PICTURE_HEADER_SIZE],
 			    (unsigned char *) &state->write_data[GLC_PICTURE_HEADER_SIZE]);
+		pthread_rwlock_unlock(&ctx->update);
 		return 0;
 	}
 copy:
@@ -225,6 +234,8 @@ int rgb_ctx_msg(struct rgb_private_s *rgb, glc_ctx_message_t *ctx_msg)
 
 	if (!(ctx_msg->flags & GLC_CTX_YCBCR_420JPEG))
 		return 0; /* just don't convert */
+	
+	pthread_rwlock_wrlock(&ctx->update);
 
 	ctx->w = ctx_msg->w;
 	ctx->h = ctx_msg->h;
@@ -233,6 +244,8 @@ int rgb_ctx_msg(struct rgb_private_s *rgb, glc_ctx_message_t *ctx_msg)
 
 	ctx_msg->flags &= ~GLC_CTX_YCBCR_420JPEG;
 	ctx_msg->flags |= GLC_CTX_BGR;
+
+	pthread_rwlock_unlock(&ctx->update);
 
 	return 0;
 }
