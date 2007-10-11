@@ -1,12 +1,12 @@
 /**
- * \file src/stream/audio.c
- * \brief audio capture/playback
+ * \file src/stream/audio_capture.c
+ * \brief audio capture
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
  */
 
 
-/* audio.c -- audio capture/playback
+/* audio_capture.c -- audio capture
  * Copyright (C) 2007 Pyry Haulos
  * For conditions of distribution and use, see copyright notice in glc.h
  */
@@ -26,8 +26,7 @@
 
 #include "../common/glc.h"
 #include "../common/util.h"
-#include "../common/thread.h"
-#include "audio.h"
+#include "audio_capture.h"
 
 /**
  * \addtogroup stream
@@ -35,7 +34,7 @@
  */
 
 /**
- * \defgroup audio audio capture/playback
+ * \defgroup audio_capture audio capture
  *  \{
  */
 
@@ -53,8 +52,6 @@ struct audio_stream_s {
 
 	ps_packet_t packet;
 
-	void **bufs;
-
 	pthread_t capture_thread;
 	sem_t capture, capture_finished;
 	int capture_ready, capture_running;
@@ -69,13 +66,8 @@ struct audio_private_s {
 	glc_t *glc;
 	ps_buffer_t *to;
 
-	const char *device;
-	unsigned int silence_threshold;
-
 	glc_audio_i stream_count;
 	struct audio_stream_s *stream;
-
-	glc_thread_t thread;
 };
 
 int audio_capture_get_stream_alsa(struct audio_private_s *audio, snd_pcm_t *pcm, struct audio_stream_s **stream);
@@ -87,17 +79,7 @@ int audio_capture_wait_for_thread(struct audio_private_s *audio, struct audio_st
 int audio_capture_set_data_size(struct audio_stream_s *stream, size_t size);
 void *audio_capture_thread(void *argptr);
 
-int audio_playback_read_callback(glc_thread_state_t *state);
-void audio_playback_finish_callback(void *priv, int err);
-
-int audio_playback_hw(struct audio_private_s *audio, glc_audio_format_message_t *fmt_msg);
-int audio_playback_play(struct audio_private_s *audio, glc_audio_header_t *audio_msg, char *data);
-int audio_playback_get_stream(struct audio_private_s *audio, glc_audio_i audio_i, struct audio_stream_s **stream);
-
-snd_pcm_format_t glc_fmt_to_pcm_fmt(glc_audio_format_t glc_fmt);
 glc_audio_format_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt);
-
-int audio_playback_xrun(struct audio_stream_s *stream, int err);
 
 void *audio_capture_init(glc_t *glc, ps_buffer_t *to)
 {
@@ -150,20 +132,6 @@ glc_audio_format_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt)
 		return GLC_AUDIO_FORMAT_S32_LE;
 	default:
 		return GLC_AUDIO_FORMAT_UNKNOWN;
-	}
-}
-
-snd_pcm_format_t glc_fmt_to_pcm_fmt(glc_audio_format_t glc_fmt)
-{
-	switch (glc_fmt) {
-	case GLC_AUDIO_FORMAT_S16_LE:
-		return SND_PCM_FORMAT_S16_LE;
-	case GLC_AUDIO_FORMAT_S24_LE:
-		return SND_PCM_FORMAT_S24_LE;
-	case GLC_AUDIO_FORMAT_S32_LE:
-		return SND_PCM_FORMAT_S32_LE;
-	default:
-		return 0;
 	}
 }
 
@@ -477,220 +445,6 @@ err:
 	fprintf(stderr, "audio: can't extract hardware configuration: %s (%d)\n", snd_strerror(ret), ret);
 	return ret;
 }
-
-int audio_playback_init(glc_t *glc, ps_buffer_t *from)
-{
-	struct audio_private_s *audio = (struct audio_private_s *) malloc(sizeof(struct audio_private_s));
-	memset(audio, 0, sizeof(struct audio_private_s));
-
-	audio->glc = glc;
-	audio->device = "default";
-	audio->silence_threshold = 100000;
-
-	audio->thread.flags = GLC_THREAD_READ;
-	audio->thread.ptr = audio;
-	audio->thread.read_callback = &audio_playback_read_callback;
-	audio->thread.finish_callback = &audio_playback_finish_callback;
-	audio->thread.threads = 1;
-
-	return glc_thread_create(glc, &audio->thread, from, NULL);
-}
-
-void audio_playback_finish_callback(void *priv, int err)
-{
-	struct audio_private_s *audio = (struct audio_private_s *) priv;
-	struct audio_stream_s *del;
-
-	if (err)
-		fprintf(stderr, "audio failed: %s (%d)\n", strerror(err), err);
-	
-	while (audio->stream != NULL) {
-		del = audio->stream;
-		audio->stream = audio->stream->next;
-
-		if (del->pcm)
-			snd_pcm_close(del->pcm);
-
-		if (del->bufs)
-			free(del->bufs);
-		
-		free(del);
-	}
-
-	sem_post(&audio->glc->signal[GLC_SIGNAL_AUDIO_FINISHED]);
-	free(audio);
-}
-
-int audio_playback_read_callback(glc_thread_state_t *state)
-{
-	struct audio_private_s *audio = (struct audio_private_s *) state->ptr;
-
-	if (state->header.type == GLC_MESSAGE_AUDIO_FORMAT)
-		return audio_playback_hw(audio, (glc_audio_format_message_t *) state->read_data);
-	else if (state->header.type == GLC_MESSAGE_AUDIO)
-		return audio_playback_play(audio, (glc_audio_header_t *) state->read_data, &state->read_data[GLC_AUDIO_HEADER_SIZE]);
-	
-	return 0;
-}
-
-int audio_playback_get_stream(struct audio_private_s *audio, glc_audio_i audio_i, struct audio_stream_s **stream)
-{
-	struct audio_stream_s *find = audio->stream;
-
-	while (find != NULL) {
-		if (find->audio_i == audio_i)
-			break;
-		find = find->next;
-	}
-
-	if (find == NULL) {
-		find = (struct audio_stream_s *) malloc(sizeof(struct audio_stream_s));
-		memset(find, 0, sizeof(struct audio_stream_s));
-		find->audio_i = audio_i;
-
-		find->next = audio->stream;
-		audio->stream = find;
-	}
-
-	*stream = find;
-	return 0;
-}
-
-int audio_playback_hw(struct audio_private_s *audio, glc_audio_format_message_t *fmt_msg)
-{
-	struct audio_stream_s *stream;
-	snd_pcm_hw_params_t *hw_params;
-	snd_pcm_access_t access;
-	snd_pcm_uframes_t max_buffer_size;
-	unsigned int min_periods;
-	int dir, ret = 0;
-
-	audio_playback_get_stream(audio, fmt_msg->audio, &stream);
-
-	stream->interleaved = fmt_msg->interleaved;
-	stream->rate = fmt_msg->rate;
-	stream->format = fmt_msg->format;
-	stream->channels = fmt_msg->channels;
-
-	if (stream->pcm) /* re-open */
-		snd_pcm_close(stream->pcm);
-
-	if (stream->interleaved)
-		access = SND_PCM_ACCESS_RW_INTERLEAVED;
-	else
-		access = SND_PCM_ACCESS_RW_NONINTERLEAVED;
-
-	/* initialize device, SND_PCM_NONBLOCK? */
-	/* TODO multiple streams */
-	if ((ret = snd_pcm_open(&stream->pcm, audio->device, SND_PCM_STREAM_PLAYBACK, 0)) < 0)
-		goto err;
-	if ((ret = snd_pcm_hw_params_malloc(&hw_params)) < 0)
-		goto err;
-	if ((ret = snd_pcm_hw_params_any(stream->pcm, hw_params)) < 0)
-		goto err;
-	if ((ret = snd_pcm_hw_params_set_access(stream->pcm, hw_params, access)) < 0)
-		goto err;
-	if ((ret = snd_pcm_hw_params_set_format(stream->pcm, hw_params, glc_fmt_to_pcm_fmt(stream->format))) < 0)
-		goto err;
-	if ((ret = snd_pcm_hw_params_set_channels(stream->pcm, hw_params, stream->channels)) < 0)
-		goto err;
-	if ((ret = snd_pcm_hw_params_set_rate(stream->pcm, hw_params, stream->rate, 0)) < 0)
-		goto err;
-	if ((ret = snd_pcm_hw_params_get_buffer_size_max(hw_params, &max_buffer_size)) < 0)
-		goto err;
-	if ((ret = snd_pcm_hw_params_set_buffer_size(stream->pcm, hw_params, max_buffer_size)) < 0)
-		goto err;
-	if ((ret = snd_pcm_hw_params_get_periods_min(hw_params, &min_periods, &dir)) < 0)
-		goto err;
-	if ((ret = snd_pcm_hw_params_set_periods(stream->pcm, hw_params, min_periods < 2 ? 2 : min_periods, dir)) < 0)
-		goto err;
-	if ((ret = snd_pcm_hw_params(stream->pcm, hw_params)) < 0)
-		goto err;
-
-	stream->bufs = (void **) malloc(sizeof(void *) * stream->channels);
-
-	snd_pcm_hw_params_free(hw_params);
-	return 0;
-err:
-	if (hw_params)
-		snd_pcm_hw_params_free(hw_params);
-	return -ret;
-}
-
-int audio_playback_play(struct audio_private_s *audio, glc_audio_header_t *audio_hdr, char *data)
-{
-	struct audio_stream_s *stream;
-	snd_pcm_uframes_t frames, rem;
-	snd_pcm_sframes_t ret = 0;
-	unsigned int c;
-
-	audio_playback_get_stream(audio, audio_hdr->audio, &stream);
-
-	if (!stream->pcm) {
-		fprintf(stderr, "audio: broken stream %d\n", stream->audio_i);
-		return EINVAL;
-	}
-	
-	frames = snd_pcm_bytes_to_frames(stream->pcm, audio_hdr->size);
-	glc_utime_t time = util_timestamp(audio->glc);
-	glc_utime_t duration = (1000000 * frames) / stream->rate;
-	
-	if (time + audio->silence_threshold + duration < audio_hdr->timestamp)
-		usleep(audio_hdr->timestamp - time);
-	else if (time > audio_hdr->timestamp)
-		return 0;
-
-	rem = frames;
-
-	while (rem > 0) {
-		/* alsa is horrible... */
-		snd_pcm_wait(stream->pcm, duration);
-		
-		if (stream->interleaved)
-			ret = snd_pcm_writei(stream->pcm, &data[snd_pcm_frames_to_bytes(stream->pcm, frames - rem)], rem);
-		else {
-			for (c = 0; c < stream->channels; c++)
-				stream->bufs[c] = &data[snd_pcm_samples_to_bytes(stream->pcm, frames) * c
-				                        + snd_pcm_samples_to_bytes(stream->pcm, frames - rem)];
-			ret = snd_pcm_writen(stream->pcm, stream->bufs, rem);
-		}
-
-		if (ret == 0)
-			break;
-
-		if ((ret == -EBUSY) | (ret == -EAGAIN))
-			break;
-		else if (ret < 0) {
-			if ((ret = audio_playback_xrun(stream, ret))) {
-				fprintf(stderr, "audio: xrun recovery failed: %s\n", snd_strerror(-ret));
-				return ret;
-			}
-		} else
-			rem -= ret;
-	}
-
-	return 0;
-}
-
-int audio_playback_xrun(struct audio_stream_s *stream, int err)
-{
-	/* fprintf(stderr, "audio: xrun\n"); */
-	if (err == -EPIPE) {
-		if ((err = snd_pcm_prepare(stream->pcm)) < 0)
-			return -err;
-		return 0;
-	} else if (err == -ESTRPIPE) {
-		while ((err = snd_pcm_resume(stream->pcm)) == -EAGAIN)
-			sched_yield();
-		if (err < 0) {
-			if ((err = snd_pcm_prepare(stream->pcm)) < 0)
-				return -err;
-			return 0;
-		}
-	}
-	return -err;
-}
-
 
 /**  \} */
 /**  \} */

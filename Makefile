@@ -34,7 +34,8 @@ HEADERS = $(COMMON)/glc.h \
 	  $(STREAM)/img.h \
 	  $(STREAM)/scale.h \
 	  $(STREAM)/info.h \
-	  $(STREAM)/audio.h \
+	  $(STREAM)/audio_capture.h \
+	  $(STREAM)/audio_play.h \
 	  $(STREAM)/wav.h \
 	  $(STREAM)/demux.h \
 	  $(STREAM)/ycbcr.h \
@@ -50,7 +51,8 @@ LIB_OBJS = $(BUILD)/gl_capture.o \
            $(BUILD)/scale.o \
            $(BUILD)/info.o \
            $(BUILD)/thread.o \
-           $(BUILD)/audio.o \
+           $(BUILD)/audio_capture.o \
+           $(BUILD)/audio_play.o \
            $(BUILD)/wav.o \
            $(BUILD)/demux.o \
            $(BUILD)/ycbcr.o \
@@ -141,8 +143,11 @@ $(BUILD)/scale.o: $(STREAM)/scale.c $(HEADERS)
 $(BUILD)/info.o: $(STREAM)/info.c $(HEADERS)
 	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/info.o -c $(STREAM)/info.c
 
-$(BUILD)/audio.o: $(STREAM)/audio.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/audio.o -c $(STREAM)/audio.c
+$(BUILD)/audio_capture.o: $(STREAM)/audio_capture.c $(HEADERS)
+	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/audio_capture.o -c $(STREAM)/audio_capture.c
+
+$(BUILD)/audio_play.o: $(STREAM)/audio_play.c $(HEADERS)
+	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/audio_play.o -c $(STREAM)/audio_play.c
 
 $(BUILD)/wav.o: $(STREAM)/wav.c $(HEADERS)
 	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/wav.o -c $(STREAM)/wav.c

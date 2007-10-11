@@ -24,7 +24,7 @@
 #include "stream/img.h"
 #include "stream/info.h"
 #include "stream/wav.h"
-#include "stream/audio.h"
+#include "stream/audio_play.h"
 #include "stream/demux.h"
 #include "stream/ycbcr.h"
 #include "stream/yuv4mpeg.h"
@@ -200,7 +200,7 @@ int main(int argc, char *argv[])
 	} else { /* play */
 		demux_init(glc, uncompressed, audio, picture);
 		rgb_init(glc, picture, rgb);
-		audio_playback_init(glc, audio);
+		audio_play_init(glc, audio);
 		gl_play_init(glc, rgb);
 	}
 	

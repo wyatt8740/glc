@@ -15,7 +15,7 @@
 #include <elfhacks.h>
 #include <alsa/asoundlib.h>
 
-#include "../stream/audio.h"
+#include "../stream/audio_capture.h"
 #include "lib.h"
 
 /**
