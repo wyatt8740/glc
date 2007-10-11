@@ -35,7 +35,7 @@
  * \defgroup play stream player
  *  \{
  */
- 
+
 int show_info_value(glc_t *glc, const char *value);
 
 int main(int argc, char *argv[])
@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 	img = info = wav = 0;
 	picture = audio = ycbcr = rgb = NULL;
 	play = 1;
-	
+
 	img = info = show_stats = yuv4mpeg = 0;
 	glc_create(&glc);
 	glc->scale = 1;
@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
 			goto usage;
 		}
 	}
-	
+
 	if (optind >= argc)
 		goto usage;
 	glc->stream_file = argv[optind];
@@ -305,6 +305,5 @@ int show_info_value(glc_t *glc, const char *value)
 		return EXIT_FAILURE;
 	return EXIT_SUCCESS;
 }
-
 
 /**  \} */
