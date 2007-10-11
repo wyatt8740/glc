@@ -127,7 +127,7 @@ int yuv4mpeg_handle_hdr(struct yuv4mpeg_private_s *yuv4mpeg, glc_ctx_message_t *
 	/* Set Y' 0 */
 	memset(yuv4mpeg->prev_pic, 0, ctx_msg->w * ctx_msg->h);
 	/* Set CbCr 128 */
-	memset(yuv4mpeg->prev_pic, 128, (ctx_msg->w * ctx_msg->h) / 2);
+	memset(&yuv4mpeg->prev_pic[ctx_msg->w * ctx_msg->h], 128, (ctx_msg->w * ctx_msg->h) / 2);
 
 	fprintf(yuv4mpeg->to, "YUV4MPEG2 W%d H%d F%d:1 Ip\n", ctx_msg->w, ctx_msg->h, yuv4mpeg->glc->fps);
 	return 0;
