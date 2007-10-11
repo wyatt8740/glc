@@ -15,6 +15,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <packetstream.h>
+#include <pthread.h>
 
 #include "../common/glc.h"
 #include "../common/thread.h"
@@ -40,7 +41,8 @@ struct scale_ctx_s {
 	
 	unsigned int *pos;
 	float *factor;
-	
+
+	pthread_rwlock_t update;
 	struct scale_ctx_s *next;
 };
 
@@ -91,6 +93,8 @@ void scale_finish_callback(void *ptr, int err)
 			free(del->pos);
 		if (del->factor)
 			free(del->factor);
+
+		pthread_rwlock_destroy(&del->update);
 		free(del);
 	}
 	
@@ -110,7 +114,9 @@ int scale_read_callback(glc_thread_state_t *state) {
 		pic_header = (glc_picture_header_t *) state->read_data;
 		scale_get_ctx(scale, pic_header->ctx, &ctx);
 		state->threadptr = ctx;
-		
+
+		pthread_rwlock_rdlock(&ctx->update);
+
 		if (ctx->process)
 			state->write_size = ctx->sw * ctx->sh * 3 + GLC_PICTURE_HEADER_SIZE;
 		else
@@ -126,13 +132,16 @@ int scale_write_callback(glc_thread_state_t *state) {
 	struct scale_ctx_s *ctx = state->threadptr;
 	
 	if (state->header.type == GLC_MESSAGE_PICTURE) {
-		if (!ctx->process)
+		if (!ctx->process) {
+			pthread_rwlock_unlock(&ctx->update);
 			goto copy;
+		}
 		
 		memcpy(state->write_data, state->read_data, GLC_PICTURE_HEADER_SIZE);
 		scale_pic_msg(scale, ctx,
 		               (unsigned char *) &state->read_data[GLC_PICTURE_HEADER_SIZE],
 		               (unsigned char *) &state->write_data[GLC_PICTURE_HEADER_SIZE]);
+		pthread_rwlock_unlock(&ctx->update);
 		return 0;
 	}
 copy:
@@ -158,6 +167,7 @@ int scale_get_ctx(struct scale_private_s *scale, glc_ctx_i ctx_i, struct scale_c
 		list->next = scale->ctx;
 		scale->ctx = list;
 		list->ctx = ctx_i;
+		pthread_rwlock_init(&list->update, NULL);
 	}
 	
 	*ctx = list;
@@ -245,7 +255,9 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 {
 	struct scale_ctx_s *ctx;
 	scale_get_ctx(scale, ctx_msg->ctx, &ctx);
-	
+
+	pthread_rwlock_wrlock(&ctx->update);
+
 	ctx->flags = ctx_msg->flags;
 	ctx->w = ctx_msg->w;
 	ctx->h = ctx_msg->h;
@@ -254,11 +266,11 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 		ctx_msg->flags &= ~GLC_CTX_BGR; /* do at least conversion */
 		ctx_msg->flags |= GLC_CTX_BGR;
 		ctx->bpp = 4;
-		printf("scale: converting from BGRA to BGR\n");
 	} else if ((scale->glc->scale == 1) && (ctx->flags & GLC_CTX_BGR)) {
 		ctx->sw = ctx->w; /* skip scaling */
 		ctx->sh = ctx->h;
 		ctx->scale = 1;
+		pthread_rwlock_unlock(&ctx->update);
 		return 0;
 	} else if (ctx_msg->flags & GLC_CTX_BGR)
 		ctx->bpp = 3; /* just scale */
@@ -271,8 +283,10 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 	ctx_msg->w *= scale->glc->scale;
 	ctx_msg->h *= scale->glc->scale;
 	
-	if ((ctx->scale == 0.5) | (ctx->scale == 1.0))
+	if ((ctx->scale == 0.5) | (ctx->scale == 1.0)) {
+		pthread_rwlock_unlock(&ctx->update);
 		return 0; /* don't generate scale maps */
+	}
 	
 	size_t smap_size = ctx->sw * ctx->sh * 3 * 4;
 	if (ctx->pos)
@@ -316,7 +330,8 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 		ofy += d;
 		ofx = 0;
 	}
-	
+
+	pthread_rwlock_unlock(&ctx->update);
 	return 0;
 }
 
