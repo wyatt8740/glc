@@ -102,18 +102,14 @@ int glc_thread_create(glc_t *glc, glc_thread_t *thread, ps_buffer_t *from, ps_bu
  */
 void *glc_thread(void *argptr)
 {
-	int has_locked, ret;
+	int has_locked, ret, write_size_set;
 	glc_thread_state_t *state = (glc_thread_state_t *) argptr;
 	struct glc_thread_private_s *private = (struct glc_thread_private_s *) state->thread_private;
 	glc_thread_t *thread = private->thread;
 	
 	ps_packet_t read, write;
 	
-	char *write_mem = NULL;
-	size_t write_mem_size;
-	int commit_write_mem = 0;
-	
-	ret = has_locked = 0;
+	write_size_set = ret = has_locked = 0;
 	
 	if (thread->flags & GLC_THREAD_READ) {
 		if ((ret = ps_packet_init(&read, private->from)))
@@ -123,14 +119,6 @@ void *glc_thread(void *argptr)
 	if (thread->flags & GLC_THREAD_WRITE) {
 		if ((ps_packet_init(&write, private->to)))
 			goto err;
-		
-		write_mem_size = 1024;
-		write_mem = (char *) malloc(write_mem_size);
-		
-		if (!write_mem) {
-			ret = ENOMEM;
-			goto err;
-		}
 	}
 	
 	do {
@@ -160,7 +148,8 @@ void *glc_thread(void *argptr)
 					goto err;
 			}
 			
-			if ((ret = ps_packet_dma(&read, (void *) &state->read_data, state->read_size, PS_ACCEPT_FAKE_DMA)))
+			if ((ret = ps_packet_dma(&read, (void *) &state->read_data,
+						 state->read_size, PS_ACCEPT_FAKE_DMA)))
 				goto err;
 			
 			/* read callback */
@@ -187,18 +176,12 @@ void *glc_thread(void *argptr)
 				if ((ret = ps_packet_setsize(&write,
 					                     GLC_MESSAGE_HEADER_SIZE + state->write_size)))
 					goto err;
-				
-				if ((ret = ps_packet_dma(&write, (void *) &state->write_data, state->write_size, PS_ACCEPT_FAKE_DMA)))
-					goto err;
-			} else {
-				if (state->write_size > write_mem_size) {
-					write_mem_size = state->write_size;
-					write_mem = (char *) realloc(write_mem, write_mem_size);
-				}
-				
-				state->write_data = write_mem;
-				commit_write_mem = 1;
+				write_size_set = 1;
 			}
+			
+			if ((ret = ps_packet_dma(&write, (void *) &state->write_data,
+						 state->write_size, PS_ACCEPT_FAKE_DMA)))
+					goto err;
 			
 			/* write callback */
 			if (thread->write_callback) {
@@ -212,41 +195,41 @@ void *glc_thread(void *argptr)
 			has_locked = 0;
 			pthread_mutex_unlock(&private->open);
 		}
-		
+
 		if ((thread->flags & GLC_THREAD_READ) && (!(state->flags & GLC_THREAD_STATE_SKIP_READ))) {
 			ps_packet_close(&read);
-			state->write_data = NULL;
-		}
-		
-		if ((thread->flags & GLC_THREAD_WRITE) && (!(state->flags & GLC_THREAD_STATE_SKIP_WRITE))) {
-			if (commit_write_mem)
-				ps_packet_write(&write, write_mem, state->write_size);
-			ps_packet_close(&write);
 			state->read_data = NULL;
+			state->read_size = 0;
 		}
-		
+
+		if ((thread->flags & GLC_THREAD_WRITE) && (!(state->flags & GLC_THREAD_STATE_SKIP_WRITE))) {
+			if (!write_size_set) {
+				if ((ret = ps_packet_setsize(&write,
+							     GLC_MESSAGE_HEADER_SIZE + state->write_size)))
+					goto err;
+			}
+			ps_packet_close(&write);
+			state->write_data = NULL;
+		state->write_size = 0;
+		}
+
 		/* close callback */
 		if (thread->close_callback) {
 			if ((ret = thread->close_callback(state)))
 				goto err;
 		}
-		
+
 		state->flags = 0;
-		state->read_size = 0;
-		state->write_size = 0;
-		commit_write_mem = 0;
+		write_size_set = 0;
 	} while ((!(private->glc->flags & GLC_CANCEL)) &&
 		 (state->header.type != GLC_MESSAGE_CLOSE) &&
 		 (!private->stop));
-	
+
 finish:
 	if (thread->flags & GLC_THREAD_READ)
 		ps_packet_destroy(&read);
-	
-	if (thread->flags & GLC_THREAD_WRITE) {
+	if (thread->flags & GLC_THREAD_WRITE)
 		ps_packet_destroy(&write);
-		free(write_mem);
-	}
 
 	/* wake up remaining threads */
 	if ((thread->flags & GLC_THREAD_READ) && (!private->stop)) {
