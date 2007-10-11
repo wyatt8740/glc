@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <semaphore.h>
 #include <getopt.h>
+#include <string.h>
 
 #include "common/glc.h"
 #include "common/util.h"
