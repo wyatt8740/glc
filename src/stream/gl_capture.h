@@ -10,8 +10,8 @@
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-#ifndef _GL_H
-#define _GL_H
+#ifndef _GL_CAPTURE_H
+#define _GL_CAPTURE_H
 
 #include <X11/X.h>
 #include <GL/glx.h>

@@ -10,8 +10,8 @@
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-#ifndef _GL_H
-#define _GL_H
+#ifndef _GL_PLAY_H
+#define _GL_PLAY_H
 
 #include <packetstream.h>
 #include "../common/glc.h"
