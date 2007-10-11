@@ -35,7 +35,7 @@
  *  \{
  */
 
-struct audio_stream_s {
+struct audio_play_stream_s {
 	glc_audio_i audio_i;
 	snd_pcm_t *pcm;
 	
@@ -48,30 +48,30 @@ struct audio_stream_s {
 
 	void **bufs;
 
-	struct audio_stream_s *next;
+	struct audio_play_stream_s *next;
 };
 
-struct audio_private_s {
+struct audio_play_private_s {
 	glc_t *glc;
 	glc_thread_t thread;
 
 	const char *device;
 	unsigned int silence_threshold;
 	
-	struct audio_stream_s *stream;
+	struct audio_play_stream_s *stream;
 };
 
 int audio_play_read_callback(glc_thread_state_t *state);
 void audio_play_finish_callback(void *priv, int err);
 
-int audio_play_hw(struct audio_private_s *audio, glc_audio_format_message_t *fmt_msg);
-int audio_play_play(struct audio_private_s *audio, glc_audio_header_t *audio_msg, char *data);
-int audio_play_get_stream(struct audio_private_s *audio, glc_audio_i audio_i, struct audio_stream_s **stream);
+int audio_play_hw(struct audio_play_private_s *audio_play, glc_audio_format_message_t *fmt_msg);
+int audio_play_play(struct audio_play_private_s *audio_play, glc_audio_header_t *audio_msg, char *data);
+int audio_play_get_stream(struct audio_play_private_s *audio_play, glc_audio_i audio_i, struct audio_play_stream_s **stream);
 
 snd_pcm_format_t glc_fmt_to_pcm_fmt(glc_audio_format_t glc_fmt);
 glc_audio_format_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt);
 
-int audio_play_xrun(struct audio_stream_s *stream, int err);
+int audio_play_xrun(struct audio_play_stream_s *stream, int err);
 
 snd_pcm_format_t glc_fmt_to_pcm_fmt(glc_audio_format_t glc_fmt)
 {
@@ -89,33 +89,33 @@ snd_pcm_format_t glc_fmt_to_pcm_fmt(glc_audio_format_t glc_fmt)
 
 int audio_play_init(glc_t *glc, ps_buffer_t *from)
 {
-	struct audio_private_s *audio = (struct audio_private_s *) malloc(sizeof(struct audio_private_s));
-	memset(audio, 0, sizeof(struct audio_private_s));
+	struct audio_play_private_s *audio_play = (struct audio_play_private_s *) malloc(sizeof(struct audio_play_private_s));
+	memset(audio_play, 0, sizeof(struct audio_play_private_s));
 
-	audio->glc = glc;
-	audio->device = "default";
-	audio->silence_threshold = 100000;
+	audio_play->glc = glc;
+	audio_play->device = "default";
+	audio_play->silence_threshold = 100000;
 
-	audio->thread.flags = GLC_THREAD_READ;
-	audio->thread.ptr = audio;
-	audio->thread.read_callback = &audio_play_read_callback;
-	audio->thread.finish_callback = &audio_play_finish_callback;
-	audio->thread.threads = 1;
+	audio_play->thread.flags = GLC_THREAD_READ;
+	audio_play->thread.ptr = audio_play;
+	audio_play->thread.read_callback = &audio_play_read_callback;
+	audio_play->thread.finish_callback = &audio_play_finish_callback;
+	audio_play->thread.threads = 1;
 
-	return glc_thread_create(glc, &audio->thread, from, NULL);
+	return glc_thread_create(glc, &audio_play->thread, from, NULL);
 }
 
 void audio_play_finish_callback(void *priv, int err)
 {
-	struct audio_private_s *audio = (struct audio_private_s *) priv;
-	struct audio_stream_s *del;
+	struct audio_play_private_s *audio_play = (struct audio_play_private_s *) priv;
+	struct audio_play_stream_s *del;
 
 	if (err)
 		fprintf(stderr, "audio failed: %s (%d)\n", strerror(err), err);
 	
-	while (audio->stream != NULL) {
-		del = audio->stream;
-		audio->stream = audio->stream->next;
+	while (audio_play->stream != NULL) {
+		del = audio_play->stream;
+		audio_play->stream = audio_play->stream->next;
 
 		if (del->pcm)
 			snd_pcm_close(del->pcm);
@@ -126,25 +126,25 @@ void audio_play_finish_callback(void *priv, int err)
 		free(del);
 	}
 
-	sem_post(&audio->glc->signal[GLC_SIGNAL_AUDIO_FINISHED]);
-	free(audio);
+	sem_post(&audio_play->glc->signal[GLC_SIGNAL_AUDIO_FINISHED]);
+	free(audio_play);
 }
 
 int audio_play_read_callback(glc_thread_state_t *state)
 {
-	struct audio_private_s *audio = (struct audio_private_s *) state->ptr;
+	struct audio_play_private_s *audio_play = (struct audio_play_private_s *) state->ptr;
 
 	if (state->header.type == GLC_MESSAGE_AUDIO_FORMAT)
-		return audio_play_hw(audio, (glc_audio_format_message_t *) state->read_data);
+		return audio_play_hw(audio_play, (glc_audio_format_message_t *) state->read_data);
 	else if (state->header.type == GLC_MESSAGE_AUDIO)
-		return audio_play_play(audio, (glc_audio_header_t *) state->read_data, &state->read_data[GLC_AUDIO_HEADER_SIZE]);
+		return audio_play_play(audio_play, (glc_audio_header_t *) state->read_data, &state->read_data[GLC_AUDIO_HEADER_SIZE]);
 	
 	return 0;
 }
 
-int audio_play_get_stream(struct audio_private_s *audio, glc_audio_i audio_i, struct audio_stream_s **stream)
+int audio_play_get_stream(struct audio_play_private_s *audio_play, glc_audio_i audio_i, struct audio_play_stream_s **stream)
 {
-	struct audio_stream_s *find = audio->stream;
+	struct audio_play_stream_s *find = audio_play->stream;
 
 	while (find != NULL) {
 		if (find->audio_i == audio_i)
@@ -153,28 +153,28 @@ int audio_play_get_stream(struct audio_private_s *audio, glc_audio_i audio_i, st
 	}
 
 	if (find == NULL) {
-		find = (struct audio_stream_s *) malloc(sizeof(struct audio_stream_s));
-		memset(find, 0, sizeof(struct audio_stream_s));
+		find = (struct audio_play_stream_s *) malloc(sizeof(struct audio_play_stream_s));
+		memset(find, 0, sizeof(struct audio_play_stream_s));
 		find->audio_i = audio_i;
 
-		find->next = audio->stream;
-		audio->stream = find;
+		find->next = audio_play->stream;
+		audio_play->stream = find;
 	}
 
 	*stream = find;
 	return 0;
 }
 
-int audio_play_hw(struct audio_private_s *audio, glc_audio_format_message_t *fmt_msg)
+int audio_play_hw(struct audio_play_private_s *audio_play, glc_audio_format_message_t *fmt_msg)
 {
-	struct audio_stream_s *stream;
+	struct audio_play_stream_s *stream;
 	snd_pcm_hw_params_t *hw_params;
 	snd_pcm_access_t access;
 	snd_pcm_uframes_t max_buffer_size;
 	unsigned int min_periods;
 	int dir, ret = 0;
 
-	audio_play_get_stream(audio, fmt_msg->audio, &stream);
+	audio_play_get_stream(audio_play, fmt_msg->audio, &stream);
 
 	stream->interleaved = fmt_msg->interleaved;
 	stream->rate = fmt_msg->rate;
@@ -191,7 +191,7 @@ int audio_play_hw(struct audio_private_s *audio, glc_audio_format_message_t *fmt
 
 	/* initialize device, SND_PCM_NONBLOCK? */
 	/* TODO multiple streams */
-	if ((ret = snd_pcm_open(&stream->pcm, audio->device, SND_PCM_STREAM_PLAYBACK, 0)) < 0)
+	if ((ret = snd_pcm_open(&stream->pcm, audio_play->device, SND_PCM_STREAM_PLAYBACK, 0)) < 0)
 		goto err;
 	if ((ret = snd_pcm_hw_params_malloc(&hw_params)) < 0)
 		goto err;
@@ -226,14 +226,14 @@ err:
 	return -ret;
 }
 
-int audio_play_play(struct audio_private_s *audio, glc_audio_header_t *audio_hdr, char *data)
+int audio_play_play(struct audio_play_private_s *audio_play, glc_audio_header_t *audio_hdr, char *data)
 {
-	struct audio_stream_s *stream;
+	struct audio_play_stream_s *stream;
 	snd_pcm_uframes_t frames, rem;
 	snd_pcm_sframes_t ret = 0;
 	unsigned int c;
 
-	audio_play_get_stream(audio, audio_hdr->audio, &stream);
+	audio_play_get_stream(audio_play, audio_hdr->audio, &stream);
 
 	if (!stream->pcm) {
 		fprintf(stderr, "audio: broken stream %d\n", stream->audio_i);
@@ -241,10 +241,10 @@ int audio_play_play(struct audio_private_s *audio, glc_audio_header_t *audio_hdr
 	}
 	
 	frames = snd_pcm_bytes_to_frames(stream->pcm, audio_hdr->size);
-	glc_utime_t time = util_timestamp(audio->glc);
+	glc_utime_t time = util_timestamp(audio_play->glc);
 	glc_utime_t duration = (1000000 * frames) / stream->rate;
 	
-	if (time + audio->silence_threshold + duration < audio_hdr->timestamp)
+	if (time + audio_play->silence_threshold + duration < audio_hdr->timestamp)
 		usleep(audio_hdr->timestamp - time);
 	else if (time > audio_hdr->timestamp)
 		return 0;
@@ -281,7 +281,7 @@ int audio_play_play(struct audio_private_s *audio, glc_audio_header_t *audio_hdr
 	return 0;
 }
 
-int audio_play_xrun(struct audio_stream_s *stream, int err)
+int audio_play_xrun(struct audio_play_stream_s *stream, int err)
 {
 	/* fprintf(stderr, "audio: xrun\n"); */
 	if (err == -EPIPE) {

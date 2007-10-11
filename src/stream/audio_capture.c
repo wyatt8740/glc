@@ -38,7 +38,7 @@
  *  \{
  */
 
-struct audio_stream_s {
+struct audio_capture_stream_s {
 	glc_audio_i audio_i;
 	snd_pcm_t *pcm;
 	const snd_pcm_channel_area_t *mmap_areas;
@@ -59,49 +59,49 @@ struct audio_stream_s {
 	size_t capture_size, capture_data_size;
 	glc_utime_t capture_time;
 	
-	struct audio_stream_s *next;
+	struct audio_capture_stream_s *next;
 };
 
-struct audio_private_s {
+struct audio_capture_private_s {
 	glc_t *glc;
 	ps_buffer_t *to;
 
 	glc_audio_i stream_count;
-	struct audio_stream_s *stream;
+	struct audio_capture_stream_s *stream;
 };
 
-int audio_capture_get_stream_alsa(struct audio_private_s *audio, snd_pcm_t *pcm, struct audio_stream_s **stream);
-int audio_capture_alsa_fmt(struct audio_private_s *audio, struct audio_stream_s *stream);
+int audio_capture_get_stream_alsa(struct audio_capture_private_s *audio_capture, snd_pcm_t *pcm, struct audio_capture_stream_s **stream);
+int audio_capture_alsa_fmt(struct audio_capture_private_s *audio_capture, struct audio_capture_stream_s *stream);
 void *audio_capture_alsa_mmap_pos(const snd_pcm_channel_area_t *area, snd_pcm_uframes_t offset);
-int audio_capture_complex_to_interleaved(struct audio_stream_s *stream, const snd_pcm_channel_area_t *areas, snd_pcm_uframes_t offset, snd_pcm_uframes_t frames, char *to);
+int audio_capture_complex_to_interleaved(struct audio_capture_stream_s *stream, const snd_pcm_channel_area_t *areas, snd_pcm_uframes_t offset, snd_pcm_uframes_t frames, char *to);
 
-int audio_capture_wait_for_thread(struct audio_private_s *audio, struct audio_stream_s *stream);
-int audio_capture_set_data_size(struct audio_stream_s *stream, size_t size);
+int audio_capture_wait_for_thread(struct audio_capture_private_s *audio_capture, struct audio_capture_stream_s *stream);
+int audio_capture_set_data_size(struct audio_capture_stream_s *stream, size_t size);
 void *audio_capture_thread(void *argptr);
 
 glc_audio_format_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt);
 
 void *audio_capture_init(glc_t *glc, ps_buffer_t *to)
 {
-	struct audio_private_s *audio = malloc(sizeof(struct audio_private_s));
-	memset(audio, 0, sizeof(struct audio_private_s));
+	struct audio_capture_private_s *audio_capture = malloc(sizeof(struct audio_capture_private_s));
+	memset(audio_capture, 0, sizeof(struct audio_capture_private_s));
 	
-	audio->glc = glc;
-	audio->to = to;
+	audio_capture->glc = glc;
+	audio_capture->to = to;
 
-	return audio;
+	return audio_capture;
 }
 
 int audio_capture_close(void *audiopriv)
 {
-	struct audio_private_s *audio = (struct audio_private_s *) audiopriv;
-	struct audio_stream_s *del;
-	if (audio == NULL)
+	struct audio_capture_private_s *audio_capture = (struct audio_capture_private_s *) audiopriv;
+	struct audio_capture_stream_s *del;
+	if (audio_capture == NULL)
 		return EINVAL;
 	
-	while (audio->stream != NULL) {
-		del = audio->stream;
-		audio->stream = audio->stream->next;
+	while (audio_capture->stream != NULL) {
+		del = audio_capture->stream;
+		audio_capture->stream = audio_capture->stream->next;
 		
 		if (del->capture_running) {
 			del->capture_running = 0;
@@ -117,7 +117,7 @@ int audio_capture_close(void *audiopriv)
 		free(del);
 	}
 
-	free(audio);
+	free(audio_capture);
 	return 0;
 }
 
@@ -135,9 +135,9 @@ glc_audio_format_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt)
 	}
 }
 
-int audio_capture_get_stream_alsa(struct audio_private_s *audio, snd_pcm_t *pcm, struct audio_stream_s **stream)
+int audio_capture_get_stream_alsa(struct audio_capture_private_s *audio_capture, snd_pcm_t *pcm, struct audio_capture_stream_s **stream)
 {
-	struct audio_stream_s *find = audio->stream;
+	struct audio_capture_stream_s *find = audio_capture->stream;
 
 	while (find != NULL) {
 		if (find->pcm == pcm)
@@ -146,17 +146,17 @@ int audio_capture_get_stream_alsa(struct audio_private_s *audio, snd_pcm_t *pcm,
 	}
 
 	if (find == NULL) {
-		find = (struct audio_stream_s *) malloc(sizeof(struct audio_stream_s));
-		memset(find, 0, sizeof(struct audio_stream_s));
+		find = (struct audio_capture_stream_s *) malloc(sizeof(struct audio_capture_stream_s));
+		memset(find, 0, sizeof(struct audio_capture_stream_s));
 		find->pcm = pcm;
 
-		ps_packet_init(&find->packet, audio->to);
-		find->audio_i = ++audio->stream_count;
+		ps_packet_init(&find->packet, audio_capture->to);
+		find->audio_i = ++audio_capture->stream_count;
 		sem_init(&find->capture, 0, 0);
 		sem_init(&find->capture_finished, 0, 0);
 
-		find->next = audio->stream;
-		audio->stream = find;
+		find->next = audio_capture->stream;
+		audio_capture->stream = find;
 	}
 
 	*stream = find;
@@ -165,7 +165,7 @@ int audio_capture_get_stream_alsa(struct audio_private_s *audio, snd_pcm_t *pcm,
 
 void *audio_capture_thread(void *argptr)
 {
-	struct audio_stream_s *stream = (struct audio_stream_s *) argptr;
+	struct audio_capture_stream_s *stream = (struct audio_capture_stream_s *) argptr;
 	glc_audio_header_t hdr;
 	glc_message_header_t msg_hdr;
 
@@ -193,19 +193,19 @@ void *audio_capture_thread(void *argptr)
 	return NULL;
 }
 
-int audio_capture_wait_for_thread(struct audio_private_s *audio, struct audio_stream_s *stream)
+int audio_capture_wait_for_thread(struct audio_capture_private_s *audio_capture, struct audio_capture_stream_s *stream)
 {
 	/* NOTE this is ugly, but snd_pcm_...() functions can be called from
 	        signal handler (f.ex. async mode) */
 	while (!stream->capture_ready) {
-		if (audio->glc->flags & GLC_AUDIO_ALLOW_SKIP)
+		if (audio_capture->glc->flags & GLC_AUDIO_ALLOW_SKIP)
 			return EBUSY;
 		sched_yield();
 	}
 	return 0;
 }
 
-int audio_capture_set_data_size(struct audio_stream_s *stream, size_t size)
+int audio_capture_set_data_size(struct audio_capture_stream_s *stream, size_t size)
 {
 	stream->capture_size = size;
 	if (size <= stream->capture_data_size)
@@ -222,18 +222,18 @@ int audio_capture_set_data_size(struct audio_stream_s *stream, size_t size)
 
 int audio_capture_alsa_i(void *audiopriv, snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size)
 {
-	struct audio_private_s *audio = (struct audio_private_s *) audiopriv;
-	struct audio_stream_s *stream;
+	struct audio_capture_private_s *audio_capture = (struct audio_capture_private_s *) audiopriv;
+	struct audio_capture_stream_s *stream;
 	int ret;
 
-	audio_capture_get_stream_alsa(audio, pcm, &stream);
+	audio_capture_get_stream_alsa(audio_capture, pcm, &stream);
 
 	if (!stream->fmt) { /* TODO update this? */
-		if ((ret = audio_capture_alsa_fmt(audio, stream)))
+		if ((ret = audio_capture_alsa_fmt(audio_capture, stream)))
 			return ret;
 	}
 
-	if (audio_capture_wait_for_thread(audio, stream))
+	if (audio_capture_wait_for_thread(audio_capture, stream))
 		return 0;
 
 	if (!stream->capture_ready) {
@@ -244,7 +244,7 @@ int audio_capture_alsa_i(void *audiopriv, snd_pcm_t *pcm, const void *buffer, sn
 	if ((ret = audio_capture_set_data_size(stream, snd_pcm_frames_to_bytes(pcm, size))))
 		return ret;
 
-	stream->capture_time = util_timestamp(audio->glc);
+	stream->capture_time = util_timestamp(audio_capture->glc);
 	memcpy(stream->capture_data, buffer, stream->capture_size);
 	sem_post(&stream->capture);
 
@@ -253,14 +253,14 @@ int audio_capture_alsa_i(void *audiopriv, snd_pcm_t *pcm, const void *buffer, sn
 
 int audio_capture_alsa_n(void *audiopriv, snd_pcm_t *pcm, void **bufs, snd_pcm_uframes_t size)
 {
-	struct audio_private_s *audio = (struct audio_private_s *) audiopriv;
-	struct audio_stream_s *stream;
+	struct audio_capture_private_s *audio_capture = (struct audio_capture_private_s *) audiopriv;
+	struct audio_capture_stream_s *stream;
 	int c, ret;
 
-	audio_capture_get_stream_alsa(audio, pcm, &stream);
+	audio_capture_get_stream_alsa(audio_capture, pcm, &stream);
 
 	if (!stream->fmt) {
-		if ((ret = audio_capture_alsa_fmt(audio, stream)))
+		if ((ret = audio_capture_alsa_fmt(audio_capture, stream)))
 			return ret;
 	}
 
@@ -269,12 +269,12 @@ int audio_capture_alsa_n(void *audiopriv, snd_pcm_t *pcm, void **bufs, snd_pcm_u
 		return EINVAL;
 	}
 
-	if (audio_capture_wait_for_thread(audio, stream))
+	if (audio_capture_wait_for_thread(audio_capture, stream))
 		return 0;
 
 	if ((ret = audio_capture_set_data_size(stream, snd_pcm_frames_to_bytes(pcm, size))))
 		return ret;
-	stream->capture_time = util_timestamp(audio->glc);
+	stream->capture_time = util_timestamp(audio_capture->glc);
 	
 	for (c = 0; c < stream->channels; c++)
 		memcpy(&stream->capture_data[c * snd_pcm_samples_to_bytes(pcm, size)], bufs[c],
@@ -286,14 +286,14 @@ int audio_capture_alsa_n(void *audiopriv, snd_pcm_t *pcm, void **bufs, snd_pcm_u
 
 int audio_capture_alsa_mmap_begin(void *audiopriv, snd_pcm_t *pcm, const snd_pcm_channel_area_t *areas)
 {
-	struct audio_private_s *audio = (struct audio_private_s *) audiopriv;
-	struct audio_stream_s *stream;
+	struct audio_capture_private_s *audio_capture = (struct audio_capture_private_s *) audiopriv;
+	struct audio_capture_stream_s *stream;
 	int ret;
 	
-	audio_capture_get_stream_alsa(audio, pcm, &stream);
+	audio_capture_get_stream_alsa(audio_capture, pcm, &stream);
 
 	if (!stream->fmt) {
-		if ((ret = audio_capture_alsa_fmt(audio, stream)))
+		if ((ret = audio_capture_alsa_fmt(audio_capture, stream)))
 			return ret;
 	}
 
@@ -303,12 +303,12 @@ int audio_capture_alsa_mmap_begin(void *audiopriv, snd_pcm_t *pcm, const snd_pcm
 
 int audio_capture_alsa_mmap_commit(void *audiopriv, snd_pcm_t *pcm, snd_pcm_uframes_t offset, snd_pcm_uframes_t frames)
 {
-	struct audio_private_s *audio = (struct audio_private_s *) audiopriv;
-	struct audio_stream_s *stream;
+	struct audio_capture_private_s *audio_capture = (struct audio_capture_private_s *) audiopriv;
+	struct audio_capture_stream_s *stream;
 	unsigned int c;
 	int ret;
 
-	audio_capture_get_stream_alsa(audio, pcm, &stream);
+	audio_capture_get_stream_alsa(audio_capture, pcm, &stream);
 	
 	if (stream->channels == 0)
 		return 0; /* 0 channels :P */
@@ -318,12 +318,12 @@ int audio_capture_alsa_mmap_commit(void *audiopriv, snd_pcm_t *pcm, snd_pcm_ufra
 		return EINVAL;
 	}
 	
-	if (audio_capture_wait_for_thread(audio, stream))
+	if (audio_capture_wait_for_thread(audio_capture, stream))
 		return 0;
 
 	if ((ret = audio_capture_set_data_size(stream, snd_pcm_frames_to_bytes(pcm, frames))))
 		return ret;
-	stream->capture_time = util_timestamp(audio->glc);
+	stream->capture_time = util_timestamp(audio_capture->glc);
 	
 	if (stream->interleaved)
 		memcpy(stream->capture_data,
@@ -351,7 +351,7 @@ void *audio_capture_alsa_mmap_pos(const snd_pcm_channel_area_t *area, snd_pcm_uf
 	return addr;
 }
 
-int audio_capture_complex_to_interleaved(struct audio_stream_s *stream, const snd_pcm_channel_area_t *areas, snd_pcm_uframes_t offset, snd_pcm_uframes_t frames, char *to)
+int audio_capture_complex_to_interleaved(struct audio_capture_stream_s *stream, const snd_pcm_channel_area_t *areas, snd_pcm_uframes_t offset, snd_pcm_uframes_t frames, char *to)
 {
 	/* TODO test this... :D */
 	/* FIXME this is quite expensive operation */
@@ -372,7 +372,7 @@ int audio_capture_complex_to_interleaved(struct audio_stream_s *stream, const sn
 	return 0;
 }
 
-int audio_capture_alsa_fmt(struct audio_private_s *audio, struct audio_stream_s *stream)
+int audio_capture_alsa_fmt(struct audio_capture_private_s *audio_capture, struct audio_capture_stream_s *stream)
 {
 	snd_pcm_hw_params_t *params;
 	snd_pcm_format_t format;
