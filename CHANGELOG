@@ -1,3 +1,12 @@
+0.3.0 (2007/10/11)
+   Split gl to gl_capture and gl_play.
+   Split audio to audio_capture and audio_play
+   Fixed threading bugs in scale, ycbcr and rgb.
+   PBO timestamps should be accurate now.
+   Lots of glc-play fixes (properly kill both audio and gl at CANCEL,
+    CANCEL at WM_DELETE_WINDOW...)
+   Lots of minor cleanups.
+
 0.2.9 (2007/10/08)
    Use getopt_long() in glc-play, should make it much more accessible.
    New glc-capture application which sets correct environment variables
