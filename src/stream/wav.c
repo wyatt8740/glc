@@ -88,7 +88,7 @@ int wav_init(glc_t *glc, ps_buffer_t *from)
 
 	wav->silence_size = 1024;
 	wav->silence = (char *) malloc(wav->silence_size);
-	wav->silence_threshold = 1024; /* flawed maths somewhere or... */
+	wav->silence_threshold = 48000/10; /* flawed maths somewhere or... */
 
 	wav->thread.flags = GLC_THREAD_READ;
 	wav->thread.ptr = wav;
