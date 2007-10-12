@@ -178,7 +178,7 @@ usage:
 	       "                               default value is '420jpeg'\n"
 	       "  -k, --hotkey=HOTKEY        capture hotkey, <Ctrl> and <Shift> modifiers are\n"
 	       "                               supported, default hotkey is '<Shift>F8'\n"
-	       "  -p, --no-pbo               don't try GL_ARB_pixel_buffer_extension\n"
+	       "  -p, --no-pbo               don't try GL_ARB_pixel_buffer_object\n"
 	       "  -z, --disable-compression  don't compress stream\n"
 	       "                               by default stream is compressed with LZO\n"
 	       "  -j, --bgra                 capture as BGRA and convert to BGR\n"
