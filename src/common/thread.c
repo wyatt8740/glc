@@ -170,7 +170,8 @@ void *glc_thread(void *argptr)
 			
 			if ((ret = ps_packet_write(&write, &state->header, GLC_MESSAGE_HEADER_SIZE)))
 				goto err;
-			
+
+
 			if (!(state->flags & GLC_THREAD_STATE_UNKNOWN_FINAL_SIZE)) {
 				/* 'unlock' write */
 				if ((ret = ps_packet_setsize(&write,
@@ -178,15 +179,21 @@ void *glc_thread(void *argptr)
 					goto err;
 				write_size_set = 1;
 			}
-			
-			if ((ret = ps_packet_dma(&write, (void *) &state->write_data,
-						 state->write_size, PS_ACCEPT_FAKE_DMA)))
+
+			if (state->flags & GLC_THREAD_COPY) {
+				/* should be faster, no need for fake dma */
+				if ((ret = ps_packet_write(&write, &state->read_data, state->write_size)))
 					goto err;
-			
-			/* write callback */
-			if (thread->write_callback) {
-				if ((ret = thread->write_callback(state)))
-					goto err;
+			} else {
+				if ((ret = ps_packet_dma(&write, (void *) &state->write_data,
+							 state->write_size, PS_ACCEPT_FAKE_DMA)))
+						goto err;
+
+				/* write callback */
+				if (thread->write_callback) {
+					if ((ret = thread->write_callback(state)))
+						goto err;
+				}
 			}
 		}
 
