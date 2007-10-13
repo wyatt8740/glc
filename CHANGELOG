@@ -1,3 +1,10 @@
+0.3.1 (2007/10/13)
+   Support for non-integer fps.
+   Cleaned up audio format message. Should be more extensible now.
+   Stream version bump (won't play old streams, sorry...).
+   Support for capturing only selected area (cropping).
+   Configurable audio silence threshold.
+
 0.3.0 (2007/10/11)
    Split gl to gl_capture and gl_play.
    Split audio to audio_capture and audio_play

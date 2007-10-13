@@ -63,7 +63,7 @@ int opengl_init(glc_t *glc)
 	
 	/* load environment variables */
 	if (getenv("GLC_FPS"))
-		opengl.glc->fps = atoi(getenv("GLC_FPS"));
+		opengl.glc->fps = atof(getenv("GLC_FPS"));
 	else
 		opengl.glc->fps = 30;
 
@@ -112,6 +112,17 @@ int opengl_init(glc_t *glc)
 			opengl.glc->flags |= GLC_TRY_PBO;
 	} else
 		opengl.glc->flags |= GLC_TRY_PBO;
+
+	if (getenv("GLC_CROP")) {
+		opengl.glc->crop_width = opengl.glc->crop_height = 0;
+		opengl.glc->crop_x = opengl.glc->crop_y = 0;
+
+		/* we need at least 2 values, width and height */
+		if (sscanf(getenv("GLC_CROP"), "%ux%u+%u+%u",
+			   &opengl.glc->crop_width, &opengl.glc->crop_height,
+			   &opengl.glc->crop_x, &opengl.glc->crop_y) >= 2)
+			opengl.glc->flags |= GLC_CROP;
+	}
 
 	get_real_opengl();
 	return 0;

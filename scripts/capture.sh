@@ -17,7 +17,7 @@ export GLC_SCALE=1.0
 export GLC_AUDIO=1
 
 # install custom signal handler
-export GLC_SIGHANDLER=1
+export GLC_SIGHANDLER=0
 
 # captured pictures and audio buffer size, in MiB
 export GLC_UNCOMPRESSED_BUFFER_SIZE=10
@@ -60,6 +60,9 @@ export GLC_HOTKEY="<Shift>F8"
 # set 420jpeg to convert to Y'CbCr (420JPEG) at capture
 # NOTE this is a lossy operation
 export GLC_COLORSPACE=420jpeg
+
+# crop capture area to WxH+X+Y
+# export GLC_CROP=WxH+X+Y
 
 # set SDL audiodriver to alsa
 export SDL_AUDIODRIVER=alsa

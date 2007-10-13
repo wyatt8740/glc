@@ -45,8 +45,8 @@ struct audio_capture_stream_s {
 	
 	unsigned int channels;
 	unsigned int rate;
-	glc_audio_format_t format;
-	int interleaved, complex;
+	glc_flags_t flags;
+	int complex;
 
 	int fmt;
 
@@ -79,7 +79,7 @@ int audio_capture_wait_for_thread(struct audio_capture_private_s *audio_capture,
 int audio_capture_set_data_size(struct audio_capture_stream_s *stream, size_t size);
 void *audio_capture_thread(void *argptr);
 
-glc_audio_format_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt);
+glc_flags_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt);
 
 void *audio_capture_init(glc_t *glc, ps_buffer_t *to)
 {
@@ -121,15 +121,15 @@ int audio_capture_close(void *audiopriv)
 	return 0;
 }
 
-glc_audio_format_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt)
+glc_flags_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt)
 {
 	switch (pcm_fmt) {
 	case SND_PCM_FORMAT_S16_LE:
-		return GLC_AUDIO_FORMAT_S16_LE;
+		return GLC_AUDIO_S16_LE;
 	case SND_PCM_FORMAT_S24_LE:
-		return GLC_AUDIO_FORMAT_S24_LE;
+		return GLC_AUDIO_S24_LE;
 	case SND_PCM_FORMAT_S32_LE:
-		return GLC_AUDIO_FORMAT_S32_LE;
+		return GLC_AUDIO_S32_LE;
 	default:
 		return GLC_AUDIO_FORMAT_UNKNOWN;
 	}
@@ -264,7 +264,7 @@ int audio_capture_alsa_n(void *audiopriv, snd_pcm_t *pcm, void **bufs, snd_pcm_u
 			return ret;
 	}
 
-	if (stream->interleaved) {
+	if (stream->flags & GLC_AUDIO_INTERLEAVED) {
 		fprintf(stderr, "audio: stream format (interleaved) incompatible with snd_pcm_writen()\n");
 		return EINVAL;
 	}
@@ -325,7 +325,7 @@ int audio_capture_alsa_mmap_commit(void *audiopriv, snd_pcm_t *pcm, snd_pcm_ufra
 		return ret;
 	stream->capture_time = util_timestamp(audio_capture->glc);
 	
-	if (stream->interleaved)
+	if (stream->flags & GLC_AUDIO_INTERLEAVED)
 		memcpy(stream->capture_data,
 		       audio_capture_alsa_mmap_pos(stream->mmap_areas, offset),
 		       stream->capture_size);
@@ -391,8 +391,9 @@ int audio_capture_alsa_fmt(struct audio_capture_private_s *audio_capture, struct
 	/* extract information */
 	if ((ret = snd_pcm_hw_params_get_format(params, &format)) < 0)
 		goto err;
-	stream->format = pcm_fmt_to_glc_fmt(format);
-	if (stream->format == GLC_AUDIO_FORMAT_UNKNOWN) {
+	stream->flags = 0; /* zero flags */
+	stream->flags |= pcm_fmt_to_glc_fmt(format);
+	if (stream->flags & GLC_AUDIO_FORMAT_UNKNOWN) {
 		fprintf(stderr, "audio: unsupported audio format\n");
 		return ENOTSUP;
 	}
@@ -405,11 +406,9 @@ int audio_capture_alsa_fmt(struct audio_capture_private_s *audio_capture, struct
 	if ((ret = snd_pcm_hw_params_get_access(params, &access)) < 0)
 		goto err;
 	if ((access == SND_PCM_ACCESS_RW_INTERLEAVED) | (access == SND_PCM_ACCESS_MMAP_INTERLEAVED))
-		stream->interleaved = 1;
-	else if ((access == SND_PCM_ACCESS_RW_NONINTERLEAVED) | (access == SND_PCM_ACCESS_MMAP_NONINTERLEAVED))
-		stream->interleaved = 0;
+		stream->flags |= GLC_AUDIO_INTERLEAVED;
 	else if (access == SND_PCM_ACCESS_MMAP_COMPLEX) {
-		stream->interleaved = 1; /* convert to interleaved */
+		stream->flags |= GLC_AUDIO_INTERLEAVED; /* convert to interleaved */
 		stream->complex = 1; /* do conversion */
 	} else {
 		fprintf(stderr, "audio: unsupported access mode\n");
@@ -419,10 +418,9 @@ int audio_capture_alsa_fmt(struct audio_capture_private_s *audio_capture, struct
 	/* prepare audio format message */
 	msg_hdr.type = GLC_MESSAGE_AUDIO_FORMAT;
 	fmt_msg.audio = stream->audio_i;
-	fmt_msg.format = stream->format;
+	fmt_msg.flags = stream->flags;
 	fmt_msg.rate = stream->rate;
 	fmt_msg.channels = stream->channels;
-	fmt_msg.interleaved = stream->interleaved;
 	ps_packet_open(&stream->packet, PS_PACKET_WRITE);
 	ps_packet_write(&stream->packet, &msg_hdr, GLC_MESSAGE_HEADER_SIZE);
 	ps_packet_write(&stream->packet, &fmt_msg, GLC_AUDIO_FORMAT_MESSAGE_SIZE);
