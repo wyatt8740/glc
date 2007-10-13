@@ -272,7 +272,7 @@ int main(int argc, char *argv[])
 	return EXIT_SUCCESS;
 
 usage:
-	printf("%s [FILE] [OPTION]...\n", argv[0]);
+	printf("%s [file] [option]...\n", argv[0]);
 	printf("  -i, --info=LEVEL         show stream information, LEVEL must be\n"
 	       "                             greater than 0\n"
 	       "  -a, --wav=NUM            save audio stream NUM in wav format\n"
