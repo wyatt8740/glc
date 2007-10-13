@@ -210,17 +210,14 @@ void pic_info(struct info_private_s *info, glc_picture_header_t *pic_header)
 {
 	struct info_ctx_s *ctx;
 	info->time = pic_header->timestamp;
-	
+
 	info_get_ctx(info, &ctx, pic_header->ctx);
-	
+
 	if (!(ctx->created)) {
 		print_time(stdout, info->time);
 		printf("error: picture to uninitialized ctx %d\n", ctx->ctx_i);
 	}
-	
-	ctx->pictures++;
-	ctx->fps++;
-	
+
 	if (info->glc->info_level >= INFO_DETAILED_PICTURE) {
 		print_time(stdout, info->time);
 		printf("picture\n");
@@ -232,19 +229,22 @@ void pic_info(struct info_private_s *info, glc_picture_header_t *pic_header)
 		print_time(stdout, info->time);
 		printf("picture\n");
 	}
-	
+
 	if ((info->glc->info_level >= INFO_DETAILED_PICTURE) && (info->prev_ctx != pic_header->ctx)) {
 		print_time(stdout, info->time);
 		printf("ctx switch from %d to %d\n", info->prev_ctx, pic_header->ctx);
 	}
-	
+
+	ctx->pictures++;
+	ctx->fps++;
+
 	if ((info->glc->info_level >= INFO_FPS) && (pic_header->timestamp - ctx->last_fps_time >= 1000000)) {
 		print_time(stdout, info->time);
 		printf("ctx %d: %04.2f fps\n", ctx->ctx_i, (double) (ctx->fps * 1000000) / (double) (pic_header->timestamp - ctx->last_fps_time));
-		ctx->last_fps_time = pic_header->timestamp;
+		ctx->last_fps_time += 1000000;
 		ctx->fps = 0;
 	}
-	
+
 	info->prev_ctx = pic_header->ctx;
 }
 
