@@ -63,7 +63,7 @@ int opengl_init(glc_t *glc)
 	
 	/* load environment variables */
 	if (getenv("GLC_FPS"))
-		opengl.glc->fps = atoi(getenv("GLC_FPS"));
+		opengl.glc->fps = atof(getenv("GLC_FPS"));
 	else
 		opengl.glc->fps = 30;
 

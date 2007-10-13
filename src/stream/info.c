@@ -306,7 +306,7 @@ void stream_info(struct info_private_s *info)
 		printf("  signature   = 0x%08x\n", info->glc->info->signature);
 		printf("  version     = 0x%02x\n", info->glc->info->version);
 		printf("  flags       = %d\n", info->glc->info->flags);
-		printf("  fps         = %d\n", info->glc->info->fps);
+		printf("  fps         = %f\n", info->glc->info->fps);
 		printf("  pid         = %d\n", info->glc->info->pid);
 		printf("  name        = %s\n", info->glc->info_name);
 		printf("  date        = %s\n", info->glc->info_date);

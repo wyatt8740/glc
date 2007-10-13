@@ -47,7 +47,7 @@
  */
 
 /** stream version */
-#define GLC_STREAM_VERSION              0x1
+#define GLC_STREAM_VERSION              0x2
 /** file signature = "GLC" */
 #define GLC_SIGNATURE            0x00434c47
 
@@ -137,10 +137,10 @@ typedef struct {
 	u_int32_t signature;
 	/** stream version */
 	u_int32_t version;
+	/** fps */
+	double fps;
 	/** flags */
 	glc_flags_t flags;
-	/** fps */
-	u_int32_t fps;
 	/** captured program pid */
 	u_int32_t pid;
 	/** size of captured program's name */
@@ -149,7 +149,7 @@ typedef struct {
 	u_int32_t date_size;
 } glc_stream_info_t;
 /** sizeof(glc_stream_info_t) */
-#define GLC_STREAM_INFO_SIZE             28
+#define GLC_STREAM_INFO_SIZE             32
 
 /**
  * \brief global settings
@@ -162,7 +162,7 @@ typedef struct {
 	/** stream file path */
 	char *stream_file;
 	/** fps */
-	int fps;
+	double fps;
 	/** scale for rescaling */
 	double scale;
 

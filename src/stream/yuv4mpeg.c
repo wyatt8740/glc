@@ -95,6 +95,7 @@ int yuv4mpeg_read_callback(glc_thread_state_t *state)
 int yuv4mpeg_handle_hdr(struct yuv4mpeg_private_s *yuv4mpeg, glc_ctx_message_t *ctx_msg)
 {
 	char *filename;
+	unsigned int p, q;
 
 	if (ctx_msg->ctx != yuv4mpeg->glc->export_ctx)
 		return 0;
@@ -129,7 +130,16 @@ int yuv4mpeg_handle_hdr(struct yuv4mpeg_private_s *yuv4mpeg, glc_ctx_message_t *
 	/* Set CbCr 128 */
 	memset(&yuv4mpeg->prev_pic[ctx_msg->w * ctx_msg->h], 128, (ctx_msg->w * ctx_msg->h) / 2);
 
-	fprintf(yuv4mpeg->to, "YUV4MPEG2 W%d H%d F%d:1 Ip\n", ctx_msg->w, ctx_msg->h, yuv4mpeg->glc->fps);
+	/* calculate fps in p/q */
+	/* TODO something more intelligent perhaps... */
+	p = yuv4mpeg->glc->fps;
+	q = 1;
+	while ((p != q * yuv4mpeg->glc->fps) && (q < 1000)) {
+		q *= 10;
+		p = q * yuv4mpeg->glc->fps;
+	}
+
+	fprintf(yuv4mpeg->to, "YUV4MPEG2 W%d H%d F%d:%d Ip\n", ctx_msg->w, ctx_msg->h, p, q);
 	return 0;
 }
 

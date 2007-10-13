@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
 			play = 0;
 			break;
 		case 'f':
-			glc->fps = atoi(optarg);
+			glc->fps = atof(optarg);
 			if (glc->fps <= 0)
 				goto usage;
 			break;
@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
 	if (summary_val)
 		return show_info_value(glc, summary_val);
 
-	if (!glc->fps)
+	if (glc->fps == 0)
 		glc->fps = glc->info->fps;
 	
 	ps_bufferattr_init(&attr);
@@ -294,7 +294,7 @@ int show_info_value(glc_t *glc, const char *value)
 	else if (!strcmp("flags", value))
 		printf("%d\n", glc->info->flags);
 	else if (!strcmp("fps", value))
-		printf("%d\n", glc->info->fps);
+		printf("%f\n", glc->info->fps);
 	else if (!strcmp("pid", value))
 		printf("%d\n", glc->info->pid);
 	else if (!strcmp("name", value))
