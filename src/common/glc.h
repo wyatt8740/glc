@@ -165,6 +165,8 @@ typedef struct {
 	double fps;
 	/** scale for rescaling */
 	double scale;
+	/** playback/export silence threshold in microseconds */
+	glc_utime_t silence_threshold;
 
 	/** crop width */
 	unsigned int crop_width;

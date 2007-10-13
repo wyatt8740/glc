@@ -55,6 +55,7 @@ int main(int argc, char *argv[])
 		{"yuv4mpeg",		1, NULL, 'y'},
 		{"out",			1, NULL, 'o'},
 		{"fps",			1, NULL, 'f'},
+		{"silence",		1, NULL, 'l'},
 		{"compressed",		1, NULL, 'c'},
 		{"uncompressed",	1, NULL, 'u'},
 		{"show",		1, NULL, 's'},
@@ -74,10 +75,11 @@ int main(int argc, char *argv[])
 	glc->flags = 0;
 	glc->fps = 0;
 	glc->filename_format = NULL;
+	glc->silence_threshold = 2000000;
 	compressed_size = 10 * 1024 * 1024;
 	uncompressed_size = 10 * 1024 * 1024;
 	
-	while ((opt = getopt_long(argc, argv, "i:a:p:y:o:f:c:u:s:th",
+	while ((opt = getopt_long(argc, argv, "i:a:p:y:o:f:l:c:u:s:th",
 				  long_options, &optind)) != -1) {
 		switch (opt) {
 		case 'i':
@@ -112,6 +114,10 @@ int main(int argc, char *argv[])
 			glc->fps = atof(optarg);
 			if (glc->fps <= 0)
 				goto usage;
+			break;
+		case 'l':
+			/* glc_utime_t so always positive */
+			glc->silence_threshold = atof(optarg) * 1000000;
 			break;
 		case 'o':
 			if (!strcmp(optarg, "-"))
@@ -275,6 +281,8 @@ usage:
 	       "  -y, --yuv4mpeg=NUM       save video stream NUM in yuv4mpeg format\n"
 	       "  -o, --out=FILE           write to FILE\n"
 	       "  -f, --fps=FPS            save images or video at FPS\n"
+	       "  -l, --silence=SECONDS    audio silence threshold in seconds\n"
+	       "                             default threshold is 0.2\n"
 	       "  -c, --compressed=SIZE    compressed stream buffer size in MiB, default is 10\n"
 	       "  -u, --uncompressed=SIZE  uncompressed stream buffer size in MiB, default is 10\n"
 	       "  -s, --show=VAL           show stream summary value, possible values are:\n"

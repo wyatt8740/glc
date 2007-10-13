@@ -238,9 +238,9 @@ int audio_play_play(struct audio_play_private_s *audio_play, glc_audio_header_t 
 	glc_utime_t time = util_timestamp(audio_play->glc);
 	glc_utime_t duration = (1000000 * frames) / stream->rate;
 	
-	if (time + audio_play->silence_threshold + duration < audio_hdr->timestamp)
+	if (time + audio_play->glc->silence_threshold + duration < audio_hdr->timestamp)
 		usleep(audio_hdr->timestamp - time);
-	else if (time > audio_hdr->timestamp)
+	else if (time > audio_hdr->timestamp + audio_play->glc->silence_threshold)
 		return 0;
 
 	rem = frames;

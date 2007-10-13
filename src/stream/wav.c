@@ -88,7 +88,6 @@ int wav_init(glc_t *glc, ps_buffer_t *from)
 
 	wav->silence_size = 1024;
 	wav->silence = (char *) malloc(wav->silence_size);
-	wav->silence_threshold = 48000/10; /* flawed maths somewhere or... */
 
 	wav->thread.flags = GLC_THREAD_READ;
 	wav->thread.ptr = wav;
@@ -205,18 +204,16 @@ int wav_write_audio(struct wav_private_s *wav, glc_audio_header_t *audio_hdr, ch
 
 	wav->time += duration;
 
-	if (wav->time < audio_hdr->timestamp) {
+	if (wav->time + wav->glc->silence_threshold < audio_hdr->timestamp) {
 		need_silence = ((audio_hdr->timestamp - wav->time) * wav->bps) / 1000000;
 		need_silence -= need_silence % (wav->sample_size * wav->channels);
 
-		if (need_silence > wav->silence_threshold) {
-			wav->time += (need_silence * 1000000) / wav->bps;
-			fprintf(stderr, "wav: writing %zd bytes of silence\n", need_silence);
-			while (need_silence > 0) {
-				write_silence = need_silence > wav->silence_size ? wav->silence_size : need_silence;
-				fwrite(wav->silence, 1, write_silence, wav->to);
-				need_silence -= write_silence;
-			}
+		wav->time += (need_silence * 1000000) / wav->bps;
+		fprintf(stderr, "wav: writing %zd bytes of silence\n", need_silence);
+		while (need_silence > 0) {
+			write_silence = need_silence > wav->silence_size ? wav->silence_size : need_silence;
+			fwrite(wav->silence, 1, write_silence, wav->to);
+			need_silence -= write_silence;
 		}
 	}
 
