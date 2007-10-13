@@ -61,6 +61,9 @@ export GLC_HOTKEY="<Shift>F8"
 # NOTE this is a lossy operation
 export GLC_COLORSPACE=420jpeg
 
+# crop capture area to WxH+X+Y
+# export GLC_CROP=WxH+X+Y
+
 # set SDL audiodriver to alsa
 export SDL_AUDIODRIVER=alsa
 

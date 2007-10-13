@@ -118,6 +118,8 @@ typedef u_int32_t glc_flags_t;
 #define GLC_TRY_PBO                     256
 /** do colorspace conversion to Y'CbCr 420jpeg */
 #define GLC_CONVERT_420JPEG             512
+/** crop pictures */
+#define GLC_CROP                       1024
 
 /**
  * \brief stream info structure
@@ -163,6 +165,16 @@ typedef struct {
 	int fps;
 	/** scale for rescaling */
 	double scale;
+
+	/** crop width */
+	unsigned int crop_width;
+	/** crop height */
+	unsigned int crop_height;
+	/** crop upper left corner x coordinate */
+	unsigned int crop_x;
+	/** crop upper left corner y coordinate */
+	unsigned int crop_y;
+
 	/** util uses this to store internal state */
 	void *util;
 

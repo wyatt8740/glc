@@ -57,13 +57,15 @@ typedef GLboolean (*glUnmapBufferProc)(GLenum target);
 struct gl_capture_ctx_s {
 	Display *dpy;
 	GLXDrawable drawable;
-	unsigned int w, h;
 	ps_packet_t packet;
 	glc_ctx_i ctx_i;
 	glc_utime_t last, pbo_timestamp;
 
+	unsigned int w, h;
+	unsigned int cw, ch, cx, cy;
+
 	int indicator_list;
-	
+
 	struct gl_capture_ctx_s *next;
 
 	GLuint pbo;
@@ -96,18 +98,22 @@ struct gl_capture_private_s {
 	glUnmapBufferProc glUnmapBuffer;
 };
 
-int gl_capture_get_ctx(struct gl_capture_private_s *gl, struct gl_capture_ctx_s **ctx, Display *dpy, GLXDrawable drawable);
+int gl_capture_get_ctx(struct gl_capture_private_s *gl_capture,
+		       struct gl_capture_ctx_s **ctx, Display *dpy, GLXDrawable drawable);
 
-int gl_capture_get_geometry(struct gl_capture_private_s *gl, Display *dpy, GLXDrawable drawable, unsigned int *w, unsigned int *h);
+int gl_capture_get_geometry(struct gl_capture_private_s *gl_capture,
+			    Display *dpy, GLXDrawable drawable, unsigned int *w, unsigned int *h);
+int gl_capture_calc_geometry(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx,
+			     unsigned int w, unsigned int h);
 
-int gl_capture_get_pixels(struct gl_capture_private_s *gl, struct gl_capture_ctx_s *ctx, char *to);
-int gl_capture_gen_indicator_list(struct gl_capture_private_s *gl, struct gl_capture_ctx_s *ctx);
+int gl_capture_get_pixels(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx, char *to);
+int gl_capture_gen_indicator_list(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
 
 int gl_capture_init_pbo(struct gl_capture_private_s *gl);
-int gl_capture_create_pbo(struct gl_capture_private_s *gl, struct gl_capture_ctx_s *ctx);
-int gl_capture_destroy_pbo(struct gl_capture_private_s *gl, struct gl_capture_ctx_s *ctx);
-int gl_capture_start_pbo(struct gl_capture_private_s *gl, struct gl_capture_ctx_s *ctx);
-int gl_capture_read_pbo(struct gl_capture_private_s *gl, struct gl_capture_ctx_s *ctx, char *to);
+int gl_capture_create_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
+int gl_capture_destroy_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
+int gl_capture_start_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
+int gl_capture_read_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx, char *to);
 
 void *gl_capture_init(glc_t *glc, ps_buffer_t *to)
 {
@@ -176,16 +182,57 @@ int gl_capture_get_geometry(struct gl_capture_private_s *gl_capture, Display *dp
 	return 0;
 }
 
+int gl_capture_calc_geometry(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx,
+			     unsigned int w, unsigned int h)
+{
+	ctx->w = w;
+	ctx->h = h;
+
+	/* calculate image area when cropping */
+	if (gl_capture->glc->flags & GLC_CROP) {
+		if (gl_capture->glc->crop_x > ctx->w)
+			ctx->cx = 0;
+		else
+			ctx->cx = gl_capture->glc->crop_x;
+
+		if (gl_capture->glc->crop_y > ctx->h)
+			ctx->cy = 0;
+		else
+			ctx->cy = gl_capture->glc->crop_y;
+
+		if (gl_capture->glc->crop_width + ctx->cx > ctx->w)
+			ctx->cw = ctx->w - ctx->cx;
+		else
+			ctx->cw = gl_capture->glc->crop_width;
+
+		if (gl_capture->glc->crop_height + ctx->cy > ctx->h)
+			ctx->ch = ctx->h - ctx->cy;
+		else
+			ctx->ch = gl_capture->glc->crop_height;
+
+		/* we need to recalc y coord for OpenGL */
+		ctx->cy = ctx->h - ctx->ch - ctx->cy;
+	} else {
+		ctx->cw = ctx->w;
+		ctx->ch = ctx->h;
+		ctx->cx = ctx->cy = 0;
+	}
+
+	return 0;
+}
+
 int gl_capture_get_pixels(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx, char *to)
 {
 	glPushAttrib(GL_PIXEL_MODE_BIT);
 	glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);
+
 	glReadBuffer(gl_capture->capture_buffer);
 	glPixelStorei(GL_PACK_ALIGNMENT, 1);
-	glReadPixels(0, 0, ctx->w, ctx->h, gl_capture->format, GL_UNSIGNED_BYTE, to);
+	glReadPixels(ctx->cx, ctx->cy, ctx->cw, ctx->ch, gl_capture->format, GL_UNSIGNED_BYTE, to);
+
 	glPopClientAttrib();
 	glPopAttrib();
-	
+
 	return 0;
 }
 
@@ -306,7 +353,7 @@ int gl_capture_start_pbo(struct gl_capture_private_s *gl_capture, struct gl_capt
 	glReadBuffer(gl_capture->capture_buffer);
 	glPixelStorei(GL_PACK_ALIGNMENT, 1);
 	/* to = ((char *)NULL + (offset)) */
-	glReadPixels(0, 0, ctx->w, ctx->h, gl_capture->format, GL_UNSIGNED_BYTE, NULL);
+	glReadPixels(ctx->cx, ctx->cy, ctx->cw, ctx->ch, gl_capture->format, GL_UNSIGNED_BYTE, NULL);
 
 	ctx->pbo_active = 1;
 
@@ -331,7 +378,7 @@ int gl_capture_read_pbo(struct gl_capture_private_s *gl_capture, struct gl_captu
 	if (!buf)
 		return EINVAL;
 
-	memcpy(to, buf, ctx->w * ctx->h * gl_capture->bpp);
+	memcpy(to, buf, ctx->cw * ctx->ch * gl_capture->bpp);
 	gl_capture->glUnmapBuffer(GL_PIXEL_PACK_BUFFER_ARB);
 
 	ctx->pbo_active = 0;
@@ -360,11 +407,11 @@ int gl_capture_get_ctx(struct gl_capture_private_s *gl_capture, struct gl_captur
 	if (fctx == NULL) {
 		fctx = (struct gl_capture_ctx_s *) malloc(sizeof(struct gl_capture_ctx_s));
 		memset(fctx, 0, sizeof(struct gl_capture_ctx_s));
-		
+
 		fctx->drawable = drawable;
-		
+
 		ps_packet_init(&fctx->packet, gl_capture->to);
-		
+
 		pthread_rwlock_wrlock(&gl_capture->ctxlist_lock);
 		fctx->next = gl_capture->ctx;
 		fctx->ctx_i = ++gl_capture->ctx_c;
@@ -376,9 +423,10 @@ int gl_capture_get_ctx(struct gl_capture_private_s *gl_capture, struct gl_captur
 			gl_capture->try_pbo = 0;
 		}
 		pthread_rwlock_unlock(&gl_capture->ctxlist_lock);
-		
+
 		gl_capture_get_geometry(gl_capture, dpy, drawable, &fctx->w, &fctx->h);
-		
+		gl_capture_calc_geometry(gl_capture, fctx, fctx->w, fctx->h);
+
 		msg.type = GLC_MESSAGE_CTX;
 		ctx_msg.flags = GLC_CTX_CREATE;
 		if (gl_capture->glc->flags & GLC_CAPTURE_BGRA)
@@ -386,9 +434,9 @@ int gl_capture_get_ctx(struct gl_capture_private_s *gl_capture, struct gl_captur
 		else
 			ctx_msg.flags |= GLC_CTX_BGR;
 		ctx_msg.ctx = fctx->ctx_i;
-		ctx_msg.w = fctx->w;
-		ctx_msg.h = fctx->h;
-		
+		ctx_msg.w = fctx->cw;
+		ctx_msg.h = fctx->ch;
+
 		ps_packet_open(&fctx->packet, PS_PACKET_WRITE);
 		ps_packet_write(&fctx->packet, &msg, GLC_MESSAGE_HEADER_SIZE);
 		ps_packet_write(&fctx->packet, &ctx_msg, GLC_CTX_MESSAGE_SIZE);
@@ -401,9 +449,8 @@ int gl_capture_get_ctx(struct gl_capture_private_s *gl_capture, struct gl_captur
 		gl_capture_get_geometry(gl_capture, dpy, drawable, &w, &h);
 		
 		if ((w != fctx->w) | (h != fctx->h)) {
-			fctx->w = w;
-			fctx->h = h;
-			
+			gl_capture_calc_geometry(gl_capture, fctx, w, h);
+
 			msg.type = GLC_MESSAGE_CTX;
 			ctx_msg.flags = GLC_CTX_UPDATE;
 			if (gl_capture->glc->flags & GLC_CAPTURE_BGRA)
@@ -411,9 +458,9 @@ int gl_capture_get_ctx(struct gl_capture_private_s *gl_capture, struct gl_captur
 			else
 				ctx_msg.flags |= GLC_CTX_BGR;
 			ctx_msg.ctx = fctx->ctx_i;
-			ctx_msg.w = fctx->w;
-			ctx_msg.h = fctx->h;
-			
+			ctx_msg.w = fctx->cw;
+			ctx_msg.h = fctx->ch;
+
 			ps_packet_open(&fctx->packet, PS_PACKET_WRITE);
 			ps_packet_write(&fctx->packet, &msg, GLC_MESSAGE_HEADER_SIZE);
 			ps_packet_write(&fctx->packet, &ctx_msg, GLC_CTX_MESSAGE_SIZE);
@@ -467,7 +514,7 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 		if ((ret = ps_packet_write(&ctx->packet, &pic, GLC_PICTURE_HEADER_SIZE)))
 			goto cancel;
 		if ((ret = ps_packet_dma(&ctx->packet, (void *) &dma,
-					 ctx->w * ctx->h * gl_capture->bpp, PS_ACCEPT_FAKE_DMA)))
+					 ctx->cw * ctx->ch * gl_capture->bpp, PS_ACCEPT_FAKE_DMA)))
 			goto cancel;
 
 		if (gl_capture->use_pbo) {
