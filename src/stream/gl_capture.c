@@ -244,7 +244,7 @@ int gl_capture_gen_indicator_list(struct gl_capture_private_s *gl_capture, struc
 	
 	glNewList(ctx->indicator_list, GL_COMPILE);
 	
-	size = ctx->h / 50;
+	size = ctx->h / 75;
 	if (size < 10)
 		size = 10;
 
