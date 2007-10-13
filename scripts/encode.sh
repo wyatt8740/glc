@@ -36,8 +36,9 @@ fi
 [ "$5" != "" ] && METHOD=$5
 [ "$7" != "" ] && OPTS=$7
 
-FPS=`glc-play "${FILE}" -s fps`
-KEYINT=`expr "${FPS}" \* 10`
+#FPS=`glc-play "${FILE}" -s fps`
+#KEYINT=`expr "${FPS}" \* 10`
+KEYINT=300
 
 X264_OPTS="ref=4:mixed_refs:bframes=3:b_pyramid:bime:weightb:direct_pred=auto:filter=-1,0:partitions=all:turbo=1:threads=auto:keyint=${KEYINT}"
 LAME_OPTS="q=4" # TODO configure q, cbr or abr
