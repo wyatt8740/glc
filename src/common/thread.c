@@ -141,6 +141,7 @@ void *glc_thread(void *argptr)
 			if ((ret = ps_packet_getsize(&read, &state->read_size)))
 				goto err;
 			state->read_size -= GLC_MESSAGE_HEADER_SIZE;
+			state->write_size = state->read_size;
 		
 			/* header callback */
 			if (thread->header_callback) {
