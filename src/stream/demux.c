@@ -66,7 +66,7 @@ void *demux_thread(void *argptr)
 	struct demux_private_s *demux = (struct demux_private_s *) argptr;
 	glc_message_header_t msg_hdr;
 	size_t data_size;
-	char *data, *to;
+	char *data;
 	int ret = 0;
 	
 	ps_packet_t read, audio, picture;
@@ -97,9 +97,8 @@ void *demux_thread(void *argptr)
 				goto err;
 			if ((ret = ps_packet_write(&picture, &msg_hdr, GLC_MESSAGE_HEADER_SIZE)))
 				goto err;
-			if ((ret = ps_packet_dma(&picture, (void *) &to, data_size, PS_ACCEPT_FAKE_DMA)))
+			if ((ret = ps_packet_write(&picture, data, data_size)))
 				goto err;
-			memcpy(to, data, data_size);
 			ps_packet_close(&picture);
 		}
 
@@ -110,9 +109,8 @@ void *demux_thread(void *argptr)
 				goto err;
 			if ((ret = ps_packet_write(&audio, &msg_hdr, GLC_MESSAGE_HEADER_SIZE)))
 				goto err;
-			if ((ret = ps_packet_dma(&audio, (void *) &to, data_size, PS_ACCEPT_FAKE_DMA)))
+			if ((ret = ps_packet_write(&audio, data, data_size)))
 				goto err;
-			memcpy(to, data, data_size);
 			ps_packet_close(&audio);
 		}
 
