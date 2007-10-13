@@ -175,10 +175,12 @@ int rgb_read_callback(glc_thread_state_t *state)
 
 		if (ctx->convert)
 			state->write_size = GLC_PICTURE_HEADER_SIZE + ctx->size;
-		else
-			state->write_size = state->read_size;
+		else {
+			state->flags |= GLC_THREAD_COPY;
+			pthread_rwlock_unlock(&ctx->update);
+		}
 	} else
-		state->write_size = state->read_size;
+		state->flags |= GLC_THREAD_COPY;
 
 	return 0;
 }
@@ -188,21 +190,12 @@ int rgb_write_callback(glc_thread_state_t *state)
 	struct rgb_private_s *rgb = state->ptr;
 	struct rgb_ctx_s *ctx = state->threadptr;
 
-	if (state->header.type == GLC_MESSAGE_PICTURE) {
-		if (!ctx->convert) {
-			pthread_rwlock_unlock(&ctx->update);
-			goto copy;
-		}
+	memcpy(state->write_data, state->read_data, GLC_PICTURE_HEADER_SIZE);
+	rgb_convert_lookup(rgb, ctx,
+		    (unsigned char *) &state->read_data[GLC_PICTURE_HEADER_SIZE],
+		    (unsigned char *) &state->write_data[GLC_PICTURE_HEADER_SIZE]);
+	pthread_rwlock_unlock(&ctx->update);
 
-		memcpy(state->write_data, state->read_data, GLC_PICTURE_HEADER_SIZE);
-		rgb_convert_lookup(rgb, ctx,
-			    (unsigned char *) &state->read_data[GLC_PICTURE_HEADER_SIZE],
-			    (unsigned char *) &state->write_data[GLC_PICTURE_HEADER_SIZE]);
-		pthread_rwlock_unlock(&ctx->update);
-		return 0;
-	}
-copy:
-	memcpy(state->write_data, state->read_data, state->write_size);
 	return 0;
 }
 

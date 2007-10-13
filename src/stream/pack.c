@@ -103,30 +103,24 @@ int pack_read_callback(glc_thread_state_t *state)
 		
 		state->write_size = GLC_LZO_HEADER_SIZE + __lzo_mem(state->read_size);
 		state->flags |= GLC_THREAD_STATE_UNKNOWN_FINAL_SIZE; /* don't acquire dma */
-		state->threadptr = (void *) 1;
-	} else {
-		state->write_size = state->read_size; /* too small, wont compress */
-		state->threadptr = NULL;
-	}
-	
+	} else
+		state->flags |= GLC_THREAD_COPY; /* too small, wont compress */
+
 	return 0;
 }
 
 int pack_write_callback(glc_thread_state_t *state)
 {
 	struct pack_private_s *pack = (struct pack_private_s *) state->ptr;
-	
-	if (state->threadptr != NULL) {
-		__lzo_compress((unsigned char *) state->read_data, state->read_size,
-			(unsigned char *) &state->write_data[GLC_LZO_HEADER_SIZE], &state->write_size,
-			pack->lzo_wrk_mem);
-		
-		pack->lzo_header.size = (glc_size_t) state->read_size;
-		memcpy(state->write_data, &pack->lzo_header, GLC_LZO_HEADER_SIZE);
-		
-		state->write_size += GLC_LZO_HEADER_SIZE;
-	} else
-		memcpy(state->write_data, state->read_data, state->write_size);
+
+	__lzo_compress((unsigned char *) state->read_data, state->read_size,
+		       (unsigned char *) &state->write_data[GLC_LZO_HEADER_SIZE], &state->write_size,
+		       pack->lzo_wrk_mem);
+
+	pack->lzo_header.size = (glc_size_t) state->read_size;
+	memcpy(state->write_data, &pack->lzo_header, GLC_LZO_HEADER_SIZE);
+
+	state->write_size += GLC_LZO_HEADER_SIZE;
 
 	return 0;
 }
@@ -163,31 +157,24 @@ void unpack_finish_callback(void *ptr, int err)
 int unpack_read_callback(glc_thread_state_t *state)
 {
 	struct pack_private_s *pack = (struct pack_private_s *) state->ptr;
-	
+
 	if (state->header.type == GLC_MESSAGE_LZO) {
 		memcpy(&pack->lzo_header, state->read_data, GLC_LZO_HEADER_SIZE);
-		
+
 		state->write_size = pack->lzo_header.size;
 		memcpy(&state->header, &pack->lzo_header.header, GLC_MESSAGE_HEADER_SIZE);
-		state->threadptr = (void *) 1;
-	} else {
-		state->threadptr = NULL;
-		state->write_size = state->read_size;
-	}
-	
+	} else
+		state->flags |= GLC_THREAD_COPY;
+
 	return 0;
 }
 
 int unpack_write_callback(glc_thread_state_t *state)
 {
-	if (state->threadptr != NULL) {
-		__lzo_decompress((unsigned char *) &state->read_data[GLC_LZO_HEADER_SIZE],
-				 state->read_size - GLC_LZO_HEADER_SIZE,
-				 (unsigned char *) state->write_data, &state->write_size,
-				 NULL);
-	} else
-		memcpy(state->write_data, state->read_data, state->write_size);
-	
+	__lzo_decompress((unsigned char *) &state->read_data[GLC_LZO_HEADER_SIZE],
+			 state->read_size - GLC_LZO_HEADER_SIZE,
+			 (unsigned char *) state->write_data, &state->write_size,
+			 NULL);
 	return 0;
 }
 

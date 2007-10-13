@@ -106,10 +106,10 @@ int scale_read_callback(glc_thread_state_t *state) {
 	struct scale_private_s *scale = (struct scale_private_s *) state->ptr;
 	struct scale_ctx_s *ctx;
 	glc_picture_header_t *pic_header;
-	
+
 	if (state->header.type == GLC_MESSAGE_CTX)
 		scale_ctx_msg(scale, (glc_ctx_message_t *) state->read_data);
-	
+
 	if (state->header.type == GLC_MESSAGE_PICTURE) {
 		pic_header = (glc_picture_header_t *) state->read_data;
 		scale_get_ctx(scale, pic_header->ctx, &ctx);
@@ -119,34 +119,25 @@ int scale_read_callback(glc_thread_state_t *state) {
 
 		if (ctx->process)
 			state->write_size = ctx->sw * ctx->sh * 3 + GLC_PICTURE_HEADER_SIZE;
-		else
-			state->write_size = state->read_size;
+		else {
+			state->flags |= GLC_THREAD_COPY;
+			pthread_rwlock_unlock(&ctx->update);
+		}
 	} else
-		state->write_size = state->read_size;
-	
+		state->flags |= GLC_THREAD_COPY;
+
 	return 0;
 }
 
 int scale_write_callback(glc_thread_state_t *state) {
 	struct scale_private_s *scale = (struct scale_private_s *) state->ptr;
 	struct scale_ctx_s *ctx = state->threadptr;
-	
-	if (state->header.type == GLC_MESSAGE_PICTURE) {
-		if (!ctx->process) {
-			pthread_rwlock_unlock(&ctx->update);
-			goto copy;
-		}
-		
-		memcpy(state->write_data, state->read_data, GLC_PICTURE_HEADER_SIZE);
-		scale_pic_msg(scale, ctx,
-		               (unsigned char *) &state->read_data[GLC_PICTURE_HEADER_SIZE],
-		               (unsigned char *) &state->write_data[GLC_PICTURE_HEADER_SIZE]);
-		pthread_rwlock_unlock(&ctx->update);
-		return 0;
-	}
-copy:
-	memcpy(state->write_data, state->read_data, state->write_size);
-	
+
+	memcpy(state->write_data, state->read_data, GLC_PICTURE_HEADER_SIZE);
+	scale_pic_msg(scale, ctx,
+	               (unsigned char *) &state->read_data[GLC_PICTURE_HEADER_SIZE],
+	               (unsigned char *) &state->write_data[GLC_PICTURE_HEADER_SIZE]);
+	pthread_rwlock_unlock(&ctx->update);
 	return 0;
 }
 

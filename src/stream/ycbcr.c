@@ -190,7 +190,7 @@ int ycbcr_read_callback(glc_thread_state_t *state)
 
 	if (state->header.type == GLC_MESSAGE_CTX)
 		ycbcr_ctx_msg(ycbcr, (glc_ctx_message_t *) state->read_data);
-	
+
 	if (state->header.type == GLC_MESSAGE_PICTURE) {
 		pic_hdr = (glc_picture_header_t *) state->read_data;
 		ycbcr_get_ctx(ycbcr, pic_hdr->ctx, &ctx);
@@ -200,10 +200,12 @@ int ycbcr_read_callback(glc_thread_state_t *state)
 
 		if (ctx->convert != NULL)
 			state->write_size = GLC_PICTURE_HEADER_SIZE + ctx->size;
-		else
-			state->write_size = state->read_size;
+		else {
+			state->flags |= GLC_THREAD_COPY;
+			pthread_rwlock_unlock(&ctx->update);
+		}
 	} else
-		state->write_size = state->read_size;
+		state->flags |= GLC_THREAD_COPY;
 
 	return 0;
 }
@@ -213,20 +215,11 @@ int ycbcr_write_callback(glc_thread_state_t *state)
 	struct ycbcr_private_s *ycbcr = state->ptr;
 	struct ycbcr_ctx_s *ctx = state->threadptr;
 
-	if (state->header.type == GLC_MESSAGE_PICTURE) {
-		if (ctx->convert == NULL) {
-			pthread_rwlock_unlock(&ctx->update);
-			memcpy(state->write_data, state->read_data, state->write_size);
-			return 0;
-		}
-		
-		memcpy(state->write_data, state->read_data, GLC_PICTURE_HEADER_SIZE);
-		ctx->convert(ycbcr, ctx,
-			     (unsigned char *) &state->read_data[GLC_PICTURE_HEADER_SIZE],
-			     (unsigned char *) &state->write_data[GLC_PICTURE_HEADER_SIZE]);
-		pthread_rwlock_unlock(&ctx->update);
-	} else
-		memcpy(state->write_data, state->read_data, state->write_size);
+	memcpy(state->write_data, state->read_data, GLC_PICTURE_HEADER_SIZE);
+	ctx->convert(ycbcr, ctx,
+		     (unsigned char *) &state->read_data[GLC_PICTURE_HEADER_SIZE],
+		     (unsigned char *) &state->write_data[GLC_PICTURE_HEADER_SIZE]);
+	pthread_rwlock_unlock(&ctx->update);
 
 	return 0;
 }
