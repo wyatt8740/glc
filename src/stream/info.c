@@ -250,31 +250,21 @@ void pic_info(struct info_private_s *info, glc_picture_header_t *pic_header)
 
 void audio_fmt_info(struct info_private_s *info, glc_audio_format_message_t *fmt_message)
 {
+	INFO_FLAGS
 	print_time(stdout, info->time);
 	if (info->glc->info_level >= INFO_DETAILED_AUDIO_FORMAT) {
 		printf("audio format message\n");
 
 		printf("  stream      = %d\n", fmt_message->audio);
-		printf("  format      = ");
-		switch(fmt_message->format) {
-		case GLC_AUDIO_FORMAT_S16_LE:
-			printf("GLC_AUDIO_FORMAT_S16_LE\n");
-			break;
-		case GLC_AUDIO_FORMAT_S24_LE:
-			printf("GLC_AUDIO_FORMAT_S24_LE\n");
-			break;
-		case GLC_AUDIO_FORMAT_S32_LE:
-			printf("GLC_AUDIO_FORMAT_S32_LE\n");
-			break;
-		case GLC_AUDIO_FORMAT_UNKNOWN:
-			printf("GLC_AUDIO_FORMAT_UNKNOWN\n");
-			break;
-		default:
-			printf("(unknown)\n");
-		}
+		printf("  flags       = ");
+		INFO_FLAG(fmt_message->flags, GLC_AUDIO_INTERLEAVED)
+		INFO_FLAG(fmt_message->flags, GLC_AUDIO_FORMAT_UNKNOWN)
+		INFO_FLAG(fmt_message->flags, GLC_AUDIO_S16_LE)
+		INFO_FLAG(fmt_message->flags, GLC_AUDIO_S24_LE)
+		INFO_FLAG(fmt_message->flags, GLC_AUDIO_S32_LE)
+		printf("\n");
 		printf("  rate        = %d\n", fmt_message->rate);
 		printf("  channels    = %d\n", fmt_message->channels);
-		printf("  interleaved = %d\n", fmt_message->interleaved);
 	} else
 		printf("audio format message\n");
 }

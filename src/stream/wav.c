@@ -134,14 +134,14 @@ int wav_write_hdr(struct wav_private_s *wav, glc_audio_format_message_t *fmt_msg
 	if (fmt_msg->audio != wav->glc->export_audio)
 		return 0;
 	
-	if (fmt_msg->format == GLC_AUDIO_FORMAT_S16_LE)
+	if (fmt_msg->flags & GLC_AUDIO_S16_LE)
 		sample_size = 2;
-	else if (fmt_msg->format == GLC_AUDIO_FORMAT_S24_LE)
+	else if (fmt_msg->flags & GLC_AUDIO_S24_LE)
 		sample_size = 3;
-	else if (fmt_msg->format == GLC_AUDIO_FORMAT_S32_LE)
+	else if (fmt_msg->flags & GLC_AUDIO_S32_LE)
 		sample_size = 4;
 	else {
-		fprintf(stderr, "wav: unsupported format 0x%02x (stream %d)\n", fmt_msg->format, fmt_msg->audio);
+		fprintf(stderr, "wav: unsupported format 0x%02x (stream %d)\n", fmt_msg->flags, fmt_msg->audio);
 		return ENOTSUP;
 	}
 
@@ -180,7 +180,10 @@ int wav_write_hdr(struct wav_private_s *wav, glc_audio_format_message_t *fmt_msg
 	wav->bps = fmt.bps;
 	wav->rate = fmt_msg->rate;
 	wav->channels = fmt_msg->channels;
-	wav->interleaved = fmt_msg->interleaved;
+	if (fmt_msg->flags & GLC_AUDIO_INTERLEAVED)
+		wav->interleaved = 1;
+	else
+		wav->interleaved = 0;
 	return 0;
 }
 

@@ -41,8 +41,7 @@ struct audio_play_stream_s {
 	
 	unsigned int channels;
 	unsigned int rate;
-	glc_audio_format_t format;
-	int interleaved;
+	glc_flags_t flags;
 
 	int fmt;
 
@@ -68,23 +67,19 @@ int audio_play_hw(struct audio_play_private_s *audio_play, glc_audio_format_mess
 int audio_play_play(struct audio_play_private_s *audio_play, glc_audio_header_t *audio_msg, char *data);
 int audio_play_get_stream(struct audio_play_private_s *audio_play, glc_audio_i audio_i, struct audio_play_stream_s **stream);
 
-snd_pcm_format_t glc_fmt_to_pcm_fmt(glc_audio_format_t glc_fmt);
-glc_audio_format_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt);
+snd_pcm_format_t glc_fmt_to_pcm_fmt(glc_flags_t flags);
 
 int audio_play_xrun(struct audio_play_stream_s *stream, int err);
 
-snd_pcm_format_t glc_fmt_to_pcm_fmt(glc_audio_format_t glc_fmt)
+snd_pcm_format_t glc_fmt_to_pcm_fmt(glc_flags_t flags)
 {
-	switch (glc_fmt) {
-	case GLC_AUDIO_FORMAT_S16_LE:
+	if (flags & GLC_AUDIO_S16_LE)
 		return SND_PCM_FORMAT_S16_LE;
-	case GLC_AUDIO_FORMAT_S24_LE:
+	else if (flags & GLC_AUDIO_S24_LE)
 		return SND_PCM_FORMAT_S24_LE;
-	case GLC_AUDIO_FORMAT_S32_LE:
+	else if (flags & GLC_AUDIO_S32_LE)
 		return SND_PCM_FORMAT_S32_LE;
-	default:
-		return 0;
-	}
+	return 0;
 }
 
 int audio_play_init(glc_t *glc, ps_buffer_t *from)
@@ -176,15 +171,14 @@ int audio_play_hw(struct audio_play_private_s *audio_play, glc_audio_format_mess
 
 	audio_play_get_stream(audio_play, fmt_msg->audio, &stream);
 
-	stream->interleaved = fmt_msg->interleaved;
+	stream->flags = fmt_msg->flags;
 	stream->rate = fmt_msg->rate;
-	stream->format = fmt_msg->format;
 	stream->channels = fmt_msg->channels;
 
 	if (stream->pcm) /* re-open */
 		snd_pcm_close(stream->pcm);
 
-	if (stream->interleaved)
+	if (stream->flags & GLC_AUDIO_INTERLEAVED)
 		access = SND_PCM_ACCESS_RW_INTERLEAVED;
 	else
 		access = SND_PCM_ACCESS_RW_NONINTERLEAVED;
@@ -199,7 +193,7 @@ int audio_play_hw(struct audio_play_private_s *audio_play, glc_audio_format_mess
 		goto err;
 	if ((ret = snd_pcm_hw_params_set_access(stream->pcm, hw_params, access)) < 0)
 		goto err;
-	if ((ret = snd_pcm_hw_params_set_format(stream->pcm, hw_params, glc_fmt_to_pcm_fmt(stream->format))) < 0)
+	if ((ret = snd_pcm_hw_params_set_format(stream->pcm, hw_params, glc_fmt_to_pcm_fmt(stream->flags))) < 0)
 		goto err;
 	if ((ret = snd_pcm_hw_params_set_channels(stream->pcm, hw_params, stream->channels)) < 0)
 		goto err;
@@ -255,7 +249,7 @@ int audio_play_play(struct audio_play_private_s *audio_play, glc_audio_header_t 
 		/* alsa is horrible... */
 		snd_pcm_wait(stream->pcm, duration);
 		
-		if (stream->interleaved)
+		if (stream->flags & GLC_AUDIO_INTERLEAVED)
 			ret = snd_pcm_writei(stream->pcm, &data[snd_pcm_frames_to_bytes(stream->pcm, frames - rem)], rem);
 		else {
 			for (c = 0; c < stream->channels; c++)

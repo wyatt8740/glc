@@ -271,34 +271,32 @@ typedef struct {
 /** planar YV12 420jpeg */
 #define GLC_CTX_YCBCR_420JPEG            16
 
-/** audio format */
-typedef u_int32_t glc_audio_format_t;
-/** unknown/unsupported format */
-#define GLC_AUDIO_FORMAT_UNKNOWN          1
-/** signed 16bit little-endian */
-#define GLC_AUDIO_FORMAT_S16_LE           2
-/** signed 24bit little-endian */
-#define GLC_AUDIO_FORMAT_S24_LE           3
-/** signed 32bit little-endian */
-#define GLC_AUDIO_FORMAT_S32_LE           4
-
 /**
  * \brief audio format message
  */
 typedef struct {
+	/** stream flags */
+	glc_flags_t flags;
 	/** audio stream number */
 	glc_audio_i audio;
-	/** stream format */
-	glc_audio_format_t format;
 	/** rate */
 	u_int32_t rate;
 	/** number of channels */
 	u_int32_t channels;
-	/** 0 = non-interleaved, 1 = interleaved */
-	u_int32_t interleaved;
 } glc_audio_format_message_t;
 /** sizeof(glc_audio_format_message_t) */
-#define GLC_AUDIO_FORMAT_MESSAGE_SIZE    24
+#define GLC_AUDIO_FORMAT_MESSAGE_SIZE    16
+
+/** interleaved */
+#define GLC_AUDIO_INTERLEAVED             1
+/** unknown/unsupported format */
+#define GLC_AUDIO_FORMAT_UNKNOWN          2
+/** signed 16bit little-endian */
+#define GLC_AUDIO_S16_LE                  4
+/** signed 24bit little-endian */
+#define GLC_AUDIO_S24_LE                  8
+/** signed 32bit little-endian */
+#define GLC_AUDIO_S32_LE                 16
 
 /**
  * \brief audio data message header
