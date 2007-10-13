@@ -44,7 +44,7 @@ struct info_ctx_s {
 	unsigned long pictures;
 	
 	unsigned long fps;
-	glc_utime_t last_fps_time;
+	glc_utime_t last_fps_time, fps_time;
 	
 	struct info_ctx_s *next;
 };
@@ -238,10 +238,11 @@ void pic_info(struct info_private_s *info, glc_picture_header_t *pic_header)
 	ctx->pictures++;
 	ctx->fps++;
 
-	if ((info->glc->info_level >= INFO_FPS) && (pic_header->timestamp - ctx->last_fps_time >= 1000000)) {
+	if ((info->glc->info_level >= INFO_FPS) && (pic_header->timestamp - ctx->fps_time >= 1000000)) {
 		print_time(stdout, info->time);
 		printf("ctx %d: %04.2f fps\n", ctx->ctx_i, (double) (ctx->fps * 1000000) / (double) (pic_header->timestamp - ctx->last_fps_time));
-		ctx->last_fps_time += 1000000;
+		ctx->last_fps_time = pic_header->timestamp;
+		ctx->fps_time += 1000000;
 		ctx->fps = 0;
 	}
 
