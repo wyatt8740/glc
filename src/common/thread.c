@@ -183,7 +183,7 @@ void *glc_thread(void *argptr)
 
 			if (state->flags & GLC_THREAD_COPY) {
 				/* should be faster, no need for fake dma */
-				if ((ret = ps_packet_write(&write, &state->read_data, state->write_size)))
+				if ((ret = ps_packet_write(&write, state->read_data, state->write_size)))
 					goto err;
 			} else {
 				if ((ret = ps_packet_dma(&write, (void *) &state->write_data,
