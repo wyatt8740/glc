@@ -39,9 +39,9 @@
 
 struct main_private_s {
 	glc_t *glc;
-	
+
 	void *gl;
-	
+
 	ps_buffer_t *uncompressed;
 	ps_buffer_t *compressed;
 	size_t uncompressed_size, compressed_size;
@@ -65,18 +65,18 @@ __PRIVATE void lib_close();
 __PRIVATE int load_environ();
 __PRIVATE void signal_handler(int signum);
 
-void __PRIVATE __attribute__ ((constructor)) lib_init(void)
+void __PRIVATE __attribute__((constructor)) lib_init(void)
 {
 	struct sigaction new_sighandler, old_sighandler;
 	int ret;
-	
+
 	glc_create(&mpriv.glc);
 	load_environ();
 	util_init(mpriv.glc);
-	
+
 	if ((ret = init_buffers()))
 		goto err;
-	
+
 	util_create_info(mpriv.glc);
 
 	if ((ret = opengl_init(mpriv.glc)))
@@ -85,7 +85,7 @@ void __PRIVATE __attribute__ ((constructor)) lib_init(void)
 		goto err;
 	if ((ret = x11_init(mpriv.glc)))
 		goto err;
-	
+
 	util_init_info(mpriv.glc); /* init stream info */
 
 	if (mpriv.glc->flags & GLC_CAPTURE) {
@@ -121,7 +121,7 @@ int init_buffers()
 	int ret;
 	ps_bufferattr_t attr;
 	ps_bufferattr_init(&attr);
-	
+
 	ps_bufferattr_setsize(&attr, mpriv.uncompressed_size);
 	mpriv.uncompressed = (ps_buffer_t *) malloc(sizeof(ps_buffer_t));
 	if ((ret = ps_buffer_init(mpriv.uncompressed, &attr)))
@@ -133,7 +133,7 @@ int init_buffers()
 		if ((ret = ps_buffer_init(mpriv.compressed, &attr)))
 			return ret;
 	}
-	
+
 	ps_bufferattr_destroy(&attr);
 	return 0;
 }
@@ -156,7 +156,7 @@ int start_glc()
 		return ret;
 	if ((ret = opengl_start(mpriv.uncompressed)))
 		return ret;
-	
+
 	lib.running = 1;
 	return 0;
 }
@@ -172,7 +172,7 @@ void signal_handler(int signum)
 	else if ((signum == SIGTERM) &&
 	         (mpriv.sigterm_handler == SIG_IGN))
 		return;
-	
+
 	if ((signum == SIGINT) &&
 	    (mpriv.sigint_handler != SIG_DFL) &&
 	    (mpriv.sigint_handler != NULL))
@@ -210,13 +210,13 @@ void lib_close()
 		ps_buffer_destroy(mpriv.compressed);
 		free(mpriv.compressed);
 	}
-	
+
 	ps_buffer_destroy(mpriv.uncompressed);
 	free(mpriv.uncompressed);
-	
+
 	util_free_info(mpriv.glc);
 	util_free(mpriv.glc);
-	
+
 	free(mpriv.glc->stream_file);
 	glc_destroy(mpriv.glc);
 	return;
@@ -233,23 +233,23 @@ int load_environ()
 		if (atoi(getenv("GLC_START")))
 			mpriv.glc->flags |= GLC_CAPTURE;
 	}
-	
+
 	mpriv.glc->stream_file = malloc(1024);
 	if (getenv("GLC_FILE"))
 		snprintf(mpriv.glc->stream_file, 1023, getenv("GLC_FILE"), getpid());
 	else
 		snprintf(mpriv.glc->stream_file, 1023, "pid-%d.glc", getpid());
-	
+
 	if (getenv("GLC_SIGHANDLER"))
 		mpriv.sighandler = atoi(getenv("GLC_SIGHANDLER"));
 	else
 		mpriv.sighandler = 0;
-	
+
 	if (getenv("GLC_COMPRESSED_BUFFER_SIZE"))
 		mpriv.uncompressed_size = atoi(getenv("GLC_COMPRESSED_BUFFER_SIZE")) * 1024 * 1024;
 	else
 		mpriv.uncompressed_size = 1024 * 1024 * 10;
-	
+
 	if (getenv("GLC_COMPRESSED_BUFFER_SIZE"))
 		mpriv.compressed_size = atoi(getenv("GLC_COMPRESSED_BUFFER_SIZE")) * 1024 * 1024;
 	else
@@ -265,14 +265,14 @@ int load_environ()
 		mpriv.compress = atoi(getenv("GLC_COMPRESS"));
 	else
 		mpriv.compress = 1;
-	
+
 	return 0;
 }
 
 void get_real_dlsym()
 {
 	eh_obj_t *libdl;
-	
+
 	if (eh_find_obj("*libdl.so*", &libdl)) {
 		fprintf(stderr, "glc: libdl.so is not present in memory\n");
 		exit(1);
@@ -282,7 +282,7 @@ void get_real_dlsym()
 		fprintf(stderr, "glc: can't get real dlopen()\n");
 		exit(1);
 	}
-	
+
 	if (eh_find_sym(libdl, "dlsym", (void *) &lib.dlsym)) {
 		fprintf(stderr, "glc: can't get real dlsym()\n");
 		exit(1);
@@ -292,7 +292,7 @@ void get_real_dlsym()
 		fprintf(stderr, "glc: can't get real dlvsym()\n");
 		exit(1);
 	}
-	
+
 	eh_free_obj(libdl);
 }
 
@@ -343,14 +343,14 @@ void *dlopen(const char *filename, int flag)
 {
 	if (lib.dlopen == NULL)
 		get_real_dlsym();
-	
+
 	void *ret = lib.dlopen(filename, flag);
 
 	if ((ret != NULL) && (filename != NULL)) {
 		if ((!fnmatch("*libasound.so*", filename, 0)) | (!fnmatch("*libasound_module_*.so*", filename, 0)))
 			alsa_unhook_so(filename); /* no audio stream duplication, thanks */
 	}
-	
+
 	return ret;
 }
 
@@ -362,7 +362,7 @@ void *dlsym(void *handle, const char *symbol)
 	void *ret = wrapped_func(symbol);
 	if (ret)
 		return ret;
-	
+
 	return lib.dlsym(handle, symbol);
 }
 

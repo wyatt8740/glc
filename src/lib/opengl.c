@@ -36,12 +36,12 @@ struct opengl_private_s {
 	glc_t *glc;
 	ps_buffer_t *unscaled, *buffer;
 	size_t unscaled_size;
-	
+
 	void *libGL_handle;
 	void (*glXSwapBuffers)(Display *dpy, GLXDrawable drawable);
 	void (*glFinish)(void);
 	__GLXextFuncPtr (*glXGetProcAddressARB)(const GLubyte *);
-	
+
 	int capture_glfinish;
 	int convert_ycbcr_420jpeg;
 	void *gl;
@@ -60,7 +60,7 @@ int opengl_init(glc_t *glc)
 	opengl.glc = glc;
 	opengl.glc->flags |= GLC_SCALE;
 	opengl.started = 0;
-	
+
 	/* load environment variables */
 	if (getenv("GLC_FPS"))
 		opengl.glc->fps = atof(getenv("GLC_FPS"));
@@ -79,7 +79,7 @@ int opengl_init(glc_t *glc)
 		opengl.unscaled_size = atoi(getenv("GLC_UNSCALED_BUFFER_SIZE")) * 1024 * 1024;
 	else
 		opengl.unscaled_size = 1024 * 1024 * 10;
-	
+
 	if (getenv("GLC_CAPTURE")) {
 		if (!strcmp(getenv("GLC_CAPTURE"), "front"))
 			opengl.glc->flags |= GLC_CAPTURE_FRONT;
@@ -87,12 +87,12 @@ int opengl_init(glc_t *glc)
 			opengl.glc->flags |= GLC_CAPTURE_BACK;
 	} else
 		opengl.glc->flags |= GLC_CAPTURE_BACK;
-	
+
 	if (getenv("GLC_CAPTURE_GLFINISH"))
 		opengl.capture_glfinish = atoi(getenv("GLC_CAPTURE_GLFINISH"));
 	else
 		opengl.capture_glfinish = 0;
-	
+
 	if (getenv("GLC_SCALE"))
 		opengl.glc->scale = atof(getenv("GLC_SCALE"));
 	else
@@ -166,16 +166,16 @@ int opengl_close()
 	int ret;
 	if (!opengl.started)
 		return 0;
-	
+
 	gl_capture_close(opengl.gl);
-	
+
 	if (opengl.glc->flags & GLC_SCALE) {
 		if (lib.running) {
 			if ((ret = util_write_end_of_stream(opengl.glc, opengl.unscaled)))
 				return ret;
 		} else
 			ps_buffer_cancel(opengl.unscaled);
-		
+
 		if (opengl.glc->flags & GLC_CONVERT_420JPEG)
 			sem_wait(&opengl.glc->signal[GLC_SIGNAL_YCBCR_FINISHED]);
 		else
@@ -190,7 +190,7 @@ int opengl_close()
 		ps_buffer_destroy(opengl.unscaled);
 		free(opengl.unscaled);
 	}
-	
+
 	/*if (opengl.libGL_handle)
 		dlclose(opengl.libGL_handle);*/
 	return 0;
@@ -200,7 +200,7 @@ void get_real_opengl()
 {
 	if (!lib.dlopen)
 		get_real_dlsym();
-	
+
 	opengl.libGL_handle = lib.dlopen("libGL.so", RTLD_LAZY);
 	if (!opengl.libGL_handle)
 		goto err;
@@ -229,7 +229,7 @@ __GLXextFuncPtr glXGetProcAddressARB(const GLubyte *proc_name)
 	__GLXextFuncPtr ret = (__GLXextFuncPtr) wrapped_func((char *) proc_name);
 	if (ret)
 		return ret;
-	
+
 	return opengl.glXGetProcAddressARB(proc_name);
 }
 
@@ -238,10 +238,10 @@ void glXSwapBuffers(Display *dpy, GLXDrawable drawable)
 	/* both flags shouldn't be defined */
 	if (opengl.glc->flags & GLC_CAPTURE_FRONT)
 		opengl.glXSwapBuffers(dpy, drawable);
-	
+
 	if (opengl.glc->flags & GLC_CAPTURE)
 		gl_capture(opengl.gl, dpy, drawable);
-	
+
 	if (opengl.glc->flags & GLC_CAPTURE_BACK)
 		opengl.glXSwapBuffers(dpy, drawable);
 }
@@ -257,7 +257,7 @@ void opengl_capture_current()
 {
 	Display *dpy = glXGetCurrentDisplay();
 	GLXDrawable drawable = glXGetCurrentDrawable();
-	
+
 	if ((opengl.glc->flags & GLC_CAPTURE) && (dpy != NULL) && (drawable != None))
 		gl_capture(opengl.gl, dpy, drawable);
 }

@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
 	glc->silence_threshold = 2000000;
 	compressed_size = 10 * 1024 * 1024;
 	uncompressed_size = 10 * 1024 * 1024;
-	
+
 	while ((opt = getopt_long(argc, argv, "i:a:p:y:o:f:l:c:u:s:th",
 				  long_options, &optind)) != -1) {
 		switch (opt) {
@@ -162,11 +162,11 @@ int main(int argc, char *argv[])
 
 	if (glc->fps == 0)
 		glc->fps = glc->info->fps;
-	
+
 	ps_bufferattr_init(&attr);
 	if (show_stats)
 		ps_bufferattr_setflags(&attr, PS_BUFFER_STATS);
-		
+
 	ps_bufferattr_setsize(&attr, uncompressed_size);
 	uncompressed = malloc(sizeof(ps_buffer_t));
 	ps_buffer_init(uncompressed, &attr);
@@ -185,15 +185,15 @@ int main(int argc, char *argv[])
 		rgb = malloc(sizeof(ps_buffer_t));
 		ps_buffer_init(rgb, &attr);
 	}
-	
+
 	ps_bufferattr_setsize(&attr, compressed_size);
 	compressed = malloc(sizeof(ps_buffer_t));
 	ps_buffer_init(compressed, &attr);
-	
+
 	ps_bufferattr_destroy(&attr);
-	
+
 	util_init(glc);
-	
+
 	if (img) {
 		rgb_init(glc, uncompressed, rgb);
 		img_init(glc, rgb);
@@ -210,13 +210,13 @@ int main(int argc, char *argv[])
 		audio_play_init(glc, audio);
 		gl_play_init(glc, rgb);
 	}
-	
+
 	unpack_init(glc, compressed, uncompressed);
 	if (file_read(glc, compressed)) {
 		ps_buffer_cancel(compressed);
 		ps_buffer_cancel(uncompressed);
 	}
-	
+
 	if (img) {
 		sem_wait(&glc->signal[GLC_SIGNAL_IMG_FINISHED]);
 		sem_wait(&glc->signal[GLC_SIGNAL_RGB_FINISHED]);
@@ -234,19 +234,19 @@ int main(int argc, char *argv[])
 		sem_wait(&glc->signal[GLC_SIGNAL_GL_PLAY_FINISHED]);
 	}
 	sem_wait(&glc->signal[GLC_SIGNAL_PACK_FINISHED]);
-	
+
 	if (show_stats) {
 		if (!ps_buffer_stats(uncompressed, &stats)) {
 			printf("uncompressed stream:\n");
 			ps_stats_text(&stats, stdout);
 		}
-		
+
 		if (!ps_buffer_stats(compressed, &stats)) {
 			printf("compressed stream:\n");
 			ps_stats_text(&stats, stdout);
 		}
 	}
-	
+
 	ps_buffer_destroy(compressed);
 	ps_buffer_destroy(uncompressed);
 	free(compressed);
@@ -268,7 +268,7 @@ int main(int argc, char *argv[])
 	util_free_info(glc);
 	util_free(glc);
 	glc_destroy(glc);
-	
+
 	return EXIT_SUCCESS;
 
 usage:
@@ -289,7 +289,7 @@ usage:
 	       "                             signature, version, flags, fps, pid, name, date\n"
 	       "  -t, --statistics         show stream statistics\n"
 	       "  -h, --help               show help\n");
-	
+
 	return EXIT_FAILURE;
 }
 

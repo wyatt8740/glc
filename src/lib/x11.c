@@ -65,7 +65,7 @@ __PRIVATE int x11_parse_hotkey(const char *hotkey);
 int x11_init(glc_t *glc)
 {
 	x11.glc = glc;
-	
+
 	get_real_x11();
 
 	if (getenv("GLC_HOTKEY")) {
@@ -80,7 +80,7 @@ int x11_init(glc_t *glc)
 	}
 
 	x11.stop = util_timestamp(x11.glc);
-	
+
 	return 0;
 }
 
@@ -104,7 +104,7 @@ int x11_parse_hotkey(const char *hotkey)
 		}
 		c++;
 	}
-	
+
 	x11.capture = XStringToKeysym(&hotkey[s]);
 
 	if (!x11.capture)
@@ -135,7 +135,7 @@ void x11_event(Display *dpy, XEvent *event)
 
 			if ((x11.key_mask & X11_KEY_SHIFT) && (!(event->xkey.state & ShiftMask)))
 				return;
-			
+
 			if (x11.glc->flags & GLC_CAPTURE) { /* stop */
 				x11.glc->flags &= ~GLC_CAPTURE;
 				x11.stop = util_timestamp(x11.glc);
@@ -159,11 +159,11 @@ void get_real_x11()
 {
 	if (!lib.dlopen)
 		get_real_dlsym();
-	
+
 	x11.libX11_handle = lib.dlopen("libX11.so", RTLD_LAZY);
 	if (!x11.libX11_handle)
 		goto err;
-	
+
 	x11.XNextEvent =
 	  (int (*)(Display *, XEvent *))
 	    lib.dlsym(x11.libX11_handle, "XNextEvent");
@@ -219,7 +219,7 @@ void get_real_x11()
 	    lib.dlsym(x11.libX11_handle, "XPeekIfEvent");
 	if (!x11.XPeekIfEvent)
 		goto err;
-	
+
 	return;
 err:
 	fprintf(stderr, "can't get real X11\n");
