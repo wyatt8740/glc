@@ -30,16 +30,22 @@ typedef struct {
 	void *(*dlopen)(const char *filename, int flag);
 	void *(*dlsym)(void *, const char *);
 	void *(*dlvsym)(void *, const char *, const char *);
+	int initialized;
 	int running;
 } glc_lib_t;
 
 #define __PRIVATE __attribute__ ((visibility ("hidden")))
+
+#define INIT_GLC \
+	if (!lib.initialized) \
+		init_glc();
 
 /**
  * \addtogroup main
  *  \{
  */
 __PRIVATE extern glc_lib_t lib;
+__PRIVATE void init_glc();
 __PRIVATE int start_glc();
 __PRIVATE void get_real_dlsym();
 __PRIVATE void *wrapped_func(const char *symbol);

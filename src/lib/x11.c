@@ -228,6 +228,7 @@ err:
 
 int XNextEvent(Display *display, XEvent *event_return)
 {
+	INIT_GLC
 	int ret = x11.XNextEvent(display, event_return);
 	x11_event(display, event_return);
 	return ret;
@@ -235,6 +236,7 @@ int XNextEvent(Display *display, XEvent *event_return)
 
 int XPeekEvent(Display *display, XEvent *event_return)
 {
+	INIT_GLC
 	int ret = x11.XPeekEvent(display, event_return);
 	x11_event(display, event_return);
 	return ret;
@@ -242,6 +244,7 @@ int XPeekEvent(Display *display, XEvent *event_return)
 
 int XWindowEvent(Display *display, Window w, long event_mask, XEvent *event_return)
 {
+	INIT_GLC
 	int ret = x11.XWindowEvent(display, w, event_mask, event_return);
 	x11_event(display, event_return);
 	return ret;
@@ -257,6 +260,7 @@ Bool XCheckWindowEvent(Display *display, Window w, long event_mask, XEvent *even
 
 int XMaskEvent(Display *display, long event_mask, XEvent *event_return)
 {
+	INIT_GLC
 	int ret = x11.XMaskEvent(display, event_mask, event_return);
 	x11_event(display, event_return);
 	return ret;
@@ -288,6 +292,7 @@ Bool XCheckTypedWindowEvent(Display *display, Window w, int event_type, XEvent *
 
 int XIfEvent(Display *display, XEvent *event_return, Bool ( *predicate)(), XPointer arg)
 {
+	INIT_GLC
 	int ret = x11.XIfEvent(display, event_return, predicate, arg);
 	x11_event(display, event_return);
 	return ret;
@@ -303,6 +308,7 @@ Bool XCheckIfEvent(Display *display, XEvent *event_return, Bool ( *predicate)(),
 
 int XPeekIfEvent(Display *display, XEvent *event_return, Bool ( *predicate)(), XPointer arg)
 {
+	INIT_GLC
 	int ret = x11.XPeekIfEvent(display, event_return, predicate, arg);
 	x11_event(display, event_return);
 	return ret;

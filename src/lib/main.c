@@ -56,6 +56,7 @@ struct main_private_s {
 __PRIVATE glc_lib_t lib = {NULL, /* dlopen */
 			   NULL, /* dlsym */
 			   NULL, /* dlvsym */
+			   0, /* initialized */
 			   0, /* running */
 			   };
 __PRIVATE struct main_private_s mpriv;
@@ -65,10 +66,13 @@ __PRIVATE void lib_close();
 __PRIVATE int load_environ();
 __PRIVATE void signal_handler(int signum);
 
-void __PRIVATE __attribute__((constructor)) lib_init(void)
+void init_glc()
 {
 	struct sigaction new_sighandler, old_sighandler;
 	int ret;
+
+	if (lib.initialized)
+		return;
 
 	glc_create(&mpriv.glc);
 	load_environ();
@@ -87,6 +91,8 @@ void __PRIVATE __attribute__((constructor)) lib_init(void)
 		goto err;
 
 	util_init_info(mpriv.glc); /* init stream info */
+
+	lib.initialized = 1; /* we've technically done */
 
 	if (mpriv.glc->flags & GLC_CAPTURE) {
 		if ((ret = start_glc()))
@@ -113,7 +119,7 @@ void __PRIVATE __attribute__((constructor)) lib_init(void)
 	return;
 err:
 	fprintf(stderr, "glc: %s (%d)\n", strerror(ret), ret);
-	exit(ret);
+	exit(ret); /* glc initialization is critical */
 }
 
 int init_buffers()
@@ -143,6 +149,9 @@ int start_glc()
 	int ret;
 	if (lib.running)
 		return EINVAL;
+
+	if (!lib.initialized)
+		return EAGAIN;
 
 	if (mpriv.compress) {
 		if ((ret = file_init(mpriv.glc, mpriv.compressed))) /* file needs stream info */
@@ -303,7 +312,7 @@ void *wrapped_func(const char *symbol)
 		return &glXGetProcAddressARB;
 	else if (!strcmp(symbol, "glXSwapBuffers"))
 		return &glXSwapBuffers;
-	else if (!strcmp(symbol, "glFinish")) /* TODO opengl_load_cfg() */
+	else if (!strcmp(symbol, "glFinish"))
 		return &glFinish;
 	else if (!strcmp(symbol, "snd_pcm_writei"))
 		return &snd_pcm_writei;

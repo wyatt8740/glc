@@ -226,6 +226,8 @@ err:
 
 __GLXextFuncPtr glXGetProcAddressARB(const GLubyte *proc_name)
 {
+	INIT_GLC
+
 	__GLXextFuncPtr ret = (__GLXextFuncPtr) wrapped_func((char *) proc_name);
 	if (ret)
 		return ret;
@@ -235,6 +237,8 @@ __GLXextFuncPtr glXGetProcAddressARB(const GLubyte *proc_name)
 
 void glXSwapBuffers(Display *dpy, GLXDrawable drawable)
 {
+	INIT_GLC
+
 	/* both flags shouldn't be defined */
 	if (opengl.glc->flags & GLC_CAPTURE_FRONT)
 		opengl.glXSwapBuffers(dpy, drawable);
@@ -248,6 +252,8 @@ void glXSwapBuffers(Display *dpy, GLXDrawable drawable)
 
 void glFinish(void)
 {
+	INIT_GLC
+
 	opengl.glFinish();
 	if (opengl.capture_glfinish)
 		opengl_capture_current();
@@ -257,6 +263,8 @@ void opengl_capture_current()
 {
 	Display *dpy = glXGetCurrentDisplay();
 	GLXDrawable drawable = glXGetCurrentDrawable();
+
+	INIT_GLC
 
 	if ((opengl.glc->flags & GLC_CAPTURE) && (dpy != NULL) && (drawable != None))
 		gl_capture(opengl.gl, dpy, drawable);
