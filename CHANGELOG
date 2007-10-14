@@ -1,3 +1,7 @@
+0.3.2 (2007/10/14)
+   Hopefully fixed that crippling bash bug, glc-capture -s against
+    scripts should be perfectly safe now.
+
 0.3.1 (2007/10/13)
    Support for non-integer fps.
    Cleaned up audio format message. Should be more extensible now.

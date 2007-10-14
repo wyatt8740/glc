@@ -113,7 +113,7 @@ int gl_capture_init_pbo(struct gl_capture_private_s *gl);
 int gl_capture_create_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
 int gl_capture_destroy_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
 int gl_capture_start_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
-int gl_capture_read_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx, char *to);
+int gl_capture_read_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
 
 void *gl_capture_init(glc_t *glc, ps_buffer_t *to)
 {
@@ -244,7 +244,7 @@ int gl_capture_gen_indicator_list(struct gl_capture_private_s *gl_capture, struc
 	
 	glNewList(ctx->indicator_list, GL_COMPILE);
 	
-	size = ctx->h / 50;
+	size = ctx->h / 75;
 	if (size < 10)
 		size = 10;
 
@@ -363,7 +363,7 @@ int gl_capture_start_pbo(struct gl_capture_private_s *gl_capture, struct gl_capt
 	return 0;
 }
 
-int gl_capture_read_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx, char *to)
+int gl_capture_read_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
 {
 	GLvoid *buf;
 	GLint binding;
@@ -378,7 +378,8 @@ int gl_capture_read_pbo(struct gl_capture_private_s *gl_capture, struct gl_captu
 	if (!buf)
 		return EINVAL;
 
-	memcpy(to, buf, ctx->cw * ctx->ch * gl_capture->bpp);
+	ps_packet_write(&ctx->packet, buf, ctx->cw * ctx->ch * gl_capture->bpp);
+
 	gl_capture->glUnmapBuffer(GL_PIXEL_PACK_BUFFER_ARB);
 
 	ctx->pbo_active = 0;
@@ -513,16 +514,26 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 			goto cancel;
 		if ((ret = ps_packet_write(&ctx->packet, &pic, GLC_PICTURE_HEADER_SIZE)))
 			goto cancel;
-		if ((ret = ps_packet_dma(&ctx->packet, (void *) &dma,
+
+		if (gl_capture->use_pbo) {
+			/* is this safe, what happens if this is called simultaneously? */
+			if ((ret = ps_packet_setsize(&ctx->packet, ctx->cw * ctx->ch * gl_capture->bpp
+								   + GLC_MESSAGE_HEADER_SIZE
+								   + GLC_PICTURE_HEADER_SIZE)))
+				goto cancel;
+
+			if ((ret = gl_capture_read_pbo(gl_capture, ctx)))
+				goto cancel;
+
+			ret = gl_capture_start_pbo(gl_capture, ctx);
+			ctx->pbo_timestamp = now;
+		} else {
+			if ((ret = ps_packet_dma(&ctx->packet, (void *) &dma,
 					 ctx->cw * ctx->ch * gl_capture->bpp, PS_ACCEPT_FAKE_DMA)))
 			goto cancel;
 
-		if (gl_capture->use_pbo) {
-			gl_capture_read_pbo(gl_capture, ctx, dma);
-			ret = gl_capture_start_pbo(gl_capture, ctx);
-			ctx->pbo_timestamp = now;
-		} else
 			ret = gl_capture_get_pixels(gl_capture, ctx, dma);
+		}
 		
 		ctx->last += gl_capture->fps;
 

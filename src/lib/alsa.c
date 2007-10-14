@@ -30,11 +30,11 @@
 
 struct alsa_private_s {
 	glc_t *glc;
-	
+
 	void *audio;
 	int capture;
 	int started;
-	
+
 	void *libasound_handle;
 	snd_pcm_sframes_t (*snd_pcm_writei)(snd_pcm_t *, const void *, snd_pcm_uframes_t);
 	snd_pcm_sframes_t (*snd_pcm_writen)(snd_pcm_t *, void **, snd_pcm_uframes_t);
@@ -70,7 +70,7 @@ int alsa_start(ps_buffer_t *buffer)
 {
 	if (alsa.started)
 		return EINVAL;
-	
+
 	if (alsa.capture) {
 		if (!(alsa.audio = audio_capture_init(alsa.glc, buffer)))
 			return EAGAIN;
@@ -84,7 +84,7 @@ int alsa_close()
 {
 	if (!alsa.started)
 		return 0;
-	
+
 	if (alsa.capture)
 		audio_capture_close(alsa.audio);
 	/*if (alsa.libasound_handle)
@@ -96,7 +96,7 @@ void get_real_alsa()
 {
 	if (!lib.dlopen)
 		get_real_dlsym();
-	
+
 	alsa.libasound_handle = lib.dlopen("libasound.so", RTLD_LAZY);
 	if (!alsa.libasound_handle)
 		goto err;
@@ -130,7 +130,7 @@ int alsa_unhook_so(const char *soname)
 	/* TODO cache applied unhooks => reduce fs load */
 	int ret;
 	eh_obj_t *so;
-	
+
 	if ((ret = eh_find_obj(soname, &so)))
 		return ret;
 
@@ -141,7 +141,7 @@ int alsa_unhook_so(const char *soname)
 	eh_set_rel(so, "snd_pcm_mmap_commit", alsa.snd_pcm_mmap_commit);
 	eh_set_rel(so, "dlsym", lib.dlsym);
 	eh_set_rel(so, "dlvsym", lib.dlvsym);
-	
+
 	eh_free_obj(so);
 
 	return 0;
@@ -149,6 +149,7 @@ int alsa_unhook_so(const char *soname)
 
 snd_pcm_sframes_t snd_pcm_writei(snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size)
 {
+	INIT_GLC
 	snd_pcm_sframes_t ret = alsa.snd_pcm_writei(pcm, buffer, size);
 	if ((alsa.capture) && (ret > 0) && (alsa.glc->flags & GLC_CAPTURE))
 		audio_capture_alsa_i(alsa.audio, pcm, buffer, ret);
@@ -157,6 +158,7 @@ snd_pcm_sframes_t snd_pcm_writei(snd_pcm_t *pcm, const void *buffer, snd_pcm_ufr
 
 snd_pcm_sframes_t snd_pcm_writen(snd_pcm_t *pcm, void **bufs, snd_pcm_uframes_t size)
 {
+	INIT_GLC
 	snd_pcm_sframes_t ret = alsa.snd_pcm_writen(pcm, bufs, size);
 	if ((alsa.capture) && (ret > 0) && (alsa.glc->flags & GLC_CAPTURE))
 		audio_capture_alsa_n(alsa.audio, pcm, bufs, ret);
@@ -165,6 +167,7 @@ snd_pcm_sframes_t snd_pcm_writen(snd_pcm_t *pcm, void **bufs, snd_pcm_uframes_t 
 
 int snd_pcm_mmap_begin(snd_pcm_t *pcm, const snd_pcm_channel_area_t **areas, snd_pcm_uframes_t *offset, snd_pcm_uframes_t *frames)
 {
+	INIT_GLC
 	int ret = alsa.snd_pcm_mmap_begin(pcm, areas, offset, frames);
 	if ((alsa.capture) && (ret >= 0) && (alsa.glc->flags & GLC_CAPTURE))
 		audio_capture_alsa_mmap_begin(alsa.audio, pcm, *areas);
@@ -173,6 +176,7 @@ int snd_pcm_mmap_begin(snd_pcm_t *pcm, const snd_pcm_channel_area_t **areas, snd
 
 snd_pcm_sframes_t snd_pcm_mmap_commit(snd_pcm_t *pcm, snd_pcm_uframes_t offset, snd_pcm_uframes_t frames)
 {
+	INIT_GLC
 	if (alsa.capture && (alsa.glc->flags & GLC_CAPTURE))
 		audio_capture_alsa_mmap_commit(alsa.audio, pcm, offset,  frames);
 	return alsa.snd_pcm_mmap_commit(pcm, offset, frames);

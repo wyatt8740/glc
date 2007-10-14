@@ -65,7 +65,7 @@ __PRIVATE int x11_parse_hotkey(const char *hotkey);
 int x11_init(glc_t *glc)
 {
 	x11.glc = glc;
-	
+
 	get_real_x11();
 
 	if (getenv("GLC_HOTKEY")) {
@@ -80,7 +80,7 @@ int x11_init(glc_t *glc)
 	}
 
 	x11.stop = util_timestamp(x11.glc);
-	
+
 	return 0;
 }
 
@@ -104,7 +104,7 @@ int x11_parse_hotkey(const char *hotkey)
 		}
 		c++;
 	}
-	
+
 	x11.capture = XStringToKeysym(&hotkey[s]);
 
 	if (!x11.capture)
@@ -135,7 +135,7 @@ void x11_event(Display *dpy, XEvent *event)
 
 			if ((x11.key_mask & X11_KEY_SHIFT) && (!(event->xkey.state & ShiftMask)))
 				return;
-			
+
 			if (x11.glc->flags & GLC_CAPTURE) { /* stop */
 				x11.glc->flags &= ~GLC_CAPTURE;
 				x11.stop = util_timestamp(x11.glc);
@@ -159,11 +159,11 @@ void get_real_x11()
 {
 	if (!lib.dlopen)
 		get_real_dlsym();
-	
+
 	x11.libX11_handle = lib.dlopen("libX11.so", RTLD_LAZY);
 	if (!x11.libX11_handle)
 		goto err;
-	
+
 	x11.XNextEvent =
 	  (int (*)(Display *, XEvent *))
 	    lib.dlsym(x11.libX11_handle, "XNextEvent");
@@ -219,7 +219,7 @@ void get_real_x11()
 	    lib.dlsym(x11.libX11_handle, "XPeekIfEvent");
 	if (!x11.XPeekIfEvent)
 		goto err;
-	
+
 	return;
 err:
 	fprintf(stderr, "can't get real X11\n");
@@ -228,6 +228,7 @@ err:
 
 int XNextEvent(Display *display, XEvent *event_return)
 {
+	INIT_GLC
 	int ret = x11.XNextEvent(display, event_return);
 	x11_event(display, event_return);
 	return ret;
@@ -235,6 +236,7 @@ int XNextEvent(Display *display, XEvent *event_return)
 
 int XPeekEvent(Display *display, XEvent *event_return)
 {
+	INIT_GLC
 	int ret = x11.XPeekEvent(display, event_return);
 	x11_event(display, event_return);
 	return ret;
@@ -242,6 +244,7 @@ int XPeekEvent(Display *display, XEvent *event_return)
 
 int XWindowEvent(Display *display, Window w, long event_mask, XEvent *event_return)
 {
+	INIT_GLC
 	int ret = x11.XWindowEvent(display, w, event_mask, event_return);
 	x11_event(display, event_return);
 	return ret;
@@ -257,6 +260,7 @@ Bool XCheckWindowEvent(Display *display, Window w, long event_mask, XEvent *even
 
 int XMaskEvent(Display *display, long event_mask, XEvent *event_return)
 {
+	INIT_GLC
 	int ret = x11.XMaskEvent(display, event_mask, event_return);
 	x11_event(display, event_return);
 	return ret;
@@ -288,6 +292,7 @@ Bool XCheckTypedWindowEvent(Display *display, Window w, int event_type, XEvent *
 
 int XIfEvent(Display *display, XEvent *event_return, Bool ( *predicate)(), XPointer arg)
 {
+	INIT_GLC
 	int ret = x11.XIfEvent(display, event_return, predicate, arg);
 	x11_event(display, event_return);
 	return ret;
@@ -303,6 +308,7 @@ Bool XCheckIfEvent(Display *display, XEvent *event_return, Bool ( *predicate)(),
 
 int XPeekIfEvent(Display *display, XEvent *event_return, Bool ( *predicate)(), XPointer arg)
 {
+	INIT_GLC
 	int ret = x11.XPeekIfEvent(display, event_return, predicate, arg);
 	x11_event(display, event_return);
 	return ret;
