@@ -224,11 +224,11 @@ err:
 	exit(1);
 }
 
-__GLXextFuncPtr glXGetProcAddressARB(const GLubyte *proc_name)
+GLXextFuncPtr glXGetProcAddressARB(const GLubyte *proc_name)
 {
 	INIT_GLC
 
-	__GLXextFuncPtr ret = (__GLXextFuncPtr) wrapped_func((char *) proc_name);
+	GLXextFuncPtr ret = (GLXextFuncPtr) wrapped_func((char *) proc_name);
 	if (ret)
 		return ret;
 
