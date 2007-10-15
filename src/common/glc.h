@@ -6,7 +6,7 @@
  */
 
 /* glc.h -- OpenGL video capture tool
-  version 0.3.2, October 14th, 2007
+  version 0.3.3, October 15th, 2007
 
   Copyright (C) 2007 Pyry Haulos
 
@@ -195,6 +195,11 @@ typedef struct {
 	char *info_name;
 	/** date */
 	char *info_date;
+
+	/** uncompressed data buffer size */
+	size_t uncompressed_size;
+	/** compressed data buffer size */
+	size_t compressed_size;
 } glc_t;
 
 /** stream message type */

@@ -314,6 +314,8 @@ void *wrapped_func(const char *symbol)
 		return &glXSwapBuffers;
 	else if (!strcmp(symbol, "glFinish"))
 		return &glFinish;
+	else if (!strcmp(symbol, "snd_pcm_open"))
+		return &snd_pcm_open;
 	else if (!strcmp(symbol, "snd_pcm_writei"))
 		return &snd_pcm_writei;
 	else if (!strcmp(symbol, "snd_pcm_writen"))

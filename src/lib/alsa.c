@@ -36,6 +36,7 @@ struct alsa_private_s {
 	int started;
 
 	void *libasound_handle;
+	int (*snd_pcm_open)(snd_pcm_t **, const char *, snd_pcm_stream_t, int);
 	snd_pcm_sframes_t (*snd_pcm_writei)(snd_pcm_t *, const void *, snd_pcm_uframes_t);
 	snd_pcm_sframes_t (*snd_pcm_writen)(snd_pcm_t *, void **, snd_pcm_uframes_t);
 	int (*snd_pcm_mmap_begin)(snd_pcm_t *, const snd_pcm_channel_area_t **, snd_pcm_uframes_t *, snd_pcm_uframes_t *);
@@ -100,6 +101,11 @@ void get_real_alsa()
 	alsa.libasound_handle = lib.dlopen("libasound.so", RTLD_LAZY);
 	if (!alsa.libasound_handle)
 		goto err;
+	alsa.snd_pcm_open =
+	  (int (*)(snd_pcm_t **, const char *, snd_pcm_stream_t, int))
+	    lib.dlsym(alsa.libasound_handle, "snd_pcm_open");
+	if (!alsa.snd_pcm_open)
+		goto err;
 	alsa.snd_pcm_writei =
 	  (snd_pcm_sframes_t (*)(snd_pcm_t *, const void *, snd_pcm_uframes_t))
 	    lib.dlsym(alsa.libasound_handle, "snd_pcm_writei");
@@ -135,6 +141,7 @@ int alsa_unhook_so(const char *soname)
 		return ret;
 
 	/* don't look at 'elfhacks'... contains some serious black magic */
+	/* TODO should we apply for snd_pcm_open() as well? */
 	eh_set_rel(so, "snd_pcm_writei", alsa.snd_pcm_writei);
 	eh_set_rel(so, "snd_pcm_writen", alsa.snd_pcm_writen);
 	eh_set_rel(so, "snd_pcm_mmap_begin", alsa.snd_pcm_mmap_begin);
@@ -145,6 +152,14 @@ int alsa_unhook_so(const char *soname)
 	eh_free_obj(so);
 
 	return 0;
+}
+
+int snd_pcm_open(snd_pcm_t **pcmp, const char *name, snd_pcm_stream_t stream, int mode)
+{
+	/* it is not necessarily safe to call glc_init() from write funcs
+	   especially async mode (initiated from signal) is troublesome */
+	INIT_GLC
+	return alsa.snd_pcm_open(pcmp, name, stream, mode);
 }
 
 snd_pcm_sframes_t snd_pcm_writei(snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size)
