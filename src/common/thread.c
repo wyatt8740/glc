@@ -222,6 +222,9 @@ void *glc_thread(void *argptr)
 				goto err;
 		}
 
+		if (state.flags & GLC_THREAD_STOP)
+			break; /* no error, just stop, please */
+
 		state.flags = 0;
 		write_size_set = 0;
 	} while ((!(private->glc->flags & GLC_CANCEL)) &&
@@ -241,7 +244,7 @@ finish:
 
 		/* error might have happened @ write buffer
 		   so there could be blocking threads */
-		if (ret)
+		if ((ret) && (thread->flags & GLC_THREAD_WRITE))
 			ps_buffer_cancel(private->to);
 	}
 

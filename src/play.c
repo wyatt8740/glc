@@ -21,11 +21,9 @@
 #include "common/util.h"
 #include "stream/file.h"
 #include "stream/pack.h"
-#include "stream/gl_play.h"
 #include "stream/img.h"
 #include "stream/info.h"
 #include "stream/wav.h"
-#include "stream/audio_play.h"
 #include "stream/demux.h"
 #include "stream/ycbcr.h"
 #include "stream/yuv4mpeg.h"
@@ -45,8 +43,7 @@ int main(int argc, char *argv[])
 	ps_bufferattr_t attr;
 	const char *summary_val = NULL;
 	int play, opt, option_index, img, info, show_stats, wav, yuv4mpeg;
-	ps_buffer_t *uncompressed, *compressed, *picture, *audio, *ycbcr, *rgb;
-	size_t uncompressed_size, compressed_size;
+	ps_buffer_t *uncompressed, *compressed, *ycbcr, *rgb;
 
 	struct option long_options[] = {
 		{"info",		1, NULL, 'i'},
@@ -66,7 +63,7 @@ int main(int argc, char *argv[])
 	option_index = 0;
 
 	img = info = wav = 0;
-	picture = audio = ycbcr = rgb = NULL;
+	ycbcr = rgb = NULL;
 	play = 1;
 
 	img = info = show_stats = yuv4mpeg = 0;
@@ -76,8 +73,8 @@ int main(int argc, char *argv[])
 	glc->fps = 0;
 	glc->filename_format = NULL;
 	glc->silence_threshold = 2000000;
-	compressed_size = 10 * 1024 * 1024;
-	uncompressed_size = 10 * 1024 * 1024;
+	glc->compressed_size = 10 * 1024 * 1024;
+	glc->uncompressed_size = 10 * 1024 * 1024;
 
 	while ((opt = getopt_long(argc, argv, "i:a:p:y:o:f:l:c:u:s:th",
 				  long_options, &optind)) != -1) {
@@ -126,13 +123,13 @@ int main(int argc, char *argv[])
 				glc->filename_format = optarg;
 			break;
 		case 'c':
-			compressed_size = atoi(optarg) * 1024 * 1024;
-			if (compressed_size <= 0)
+			glc->compressed_size = atoi(optarg) * 1024 * 1024;
+			if (glc->compressed_size <= 0)
 				goto usage;
 			break;
 		case 'u':
-			uncompressed_size = atoi(optarg) * 1024 * 1024;
-			if (uncompressed_size <= 0)
+			glc->uncompressed_size = atoi(optarg) * 1024 * 1024;
+			if (glc->uncompressed_size <= 0)
 				goto usage;
 			break;
 		case 's':
@@ -167,26 +164,19 @@ int main(int argc, char *argv[])
 	if (show_stats)
 		ps_bufferattr_setflags(&attr, PS_BUFFER_STATS);
 
-	ps_bufferattr_setsize(&attr, uncompressed_size);
+	ps_bufferattr_setsize(&attr, glc->uncompressed_size);
 	uncompressed = malloc(sizeof(ps_buffer_t));
 	ps_buffer_init(uncompressed, &attr);
 
-	if (play) {
-		picture = malloc(sizeof(ps_buffer_t));
-		ps_buffer_init(picture, &attr);
-		audio = malloc(sizeof(ps_buffer_t));
-		ps_buffer_init(audio, &attr);
-		rgb = malloc(sizeof(ps_buffer_t));
-		ps_buffer_init(rgb, &attr);
-	} else if (yuv4mpeg) {
+	if (yuv4mpeg) {
 		ycbcr = malloc(sizeof(ps_buffer_t));
 		ps_buffer_init(ycbcr, &attr);
-	} else if (img) {
+	} else if ((img) | (play)) {
 		rgb = malloc(sizeof(ps_buffer_t));
 		ps_buffer_init(rgb, &attr);
 	}
 
-	ps_bufferattr_setsize(&attr, compressed_size);
+	ps_bufferattr_setsize(&attr, glc->compressed_size);
 	compressed = malloc(sizeof(ps_buffer_t));
 	ps_buffer_init(compressed, &attr);
 
@@ -205,10 +195,8 @@ int main(int argc, char *argv[])
 		ycbcr_init(glc, uncompressed, ycbcr);
 		yuv4mpeg_init(glc, ycbcr);
 	} else { /* play */
-		demux_init(glc, uncompressed, audio, picture);
-		rgb_init(glc, picture, rgb);
-		audio_play_init(glc, audio);
-		gl_play_init(glc, rgb);
+		rgb_init(glc, uncompressed, rgb);
+		demux_init(glc, rgb);
 	}
 
 	unpack_init(glc, compressed, uncompressed);
@@ -228,10 +216,8 @@ int main(int argc, char *argv[])
 		sem_wait(&glc->signal[GLC_SIGNAL_YCBCR_FINISHED]);
 		sem_wait(&glc->signal[GLC_SIGNAL_YUV4MPEG_FINISHED]);
 	} else {
-		sem_wait(&glc->signal[GLC_SIGNAL_DEMUX_FINISHED]);
 		sem_wait(&glc->signal[GLC_SIGNAL_RGB_FINISHED]);
-		sem_wait(&glc->signal[GLC_SIGNAL_AUDIO_FINISHED]);
-		sem_wait(&glc->signal[GLC_SIGNAL_GL_PLAY_FINISHED]);
+		sem_wait(&glc->signal[GLC_SIGNAL_DEMUX_FINISHED]);
 	}
 	sem_wait(&glc->signal[GLC_SIGNAL_PACK_FINISHED]);
 
@@ -252,10 +238,6 @@ int main(int argc, char *argv[])
 	free(compressed);
 	free(uncompressed);
 	if (play) {
-		ps_buffer_destroy(audio);
-		ps_buffer_destroy(picture);
-		free(audio);
-		free(picture);
 		ps_buffer_destroy(rgb);
 		free(rgb);
 	} else if (yuv4mpeg) {

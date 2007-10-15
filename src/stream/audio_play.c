@@ -56,7 +56,7 @@ struct audio_play_private_s {
 
 	const char *device;
 	unsigned int silence_threshold;
-	
+
 	struct audio_play_stream_s *stream;
 };
 

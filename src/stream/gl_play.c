@@ -38,144 +38,93 @@
  *  \{
  */
 
-struct gl_play_ctx_s {
+struct gl_play_private_s {
+	glc_t *glc;
+	glc_thread_t play_thread;
+
+	glc_ctx_i ctx_i;
+	GLenum format;
+	unsigned int w, h;
+	float zoom;
+	glc_utime_t last, fps;
+
 	Display *dpy;
 	GLXDrawable drawable;
 	GLXContext ctx;
 	char name[100];
-
-	unsigned int w, h;
-	float zoom;
-
-	glc_ctx_i ctx_i;
-
-	glc_utime_t last;
-
-	int unsupported;
 	int created;
 
 	Atom delete_atom, wm_proto_atom;
 
-	struct gl_play_ctx_s *next;
-};
-
-struct gl_play_private_s {
-	glc_t *glc;
-	Display *dpy;
-	GLenum capture_buffer;
-	glc_utime_t fps;
-
-	struct gl_play_ctx_s *ctx;
-	glc_ctx_i ctx_c;
-	glc_ctx_i last_ctx;
-
-	glc_thread_t play_thread;
-
-	unsigned int bpp;
-	GLenum format;
+	int cancel;
+	sem_t *finished;
 };
 
 int gl_play_read_callback(glc_thread_state_t *state);
 void gl_play_finish_callback(void *ptr, int err);
 
-int gl_play_set_ctx(struct gl_play_private_s *gl_play, struct gl_play_ctx_s *ctx);
-int gl_play_create_ctx(struct gl_play_private_s *gl_play, struct gl_play_ctx_s *ctx);
-int gl_play_update_ctx(struct gl_play_private_s *gl_play, struct gl_play_ctx_s *ctx);
-int gl_play_get_ctx(struct gl_play_private_s *gl_play, struct gl_play_ctx_s **ctx, glc_ctx_i ctx_i);
+int gl_play_create_ctx(struct gl_play_private_s *gl_play);
+int gl_play_update_ctx(struct gl_play_private_s *gl_play);
 
-int gl_play_put_pixels(struct gl_play_private_s *gl_play, struct gl_play_ctx_s *ctx, char *from);
+int gl_play_put_pixels(struct gl_play_private_s *gl_play, char *from);
 
-int gl_play_handle_xevents(struct gl_play_private_s *gl_play, struct gl_play_ctx_s *ctx);
+int gl_play_handle_xevents(struct gl_play_private_s *gl_play, glc_thread_state_t *state);
 
-int gl_play_init(glc_t *glc, ps_buffer_t *from)
+int gl_play_init(glc_t *glc, ps_buffer_t *from, glc_ctx_i ctx, sem_t *finished)
 {
 	struct gl_play_private_s *gl_play = (struct gl_play_private_s *) malloc(sizeof(struct gl_play_private_s));
 	memset(gl_play, 0, sizeof(struct gl_play_private_s));
-	
+
 	gl_play->glc = glc;
-	gl_play->last_ctx = -1;
-	
+	gl_play->ctx_i = ctx;
+	gl_play->finished = finished;
+
 	gl_play->play_thread.flags = GLC_THREAD_READ;
 	gl_play->play_thread.ptr = gl_play;
 	gl_play->play_thread.read_callback = &gl_play_read_callback;
 	gl_play->play_thread.finish_callback = &gl_play_finish_callback;
 	gl_play->play_thread.threads = 1;
-	
+
 	gl_play->dpy = XOpenDisplay(NULL);
-	
+
 	if (!gl_play->dpy) {
 		fprintf(stderr, "can't open display\n");
 		return 1;
 	}
-	
+
 	return glc_thread_create(glc, &gl_play->play_thread, from, NULL);
 }
 
 void gl_play_finish_callback(void *ptr, int err)
 {
 	struct gl_play_private_s *gl_play = (struct gl_play_private_s *) ptr;
-	struct gl_play_ctx_s *del;
-	
-	if (err)
-		fprintf(stderr, "gl failed: %s (%d)\n", strerror(err), err);
 
-	while (gl_play->ctx != NULL) {
-		del = gl_play->ctx;
-		gl_play->ctx = gl_play->ctx->next;
-		
-		if (del->dpy != NULL) {
-			glXDestroyContext(del->dpy, del->ctx);
-			XUnmapWindow(del->dpy, del->drawable);
-			XDestroyWindow(del->dpy, del->drawable);
-		}
-		free(del);
-	}
-	
+	if (err)
+		fprintf(stderr, "gl_play failed: %s (%d)\n", strerror(err), err);
+
+	XUnmapWindow(gl_play->dpy, gl_play->drawable);
+	XDestroyWindow(gl_play->dpy, gl_play->drawable);
 	XCloseDisplay(gl_play->dpy);
-	
-	sem_post(&gl_play->glc->signal[GLC_SIGNAL_GL_PLAY_FINISHED]);
+
+	sem_post(gl_play->finished);
 	free(gl_play);
 }
 
-int gl_play_put_pixels(struct gl_play_private_s *gl_play, struct gl_play_ctx_s *ctx, char *from)
+int gl_play_put_pixels(struct gl_play_private_s *gl_play, char *from)
 {
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glBitmap(0, 0, 0, 0, 0, 0, NULL);
-	
-	if (ctx->zoom != 1.0)
-		glPixelZoom(ctx->zoom, ctx->zoom);
-	
-	glDrawPixels(ctx->w, ctx->h, GL_BGR, GL_UNSIGNED_BYTE, from);
-	glXSwapBuffers(ctx->dpy, ctx->drawable);
+
+	if (gl_play->zoom != 1.0)
+		glPixelZoom(gl_play->zoom, gl_play->zoom);
+
+	glDrawPixels(gl_play->w, gl_play->h, GL_BGR, GL_UNSIGNED_BYTE, from);
+	glXSwapBuffers(gl_play->dpy, gl_play->drawable);
 
 	return 0;
 }
 
-int gl_play_get_ctx(struct gl_play_private_s *gl_play, struct gl_play_ctx_s **ctx, glc_ctx_i ctx_i)
-{
-	struct gl_play_ctx_s *fctx = gl_play->ctx;
-	
-	while (fctx != NULL) {
-		if (fctx->ctx_i == ctx_i)
-			break;
-		fctx = fctx->next;
-	}
-	
-	if (fctx == NULL) {
-		fctx = (struct gl_play_ctx_s *) malloc(sizeof(struct gl_play_ctx_s));
-		memset(fctx, 0, sizeof(struct gl_play_ctx_s));
-		
-		fctx->next = gl_play->ctx;
-		gl_play->ctx = fctx;
-		fctx->ctx_i = ctx_i;
-	}
-	
-	*ctx = fctx;
-	
-	return 0;
-}
-
-int gl_play_create_ctx(struct gl_play_private_s *gl_play, struct gl_play_ctx_s *ctx)
+int gl_play_create_ctx(struct gl_play_private_s *gl_play)
 {
 	int attribs[] = { GLX_RGBA,
 			  GLX_RED_SIZE, 1,
@@ -187,79 +136,68 @@ int gl_play_create_ctx(struct gl_play_private_s *gl_play, struct gl_play_ctx_s *
 	XVisualInfo *visinfo;
 	XSetWindowAttributes winattr;
 
-	ctx->zoom = 1;
-	ctx->dpy = gl_play->dpy;
-	visinfo = glXChooseVisual(ctx->dpy, DefaultScreen(ctx->dpy), attribs);
-	
+	gl_play->zoom = 1;
+	visinfo = glXChooseVisual(gl_play->dpy, DefaultScreen(gl_play->dpy), attribs);
+
 	winattr.background_pixel = 0;
 	winattr.border_pixel = 0;
-	winattr.colormap = XCreateColormap(ctx->dpy, RootWindow(ctx->dpy, DefaultScreen(ctx->dpy)),
+	winattr.colormap = XCreateColormap(gl_play->dpy, RootWindow(gl_play->dpy, DefaultScreen(gl_play->dpy)),
 	                                   visinfo->visual, AllocNone);
 	winattr.event_mask = StructureNotifyMask | ExposureMask | KeyPressMask | KeyReleaseMask;
 	winattr.override_redirect = 0;
-	ctx->drawable = XCreateWindow(ctx->dpy, RootWindow(ctx->dpy, DefaultScreen(ctx->dpy)),
-	                              0, 0, ctx->w, ctx->h, 0, visinfo->depth, InputOutput,
+	gl_play->drawable = XCreateWindow(gl_play->dpy, RootWindow(gl_play->dpy, DefaultScreen(gl_play->dpy)),
+	                              0, 0, gl_play->w, gl_play->h, 0, visinfo->depth, InputOutput,
 	                              visinfo->visual, CWBackPixel | CWBorderPixel |
 	                              CWColormap | CWEventMask | CWOverrideRedirect, &winattr);
 
-	ctx->ctx = glXCreateContext(ctx->dpy, visinfo, NULL, True);
-	ctx->created = 1;
+	gl_play->ctx = glXCreateContext(gl_play->dpy, visinfo, NULL, True);
+	gl_play->created = 1;
 
 	XFree(visinfo);
 
-	ctx->delete_atom = XInternAtom(ctx->dpy, "WM_DELETE_WINDOW", False);
-	ctx->wm_proto_atom = XInternAtom(ctx->dpy, "WM_PROTOCOLS", True);
-	XSetWMProtocols(ctx->dpy, ctx->drawable, &ctx->delete_atom, 1);
+	gl_play->delete_atom = XInternAtom(gl_play->dpy, "WM_DELETE_WINDOW", False);
+	gl_play->wm_proto_atom = XInternAtom(gl_play->dpy, "WM_PROTOCOLS", True);
+	XSetWMProtocols(gl_play->dpy, gl_play->drawable, &gl_play->delete_atom, 1);
 
-	return gl_play_update_ctx(gl_play, ctx);
+	return gl_play_update_ctx(gl_play);
 }
 
-int gl_play_update_ctx(struct gl_play_private_s *gl_play, struct gl_play_ctx_s *ctx)
+int gl_play_update_ctx(struct gl_play_private_s *gl_play)
 {
 	XSizeHints sizehints;
-	
-	if (!ctx->created)
-		return EINVAL;
-	
-	snprintf(ctx->name, sizeof(ctx->name) - 1, "glc-play (ctx %d)", ctx->ctx_i);
-	
-	ctx->zoom = 1; /* reset zoom, sorry */
 
-	XUnmapWindow(ctx->dpy, ctx->drawable);
-	
+	if (!gl_play->created)
+		return EINVAL;
+
+	snprintf(gl_play->name, sizeof(gl_play->name) - 1, "glc-play (ctx %d)", gl_play->ctx_i);
+
+	gl_play->zoom = 1; /* reset zoom, sorry */
+
+	XUnmapWindow(gl_play->dpy, gl_play->drawable);
+
 	sizehints.x = 0;
 	sizehints.y = 0;
-	sizehints.width = ctx->w;
-	sizehints.height = ctx->h;
-	sizehints.min_aspect.x = ctx->w;
-	sizehints.min_aspect.y = ctx->h;
-	sizehints.max_aspect.x = ctx->w;
-	sizehints.max_aspect.y = ctx->h;
+	sizehints.width = gl_play->w;
+	sizehints.height = gl_play->h;
+	sizehints.min_aspect.x = gl_play->w;
+	sizehints.min_aspect.y = gl_play->h;
+	sizehints.max_aspect.x = gl_play->w;
+	sizehints.max_aspect.y = gl_play->h;
 	sizehints.flags = USSize | USPosition | PAspect;
-	XSetNormalHints(ctx->dpy, ctx->drawable, &sizehints);
-	XSetStandardProperties(ctx->dpy, ctx->drawable, ctx->name, ctx->name, None,
+	XSetNormalHints(gl_play->dpy, gl_play->drawable, &sizehints);
+	XSetStandardProperties(gl_play->dpy, gl_play->drawable, gl_play->name, gl_play->name, None,
 	                       (char **)NULL, 0, &sizehints);
-	XResizeWindow(ctx->dpy, ctx->drawable, ctx->w, ctx->h);
+	XResizeWindow(gl_play->dpy, gl_play->drawable, gl_play->w, gl_play->h);
 
-	XMapWindow(ctx->dpy, ctx->drawable);
-	
-	glXMakeCurrent(ctx->dpy, ctx->drawable, ctx->ctx);
-	glViewport(0, 0, (GLsizei) ctx->w, (GLsizei) ctx->h);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-	
+	XMapWindow(gl_play->dpy, gl_play->drawable);
+
+	glXMakeCurrent(gl_play->dpy, gl_play->drawable, gl_play->ctx);
+	glViewport(0, 0, (GLsizei) gl_play->w, (GLsizei) gl_play->h);
+
 	return 0;
 }
 
-int gl_play_set_ctx(struct gl_play_private_s *gl_play, struct gl_play_ctx_s *ctx)
-{
-	gl_play->dpy = ctx->dpy;
-	glXMakeCurrent(ctx->dpy, ctx->drawable, ctx->ctx);
-	
-	return 0;
-}
-
-int gl_handle_xevents(struct gl_play_private_s *gl_play, struct gl_play_ctx_s *ctx)
+int gl_handle_xevents(struct gl_play_private_s *gl_play, glc_thread_state_t *state)
 {
 	XEvent event;
 	XConfigureEvent *ce;
@@ -267,11 +205,11 @@ int gl_handle_xevents(struct gl_play_private_s *gl_play, struct gl_play_ctx_s *c
 
 	while (XPending(gl_play->dpy) > 0) {
 		XNextEvent(gl_play->dpy, &event);
-		
+
 		switch (event.type) {
 		case KeyPress:
 			code = XLookupKeysym(&event.xkey, 0);
-			
+
 			if (code == XK_Right)
 				util_timediff(gl_play->glc, -100000);
 			break;
@@ -282,18 +220,18 @@ int gl_handle_xevents(struct gl_play_private_s *gl_play, struct gl_play_ctx_s *c
 				gl_play->glc->flags |= GLC_CANCEL;
 			break;
 		case DestroyNotify:
-			gl_play->glc->flags |= GLC_CANCEL;
+			state->flags |= GLC_THREAD_STOP;
 			break;
 		case ClientMessage:
-			if (event.xclient.message_type == ctx->wm_proto_atom) {
-				if ((Atom) event.xclient.data.l[0] == ctx->delete_atom)
-					gl_play->glc->flags |= GLC_CANCEL;
+			if (event.xclient.message_type == gl_play->wm_proto_atom) {
+				if ((Atom) event.xclient.data.l[0] == gl_play->delete_atom)
+					state->flags |= GLC_THREAD_STOP;
 			}
 			break;
 		case ConfigureNotify:
 			ce = (XConfigureEvent *) &event;
-			ctx->zoom = (float) ce->width / (float) ctx->w;
-			
+			gl_play->zoom = (float) ce->width / (float) gl_play->w;
+
 			break;
 		}
 	}
@@ -304,56 +242,54 @@ int gl_handle_xevents(struct gl_play_private_s *gl_play, struct gl_play_ctx_s *c
 int gl_play_read_callback(glc_thread_state_t *state)
 {
 	struct gl_play_private_s *gl_play = (struct gl_play_private_s *) state->ptr;
-	
+
 	glc_ctx_message_t *ctx_msg;
 	glc_picture_header_t *pic_hdr;
 	glc_utime_t time;
-	struct gl_play_ctx_s *ctx;
-	
+
+	gl_handle_xevents(gl_play, state);
+
+	if (state->flags & GLC_THREAD_STOP)
+		return 0;
+
 	if (state->header.type == GLC_MESSAGE_CTX) {
 		ctx_msg = (glc_ctx_message_t *) state->read_data;
-		gl_play_get_ctx(gl_play, &ctx, ctx_msg->ctx);
-		ctx->w = ctx_msg->w;
-		ctx->h = ctx_msg->h;
-		
-		if ((ctx_msg->flags & GLC_CTX_BGR) && (ctx_msg->flags & GLC_CTX_CREATE)) {
-			gl_play_create_ctx(gl_play, ctx);
-			gl_play->last_ctx = ctx_msg->ctx;
-		} else if ((ctx_msg->flags & GLC_CTX_BGR) && (ctx_msg->flags & GLC_CTX_UPDATE)) {
-			if (gl_play_update_ctx(gl_play, ctx))
+		if (ctx_msg->ctx != gl_play->ctx_i)
+			return 0; /* just ignore it */
+
+		gl_play->w = ctx_msg->w;
+		gl_play->h = ctx_msg->h;
+
+		if ((ctx_msg->flags & GLC_CTX_BGR) && (ctx_msg->flags & GLC_CTX_CREATE))
+			gl_play_create_ctx(gl_play);
+		else if ((ctx_msg->flags & GLC_CTX_BGR) && (ctx_msg->flags & GLC_CTX_UPDATE)) {
+			if (gl_play_update_ctx(gl_play)) {
 				fprintf(stderr, "broken ctx %d\n", ctx_msg->ctx);
+				return EINVAL;
+			}
 		} else {
-			ctx->unsupported = 1;
-			printf("ctx %d is in unsupported format\n", ctx_msg->ctx);
+			fprintf(stderr, "ctx %d is in unsupported format\n", ctx_msg->ctx);
+			return EINVAL;
 		}
 	} else if (state->header.type == GLC_MESSAGE_PICTURE) {
 		pic_hdr = (glc_picture_header_t *) state->read_data;
-		gl_play_get_ctx(gl_play, &ctx, pic_hdr->ctx);
-		
-		if (ctx->unsupported)
+
+		if (pic_hdr->ctx != gl_play->ctx_i)
 			return 0;
-		
-		if (!ctx->created) {
+
+		if (!gl_play->created) {
 			fprintf(stderr, "picture refers to uninitalized ctx %d\n", pic_hdr->ctx);
-			gl_play->glc->flags |= GLC_CANCEL;
 			return EINVAL;
 		}
-		
-		if (gl_play->last_ctx != pic_hdr->ctx) {
-			gl_play_set_ctx(gl_play, ctx);
-			gl_play->last_ctx = pic_hdr->ctx;
-		}
-		
-		gl_handle_xevents(gl_play, ctx);
-		
+
 		time = util_timestamp(gl_play->glc);
-		
+
 		if (pic_hdr->timestamp > time)
 			usleep(pic_hdr->timestamp - time);
 		else if (time > pic_hdr->timestamp + gl_play->fps)
 			return 0;
 
-		gl_play_put_pixels(gl_play, ctx, &state->read_data[GLC_PICTURE_HEADER_SIZE]);
+		gl_play_put_pixels(gl_play, &state->read_data[GLC_PICTURE_HEADER_SIZE]);
 	}
 
 	return 0;
