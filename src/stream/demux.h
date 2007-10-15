@@ -21,7 +21,7 @@
  *  \{
  */
 
-int demux_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *audio, ps_buffer_t *picture);
+int demux_init(glc_t *glc, ps_buffer_t *from);
 
 /**  \} */
 
