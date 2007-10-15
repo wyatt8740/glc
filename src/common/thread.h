@@ -66,8 +66,6 @@ typedef struct {
 	void *ptr;
 	/** per-thread argument pointer */
 	void *threadptr;
-	/** implementation specific, used to store glc_thread_private_s */
-	void *thread_private;
 } glc_thread_state_t;
 
 /** thread does read operations */
