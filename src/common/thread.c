@@ -34,10 +34,10 @@ struct glc_thread_private_s {
 	glc_t *glc;
 	ps_buffer_t *from;
 	ps_buffer_t *to;
-	
+
 	pthread_t *pthread_thread;
 	pthread_mutex_t open, finish;
-	
+
 	glc_thread_t *thread;
 
 	int stop;
@@ -61,19 +61,19 @@ int glc_thread_create(glc_t *glc, glc_thread_t *thread, ps_buffer_t *from, ps_bu
 	struct glc_thread_private_s *private;
 	glc_thread_state_t *state;
 	size_t t;
-	
+
 	if (thread->threads < 1)
 		return EINVAL;
-	
+
 	if (!(private = (struct glc_thread_private_s *) malloc(sizeof(struct glc_thread_private_s))))
 		return ENOMEM;
 	memset(private, 0, sizeof(struct glc_thread_private_s));
-	
+
 	private->glc = glc;
 	private->from = from;
 	private->to = to;
 	private->thread = thread;
-	
+
 	pthread_mutex_init(&private->open, NULL);
 	pthread_mutex_init(&private->finish, NULL);
 
@@ -82,10 +82,10 @@ int glc_thread_create(glc_t *glc, glc_thread_t *thread, ps_buffer_t *from, ps_bu
 		if (!(state = malloc(sizeof(glc_thread_state_t))))
 			return ENOMEM;
 		memset(state, 0, sizeof(glc_thread_state_t));
-		
+
 		state->thread_private = private;
 		state->ptr = thread->ptr;
-		
+
 		if ((ret = pthread_create(&private->pthread_thread[t], NULL, glc_thread, state)))
 			return ret;
 	}
@@ -106,33 +106,33 @@ void *glc_thread(void *argptr)
 	glc_thread_state_t *state = (glc_thread_state_t *) argptr;
 	struct glc_thread_private_s *private = (struct glc_thread_private_s *) state->thread_private;
 	glc_thread_t *thread = private->thread;
-	
+
 	ps_packet_t read, write;
-	
+
 	write_size_set = ret = has_locked = 0;
-	
+
 	if (thread->flags & GLC_THREAD_READ) {
 		if ((ret = ps_packet_init(&read, private->from)))
 			goto err;
 	}
-	
+
 	if (thread->flags & GLC_THREAD_WRITE) {
 		if ((ps_packet_init(&write, private->to)))
 			goto err;
 	}
-	
+
 	do {
 		/* open callback */
 		if (thread->open_callback) {
 			if ((ret = thread->open_callback(state)))
 				goto err;
 		}
-		
+
 		if ((thread->flags & GLC_THREAD_WRITE) && (thread->flags & GLC_THREAD_READ)) {
 			pthread_mutex_lock(&private->open); /* preserve packet order */
 			has_locked = 1;
 		}
-		
+
 		if ((thread->flags & GLC_THREAD_READ) && (!(state->flags & GLC_THREAD_STATE_SKIP_READ))) {
 			if ((ret = ps_packet_open(&read, PS_PACKET_READ)))
 				goto err;
@@ -142,17 +142,17 @@ void *glc_thread(void *argptr)
 				goto err;
 			state->read_size -= GLC_MESSAGE_HEADER_SIZE;
 			state->write_size = state->read_size;
-		
+
 			/* header callback */
 			if (thread->header_callback) {
 				if ((ret = thread->header_callback(state)))
 					goto err;
 			}
-			
+
 			if ((ret = ps_packet_dma(&read, (void *) &state->read_data,
 						 state->read_size, PS_ACCEPT_FAKE_DMA)))
 				goto err;
-			
+
 			/* read callback */
 			if (thread->read_callback) {
 				if ((ret = thread->read_callback(state)))
@@ -168,7 +168,7 @@ void *glc_thread(void *argptr)
 				has_locked = 0;
 				pthread_mutex_unlock(&private->open);
 			}
-			
+
 			if ((ret = ps_packet_write(&write, &state->header, GLC_MESSAGE_HEADER_SIZE)))
 				goto err;
 
@@ -243,6 +243,11 @@ finish:
 	if ((thread->flags & GLC_THREAD_READ) && (!private->stop)) {
 		private->stop = 1;
 		ps_buffer_cancel(private->from);
+
+		/* error might have happened @ write buffer
+		   so there could be blocking threads */
+		if (ret)
+			ps_buffer_cancel(private->to);
 	}
 
 	pthread_mutex_lock(&private->finish);
@@ -256,7 +261,7 @@ finish:
 
 	/* it is safe to unlock now */
 	pthread_mutex_unlock(&private->finish);
-	
+
 	/* finish callback */
 	if (thread->finish_callback)
 		thread->finish_callback(state->ptr, ret);
@@ -271,12 +276,12 @@ finish:
 err:
 	if (has_locked)
 		pthread_mutex_unlock(&private->open);
-	
+
 	if (ret == EINTR)
 		ret = 0;
 	else
 		fprintf(stderr, "glc_thread(): %s (%d)\n", strerror(ret), ret);
-	
+
 	goto finish;
 }
 
