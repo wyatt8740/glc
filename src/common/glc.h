@@ -195,11 +195,6 @@ typedef struct {
 	char *info_name;
 	/** date */
 	char *info_date;
-
-	/** uncompressed data buffer size */
-	size_t uncompressed_size;
-	/** compressed data buffer size */
-	size_t compressed_size;
 } glc_t;
 
 /** stream message type */

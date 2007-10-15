@@ -39,8 +39,6 @@
 #define GLC_THREAD_STATE_SKIP_WRITE          16
 /** just copy data to write packet, skip write callback */
 #define GLC_THREAD_COPY                      32
-/** thread wants to stop */
-#define GLC_THREAD_STOP                      64
 
 /**
  * \brief thread state

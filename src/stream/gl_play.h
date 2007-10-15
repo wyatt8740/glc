@@ -21,7 +21,7 @@
  *  \{
  */
 
-int gl_play_init(glc_t *glc, ps_buffer_t *from, glc_ctx_i ctx, sem_t *finished);
+int gl_play_init(glc_t *glc, ps_buffer_t *from);
 
 /**  \} */
 
