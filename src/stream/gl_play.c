@@ -103,8 +103,11 @@ void gl_play_finish_callback(void *ptr, int err)
 	if (err)
 		fprintf(stderr, "gl_play failed: %s (%d)\n", strerror(err), err);
 
-	XUnmapWindow(gl_play->dpy, gl_play->drawable);
-	XDestroyWindow(gl_play->dpy, gl_play->drawable);
+	if (gl_play->created) {
+		glXDestroyContext(gl_play->dpy, gl_play->ctx);
+		XDestroyWindow(gl_play->dpy, gl_play->drawable);
+	}
+
 	XCloseDisplay(gl_play->dpy);
 
 	sem_post(gl_play->finished);
@@ -152,6 +155,9 @@ int gl_play_create_ctx(struct gl_play_private_s *gl_play)
 	                              CWColormap | CWEventMask | CWOverrideRedirect, &winattr);
 
 	gl_play->ctx = glXCreateContext(gl_play->dpy, visinfo, NULL, True);
+	if (gl_play->ctx == NULL)
+		return EAGAIN;
+
 	gl_play->created = 1;
 
 	XFree(visinfo);
