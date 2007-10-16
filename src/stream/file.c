@@ -124,7 +124,7 @@ int file_read(glc_t *glc, ps_buffer_t *to)
 
 	from = fopen(glc->stream_file, "r");
 	if (from == NULL) {
-		fprintf(stderr, "can't open %s\n", glc->stream_file);
+		fprintf(stderr, "can't open %s: %s (%d)\n", glc->stream_file, strerror(errno), errno);
 		return -1;
 	}
 
