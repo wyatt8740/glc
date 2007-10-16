@@ -14,6 +14,7 @@
 #include <dlfcn.h>
 #include <string.h>
 #include <unistd.h>
+#include <X11/keysym.h>
 
 #include "../common/glc.h"
 #include "../common/util.h"

@@ -55,18 +55,12 @@ int file_init(glc_t *glc, ps_buffer_t *from)
 
 	if (!file->to) {
 		fprintf(stderr, "glc: can't open %s\n", file->glc->stream_file);
-		file->glc->flags |= GLC_CANCEL;
-		ps_buffer_cancel(from);
-		sem_post(&file->glc->signal[GLC_SIGNAL_FILE_FINISHED]);
-		return EAGAIN;
+		goto cancel;
 	}
 
 	if (!file->glc->info) {
 		fprintf(stderr, "glc: stream info not available\n");
-		file->glc->flags |= GLC_CANCEL;
-		ps_buffer_cancel(from);
-		sem_post(&file->glc->signal[GLC_SIGNAL_FILE_FINISHED]);
-		return EINVAL;
+		goto cancel;
 	}
 
 	fwrite(file->glc->info, 1, GLC_STREAM_INFO_SIZE, file->to);
@@ -80,6 +74,12 @@ int file_init(glc_t *glc, ps_buffer_t *from)
 	file->thread.threads = 1;
 
 	return glc_thread_create(glc, &file->thread, from, NULL);
+
+cancel:
+	file->glc->flags |= GLC_CANCEL;
+	ps_buffer_cancel(from);
+	sem_post(&file->glc->signal[GLC_SIGNAL_FILE_FINISHED]);
+	return EAGAIN;
 }
 
 void file_finish_callback(void *ptr, int err)
