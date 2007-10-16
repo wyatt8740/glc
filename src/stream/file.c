@@ -172,14 +172,17 @@ int file_read(glc_t *glc, ps_buffer_t *to)
 			goto err;
 	} while ((header.type != GLC_MESSAGE_CLOSE) && (!(glc->flags & GLC_CANCEL)));
 
+finish:
 	ps_packet_destroy(&packet);
 	fclose(from);
 
 	return 0;
-
 read_fail:
 	ret = EBADMSG;
 err:
+	if (ret == EINTR)
+		goto finish; /* just cancel */
+
 	fprintf(stderr, "file (%s): %s (%d)\n", glc->stream_file, strerror(ret), ret);
 	fclose(from);
 	ps_buffer_cancel(to);
