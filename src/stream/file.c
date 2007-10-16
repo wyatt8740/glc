@@ -89,7 +89,8 @@ void file_finish_callback(void *ptr, int err)
 	if (err)
 		fprintf(stderr, "file failed: %s (%d)\n", strerror(err), err);
 
-	fclose(file->to);
+	if (fclose(file->to))
+		fprintf(stderr, "can't close file: %s (%d)\n", strerror(errno), errno);
 
 	sem_post(&file->glc->signal[GLC_SIGNAL_FILE_FINISHED]);
 	free(file);
@@ -115,7 +116,7 @@ int file_read(glc_t *glc, ps_buffer_t *to)
 	int ret = 0;
 	glc_stream_info_t *info;
 	glc_message_header_t header;
-	size_t packet_size, mem_size = 1024 * 1024;
+	size_t packet_size;
 	FILE *from;
 	ps_packet_t packet;
 	char *dma;
