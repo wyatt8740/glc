@@ -15,6 +15,7 @@
 #include <string.h>
 #include <X11/X.h>
 #include <X11/Xlib.h>
+#include <X11/keysym.h>
 #include <GL/gl.h>
 #include <GL/glx.h>
 #include <GL/glext.h>
@@ -45,7 +46,6 @@ struct gl_play_private_s {
 	glc_ctx_i ctx_i;
 	GLenum format;
 	unsigned int w, h;
-	float zoom;
 	glc_utime_t last, fps;
 
 	Display *dpy;
@@ -53,6 +53,7 @@ struct gl_play_private_s {
 	GLXContext ctx;
 	char name[100];
 	int created;
+	GLuint texture;
 
 	Atom delete_atom, wm_proto_atom;
 
@@ -65,8 +66,9 @@ void gl_play_finish_callback(void *ptr, int err);
 
 int gl_play_create_ctx(struct gl_play_private_s *gl_play);
 int gl_play_update_ctx(struct gl_play_private_s *gl_play);
+int gl_play_update_viewport(struct gl_play_private_s *gl_play, unsigned int w, unsigned int h);
 
-int gl_play_put_pixels(struct gl_play_private_s *gl_play, char *from);
+int gl_play_draw_picture(struct gl_play_private_s *gl_play, char *from);
 
 int gl_play_handle_xevents(struct gl_play_private_s *gl_play, glc_thread_state_t *state);
 
@@ -102,24 +104,35 @@ void gl_play_finish_callback(void *ptr, int err)
 	if (err)
 		fprintf(stderr, "gl_play failed: %s (%d)\n", strerror(err), err);
 
-	XUnmapWindow(gl_play->dpy, gl_play->drawable);
-	XDestroyWindow(gl_play->dpy, gl_play->drawable);
+	if (gl_play->created) {
+		if (gl_play->texture)
+			glDeleteTextures(1, &gl_play->texture);
+
+		glXDestroyContext(gl_play->dpy, gl_play->ctx);
+		XDestroyWindow(gl_play->dpy, gl_play->drawable);
+	}
+
 	XCloseDisplay(gl_play->dpy);
 
 	sem_post(gl_play->finished);
 	free(gl_play);
 }
 
-int gl_play_put_pixels(struct gl_play_private_s *gl_play, char *from)
+int gl_play_draw_picture(struct gl_play_private_s *gl_play, char *from)
 {
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, gl_play->texture);
+
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-	glBitmap(0, 0, 0, 0, 0, 0, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, 3, gl_play->w, gl_play->h, 0, GL_BGR,
+		     GL_UNSIGNED_BYTE, from);
 
-	if (gl_play->zoom != 1.0)
-		glPixelZoom(gl_play->zoom, gl_play->zoom);
-
-	glDrawPixels(gl_play->w, gl_play->h, GL_BGR, GL_UNSIGNED_BYTE, from);
-	glXSwapBuffers(gl_play->dpy, gl_play->drawable);
+	glBegin(GL_QUADS);
+	glTexCoord2i(0, 0); glVertex2i(0, 0);
+	glTexCoord2i(1, 0); glVertex2i(1, 0);
+	glTexCoord2i(1, 1); glVertex2i(1, 1);
+	glTexCoord2i(0, 1); glVertex2i(0, 1);
+	glEnd();
 
 	return 0;
 }
@@ -136,7 +149,6 @@ int gl_play_create_ctx(struct gl_play_private_s *gl_play)
 	XVisualInfo *visinfo;
 	XSetWindowAttributes winattr;
 
-	gl_play->zoom = 1;
 	visinfo = glXChooseVisual(gl_play->dpy, DefaultScreen(gl_play->dpy), attribs);
 
 	winattr.background_pixel = 0;
@@ -151,6 +163,9 @@ int gl_play_create_ctx(struct gl_play_private_s *gl_play)
 	                              CWColormap | CWEventMask | CWOverrideRedirect, &winattr);
 
 	gl_play->ctx = glXCreateContext(gl_play->dpy, visinfo, NULL, True);
+	if (gl_play->ctx == NULL)
+		return EAGAIN;
+
 	gl_play->created = 1;
 
 	XFree(visinfo);
@@ -171,8 +186,6 @@ int gl_play_update_ctx(struct gl_play_private_s *gl_play)
 
 	snprintf(gl_play->name, sizeof(gl_play->name) - 1, "glc-play (ctx %d)", gl_play->ctx_i);
 
-	gl_play->zoom = 1; /* reset zoom, sorry */
-
 	XUnmapWindow(gl_play->dpy, gl_play->drawable);
 
 	sizehints.x = 0;
@@ -192,7 +205,31 @@ int gl_play_update_ctx(struct gl_play_private_s *gl_play)
 	XMapWindow(gl_play->dpy, gl_play->drawable);
 
 	glXMakeCurrent(gl_play->dpy, gl_play->drawable, gl_play->ctx);
-	glViewport(0, 0, (GLsizei) gl_play->w, (GLsizei) gl_play->h);
+
+	return gl_play_update_viewport(gl_play, gl_play->w, gl_play->h);
+}
+
+int gl_play_update_viewport(struct gl_play_private_s *gl_play, unsigned int w, unsigned int h)
+{
+	glViewport(0, 0, (GLsizei) w, (GLsizei) h);
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	if (!gl_play->texture) {
+		glGenTextures(1, &gl_play->texture);
+
+		glBindTexture(GL_TEXTURE_2D, gl_play->texture);
+		glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	}
 
 	return 0;
 }
@@ -230,7 +267,7 @@ int gl_handle_xevents(struct gl_play_private_s *gl_play, glc_thread_state_t *sta
 			break;
 		case ConfigureNotify:
 			ce = (XConfigureEvent *) &event;
-			gl_play->zoom = (float) ce->width / (float) gl_play->w;
+			gl_play_update_viewport(gl_play, ce->width, ce->height);
 
 			break;
 		}
@@ -282,6 +319,9 @@ int gl_play_read_callback(glc_thread_state_t *state)
 			return EINVAL;
 		}
 
+		/* draw first, measure and sleep after */
+		gl_play_draw_picture(gl_play, &state->read_data[GLC_PICTURE_HEADER_SIZE]);
+
 		time = util_timestamp(gl_play->glc);
 
 		if (pic_hdr->timestamp > time)
@@ -289,7 +329,7 @@ int gl_play_read_callback(glc_thread_state_t *state)
 		else if (time > pic_hdr->timestamp + gl_play->fps)
 			return 0;
 
-		gl_play_put_pixels(gl_play, &state->read_data[GLC_PICTURE_HEADER_SIZE]);
+		glXSwapBuffers(gl_play->dpy, gl_play->drawable);
 	}
 
 	return 0;

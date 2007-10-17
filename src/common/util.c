@@ -159,12 +159,15 @@ int util_load_info(glc_t *glc, const char *filename)
 {
 	FILE *file = fopen(filename, "r");
 	if (!file) {
-		fprintf(stderr, "can't open %s\n", filename);
+		fprintf(stderr, "can't open %s: %s (%d)\n", filename, strerror(errno), errno);
 		return ENOENT;
 	}
 	
 	util_create_info(glc);
-	fread(glc->info, 1, GLC_STREAM_INFO_SIZE, file);
+	if (fread(glc->info, 1, GLC_STREAM_INFO_SIZE, file) != GLC_STREAM_INFO_SIZE) {
+		fprintf(stderr, "can't read stream information\n");
+		return ENOSTR;
+	}
 	
 	if (glc->info->signature != GLC_SIGNATURE) {
 		fprintf(stderr, "signature does not match\n");

@@ -15,9 +15,9 @@ STREAM = $(SRC)/stream
 SCRIPTS = scripts
 
 VERSION=0
-RELEASE=$(VERSION).3.3
+RELEASE=$(VERSION).3.4
 
-#MINILZO = ../minilzo/
+#MINILZO = ../minilzo.202/
 #LZO_OBJ = build/minilzo.o
 #USE_LZO = -D__MINILZO -I$(MINILZO)
 LZO_LIB = -llzo2
