@@ -1,3 +1,11 @@
+0.3.4 (2007/10/17)
+   Use 3D engine to draw frames instead of directly drawing pixels.
+    Much smoother scaling while playing.
+   More verbose IO error messages.
+   Fixed audio skip calculations. Seeking doesn't cause audio desync
+    any more.
+   Some build-related fixes.
+
 0.3.3 (2007/10/15)
    Reworked playback architecture. Should handle simultaneous audio
     and video streams better.
