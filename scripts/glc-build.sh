@@ -42,7 +42,7 @@ echo "#include <stdio.h>
 [ -e "/usr/include/X11/X.h" -a -e "/usr/include/X11/Xlib.h" ] \
 	|| die "Missing X11 headers (Ubuntu users: apt-get install libx11-dev)"
 [ -e "/usr/include/GL/gl.h" -a -e "/usr/include/GL/glx.h" ] \
-	|| die "Missing OpenGL headers (Ubuntu users: apt-get install libgl-dev)"
+	|| die "Missing OpenGL headers (Ubuntu users: apt-get install libgl1-mesa-dev)"
 [ -e "/usr/include/alsa/asoundlib.h" ] \
 	|| die "Missing ALSA headers (Ubuntu users: apt-get install libasound2-dev)"
 
@@ -116,7 +116,8 @@ cd ..
 
 info "Building glc..."
 cd glc
-make \
+LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:../elfhacks/build:../packetstream/build" \
+	make \
 	CFLAGS="${CFLAGS} -I../elfhacks/src -I../packetstream/src" \
 	LDFLAGS="${LDFLAGS} -L../elfhacks/build -L../packetstream/build" \
 	MINILZO="../minilzo.202/" \
@@ -125,7 +126,8 @@ make \
 	USE_LZO="-D__MINILZO -I../minilzo.202" \
 	> /dev/null || die "Can't compile glc"
 if [ $BUILD64 == 1 ]; then
-	make \
+	LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:../elfhacks/build32:../packetstream/build32" \
+		make \
 		CFLAGS="${CFLAGS} -m32 -I../elfhacks/src -I../packetstream/src " \
 		LDFLAGS="${LDFLAGS} -m32 -L../elfhacks/build32 -L../packetstream/build32" \
 		BUILD="build32" \
