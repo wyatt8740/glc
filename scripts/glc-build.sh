@@ -141,21 +141,28 @@ cd ..
 
 info "Installing elfhacks..."
 cd elfhacks
-$SUDOMAKE install DESTDIR="${DESTDIR}" > /dev/null \
-	|| die "Can't install elfhacks"
 if [ $BUILD64 == 1 ]; then
-	$SUDOMAKE install DESTDIR="${DESTDIR}" BUILD="build32" > /dev/null \
+	$SUDOMAKE install MLIBDIR="lib64" DESTDIR="${DESTDIR}" > /dev/null \
+		|| die "Can't install 64-bit elfhacks"
+	$SUDOMAKE install MLIBDIR="lib32" DESTDIR="${DESTDIR}" BUILD="build32" > /dev/null \
 		|| die "Can't install 32-bit elfhacks"
+else
+	$SUDOMAKE install DESTDIR="${DESTDIR}" > /dev/null \
+		|| die "Can't install elfhacks"
 fi
 cd ..
 
 info "Installing packetstream..."
 cd packetstream
-$SUDOMAKE install DESTDIR="${DESTDIR}" > /dev/null \
-	|| die "Can't install packetstream"
+
 if [ $BUILD64 == 1 ]; then
-	$SUDOMAKE install DESTDIR="${DESTDIR}" BUILD="build32" > /dev/null \
+	$SUDOMAKE install MLIBDIR="lib64" DESTDIR="${DESTDIR}" > /dev/null \
+		|| die "Can't install 64-bit packetstream"
+	$SUDOMAKE install MLIBDIR="lib32" DESTDIR="${DESTDIR}" BUILD="build32" > /dev/null \
 		|| die "Can't install 32-bit packetstream"
+else
+	$SUDOMAKE install DESTDIR="${DESTDIR}" > /dev/null \
+		|| die "Can't install packetstream"
 fi
 cd ..
 
@@ -182,3 +189,30 @@ if [ "${DESTDIR}" != "" ]; then
 	echo "PATH=\"\${PATH}:${DESTDIR}/usr/bin\""
 	echo "LD_LIBRARY_PATH=\"\$LD_LIBRARY_PATH:${LD_LIBRARY_PATH_ADD}\""
 fi
+
+RM="rm"
+[ -w "${DESTDIR}/usr/bin/glc-play" ] || RM="sudo ${RM}"
+
+# TODO more complete escape
+RDIR=`echo "${DESTDIR}" | sed 's/ /\\ /g'`
+
+info "If you want to remove glc, execute:"
+if [ $BUILD64 == 1 ]; then
+	echo "${RM} ${RDIR}/usr/lib64/libglc.so* \\"
+	echo "${RDIR}/usr/lib64/libglc-capture.so* \\"
+	echo "${RDIR}/usr/lib64/libelfhacks.so* \\"
+	echo "${RDIR}/usr/lib64/libpacketstream.so* \\"
+	echo "${RDIR}/usr/lib32/libglc.so* \\"
+	echo "${RDIR}/usr/lib32/libglc-capture.so* \\"
+	echo "${RDIR}/usr/lib32/libelfhacks.so* \\"
+	echo "${RDIR}/usr/lib32/libpacketstream.so* \\"
+else
+	echo "${RM} ${RDIR}/usr/lib/libglc.so* \\"
+	echo "${RDIR}/usr/lib/libglc-capture.so* \\"
+	echo "${RDIR}/usr/lib/libelfhacks.so* \\"
+	echo "${RDIR}/usr/lib/libpacketstream.so* \\"
+fi
+echo "${RDIR}/usr/include/elfhacks.h \\"
+echo "${RDIR}/usr/include/packetstream.h \\"
+echo "${RDIR}/usr/bin/glc-capture \\"
+echo "${RDIR}/usr/bin/glc-play"
