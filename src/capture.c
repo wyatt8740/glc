@@ -48,6 +48,7 @@ int main(int argc, char *argv[])
 		{"no-pbo",		0, NULL, 'p'},
 		{"disable-compression",	0, NULL, 'z'},
 		{"bgra",		0, NULL, 'j'},
+		{"byte-aligned",	0, NULL, 'm'},
 		{"disable-indicator",	0, NULL, 'n'},
 		{"no-audio-skip",	0, NULL, 'w'},
 		{"disable-audio",	0, NULL, 'a'},
@@ -100,6 +101,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'j':
 			setenv("GLC_CAPTURE_BGRA", "1", 1);
+			break;
+		case 'm':
+			setenv("GLC_CAPTURE_DWORD_ALIGNED", "0", 1);
 			break;
 		case 'n':
 			setenv("GLC_INDICATOR", "0", 1);
@@ -187,6 +191,7 @@ usage:
 	       "  -z, --disable-compression  don't compress stream\n"
 	       "                               by default stream is compressed with LZO\n"
 	       "  -j, --bgra                 capture as BGRA and convert to BGR\n"
+	       "  -m, --byte-aligned         use GL_PACK_ALIGNMENT 1 instead of 8\n"
 	       "  -n, --disable-indicator    disable drawing indicator while capturing\n"
 	       "  -w, --no-audio-skip        always capture audio data\n"
 	       "  -a, --disable-audio        don't capture audio\n"
