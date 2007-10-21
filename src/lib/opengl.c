@@ -98,10 +98,6 @@ int opengl_init(glc_t *glc)
 	else
 		opengl.glc->scale = 1.0;
 
-	/* Y'CbCr upscaling is broken... probably serious :/ */
-	if (opengl.glc->scale > 1.0)
-		opengl.glc->scale = 1.0;
-
 	if (getenv("GLC_CAPTURE_BGRA")) {
 		if (atoi(getenv("GLC_CAPTURE_BGRA")))
 			opengl.glc->flags |= GLC_CAPTURE_BGRA;
