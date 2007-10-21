@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
 	   is encountered. */
 	setenv("POSIXLY_CORRECT", "1", 1);
 
-	while ((opt = getopt_long(argc, argv, "o:f:r:y:se:k:pzjnwaqgvb:c:u:d:h", long_options, &option_index)) != -1) {
+	while ((opt = getopt_long(argc, argv, "o:f:r:y:se:k:pzjmnwaqgvb:c:u:d:h", long_options, &option_index)) != -1) {
 		switch(opt) {
 		case 'o':
 			setenv("GLC_FILE", optarg, 1);
