@@ -46,6 +46,7 @@ struct gl_play_private_s {
 	glc_ctx_i ctx_i;
 	GLenum format;
 	unsigned int w, h;
+	unsigned int pack_alignment;
 	glc_utime_t last, fps;
 
 	Display *dpy;
@@ -123,7 +124,7 @@ int gl_play_draw_picture(struct gl_play_private_s *gl_play, char *from)
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, gl_play->texture);
 
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, gl_play->pack_alignment);
 	glTexImage2D(GL_TEXTURE_2D, 0, 3, gl_play->w, gl_play->h, 0, GL_BGR,
 		     GL_UNSIGNED_BYTE, from);
 
@@ -308,6 +309,11 @@ int gl_play_read_callback(glc_thread_state_t *state)
 			fprintf(stderr, "ctx %d is in unsupported format\n", ctx_msg->ctx);
 			return EINVAL;
 		}
+
+		if (ctx_msg->flags & GLC_CTX_DWORD_ALIGNED)
+			gl_play->pack_alignment = 8;
+		else
+			gl_play->pack_alignment = 1;
 	} else if (state->header.type == GLC_MESSAGE_PICTURE) {
 		pic_hdr = (glc_picture_header_t *) state->read_data;
 

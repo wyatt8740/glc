@@ -335,7 +335,7 @@ int gl_capture_create_pbo(struct gl_capture_private_s *gl_capture, struct gl_cap
 
 	gl_capture->glGenBuffers(1, &ctx->pbo);
 	gl_capture->glBindBuffer(GL_PIXEL_PACK_BUFFER_ARB, ctx->pbo);
-	gl_capture->glBufferData(GL_PIXEL_PACK_BUFFER_ARB, ctx->w * ctx->h * gl_capture->bpp,
+	gl_capture->glBufferData(GL_PIXEL_PACK_BUFFER_ARB, ctx->row * ctx->ch,
 		         NULL, GL_STREAM_READ);
 
 	glPopAttrib();
@@ -388,7 +388,7 @@ int gl_capture_read_pbo(struct gl_capture_private_s *gl_capture, struct gl_captu
 	if (!buf)
 		return EINVAL;
 
-	ps_packet_write(&ctx->packet, buf, ctx->cw * ctx->ch * gl_capture->bpp);
+	ps_packet_write(&ctx->packet, buf, ctx->row * ctx->ch);
 
 	gl_capture->glUnmapBuffer(GL_PIXEL_PACK_BUFFER_ARB);
 
@@ -444,7 +444,8 @@ int gl_capture_get_ctx(struct gl_capture_private_s *gl_capture, struct gl_captur
 			ctx_msg.flags |= GLC_CTX_BGRA;
 		else
 			ctx_msg.flags |= GLC_CTX_BGR;
-		ctx_msg.flags |= GLC_CTX_DWORD_ALIGNED;
+		if (gl_capture->glc->flags & GLC_CAPTURE_DWORD_ALIGNED)
+			ctx_msg.flags |= GLC_CTX_DWORD_ALIGNED;
 		ctx_msg.ctx = fctx->ctx_i;
 		ctx_msg.w = fctx->cw;
 		ctx_msg.h = fctx->ch;
@@ -469,7 +470,8 @@ int gl_capture_get_ctx(struct gl_capture_private_s *gl_capture, struct gl_captur
 				ctx_msg.flags |= GLC_CTX_BGRA;
 			else
 				ctx_msg.flags |= GLC_CTX_BGR;
-			ctx_msg.flags |= GLC_CTX_DWORD_ALIGNED;
+			if (gl_capture->glc->flags & GLC_CAPTURE_DWORD_ALIGNED)
+				ctx_msg.flags |= GLC_CTX_DWORD_ALIGNED;
 			ctx_msg.ctx = fctx->ctx_i;
 			ctx_msg.w = fctx->cw;
 			ctx_msg.h = fctx->ch;
