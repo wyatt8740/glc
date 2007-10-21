@@ -1,3 +1,7 @@
+0.3.5 (2007/10/21)
+   Scaler (both scale and ycbcr) bugfixes.
+   Added sample build script (glc-build.sh).
+
 0.3.4 (2007/10/17)
    Use 3D engine to draw frames instead of directly drawing pixels.
     Much smoother scaling while playing.
