@@ -543,7 +543,7 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 			ctx->pbo_timestamp = now;
 		} else {
 			if ((ret = ps_packet_dma(&ctx->packet, (void *) &dma,
-					 ctx->cw * ctx->ch * gl_capture->bpp, PS_ACCEPT_FAKE_DMA)))
+					 ctx->row * ctx->ch, PS_ACCEPT_FAKE_DMA)))
 			goto cancel;
 
 			ret = gl_capture_get_pixels(gl_capture, ctx, dma);
