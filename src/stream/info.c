@@ -199,6 +199,7 @@ void ctx_info(struct info_private_s *info, glc_ctx_message_t *ctx_message)
 		INFO_FLAG(ctx_message->flags, GLC_CTX_BGR)
 		INFO_FLAG(ctx_message->flags, GLC_CTX_BGRA)
 		INFO_FLAG(ctx_message->flags, GLC_CTX_YCBCR_420JPEG)
+		INFO_FLAG(ctx_message->flags, GLC_CTX_DWORD_ALIGNED)
 		printf("\n");
 		printf("  width       = %u\n", ctx_message->w);
 		printf("  height      = %u\n", ctx_message->h);

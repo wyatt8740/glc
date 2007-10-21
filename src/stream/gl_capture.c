@@ -62,7 +62,7 @@ struct gl_capture_ctx_s {
 	glc_utime_t last, pbo_timestamp;
 
 	unsigned int w, h;
-	unsigned int cw, ch, cx, cy;
+	unsigned int cw, ch, row, cx, cy;
 
 	int indicator_list;
 
@@ -87,7 +87,8 @@ struct gl_capture_private_s {
 	int use_pbo;
 	unsigned int bpp;
 	GLenum format;
-	
+	unsigned int pack_alignment;
+
 	void *libGL_handle;
 	GLXGetProcAddressProc glXGetProcAddress;
 	glGenBuffersProc glGenBuffers;
@@ -123,6 +124,11 @@ void *gl_capture_init(glc_t *glc, ps_buffer_t *to)
 	gl_capture->glc = glc;
 	gl_capture->fps = 1000000 / gl_capture->glc->fps;
 	gl_capture->to = to;
+
+	if (gl_capture->glc->flags & GLC_CAPTURE_DWORD_ALIGNED)
+		gl_capture->pack_alignment = 8;
+	else
+		gl_capture->pack_alignment = 1;
 	
 	if (gl_capture->glc->flags & GLC_TRY_PBO)
 		gl_capture->try_pbo = 1;
@@ -218,6 +224,10 @@ int gl_capture_calc_geometry(struct gl_capture_private_s *gl_capture, struct gl_
 		ctx->cx = ctx->cy = 0;
 	}
 
+	ctx->row = ctx->cw * gl_capture->bpp;
+	if (ctx->row % gl_capture->pack_alignment != 0)
+		ctx->row += gl_capture->pack_alignment - ctx->row % gl_capture->pack_alignment;
+
 	return 0;
 }
 
@@ -227,7 +237,7 @@ int gl_capture_get_pixels(struct gl_capture_private_s *gl_capture, struct gl_cap
 	glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);
 
 	glReadBuffer(gl_capture->capture_buffer);
-	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glPixelStorei(GL_PACK_ALIGNMENT, gl_capture->pack_alignment);
 	glReadPixels(ctx->cx, ctx->cy, ctx->cw, ctx->ch, gl_capture->format, GL_UNSIGNED_BYTE, to);
 
 	glPopClientAttrib();
@@ -351,7 +361,7 @@ int gl_capture_start_pbo(struct gl_capture_private_s *gl_capture, struct gl_capt
 	gl_capture->glBindBuffer(GL_PIXEL_PACK_BUFFER_ARB, ctx->pbo);
 
 	glReadBuffer(gl_capture->capture_buffer);
-	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glPixelStorei(GL_PACK_ALIGNMENT, gl_capture->pack_alignment);
 	/* to = ((char *)NULL + (offset)) */
 	glReadPixels(ctx->cx, ctx->cy, ctx->cw, ctx->ch, gl_capture->format, GL_UNSIGNED_BYTE, NULL);
 
@@ -434,6 +444,7 @@ int gl_capture_get_ctx(struct gl_capture_private_s *gl_capture, struct gl_captur
 			ctx_msg.flags |= GLC_CTX_BGRA;
 		else
 			ctx_msg.flags |= GLC_CTX_BGR;
+		ctx_msg.flags |= GLC_CTX_DWORD_ALIGNED;
 		ctx_msg.ctx = fctx->ctx_i;
 		ctx_msg.w = fctx->cw;
 		ctx_msg.h = fctx->ch;
@@ -458,6 +469,7 @@ int gl_capture_get_ctx(struct gl_capture_private_s *gl_capture, struct gl_captur
 				ctx_msg.flags |= GLC_CTX_BGRA;
 			else
 				ctx_msg.flags |= GLC_CTX_BGR;
+			ctx_msg.flags |= GLC_CTX_DWORD_ALIGNED;
 			ctx_msg.ctx = fctx->ctx_i;
 			ctx_msg.w = fctx->cw;
 			ctx_msg.h = fctx->ch;
@@ -517,7 +529,7 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 
 		if (gl_capture->use_pbo) {
 			/* is this safe, what happens if this is called simultaneously? */
-			if ((ret = ps_packet_setsize(&ctx->packet, ctx->cw * ctx->ch * gl_capture->bpp
+			if ((ret = ps_packet_setsize(&ctx->packet, ctx->row * ctx->ch
 								   + GLC_MESSAGE_HEADER_SIZE
 								   + GLC_PICTURE_HEADER_SIZE)))
 				goto cancel;

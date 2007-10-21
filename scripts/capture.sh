@@ -64,6 +64,9 @@ export GLC_COLORSPACE=420jpeg
 # crop capture area to WxH+X+Y
 # export GLC_CROP=WxH+X+Y
 
+# use GL_PACK_ALIGNMENT 8
+export GLC_CAPTURE_DWORD_ALIGNED=1
+
 # set SDL audiodriver to alsa
 export SDL_AUDIODRIVER=alsa
 

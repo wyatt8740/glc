@@ -120,6 +120,8 @@ typedef u_int32_t glc_flags_t;
 #define GLC_CONVERT_420JPEG             512
 /** crop pictures */
 #define GLC_CROP                       1024
+/** use GL_PACK_ALIGNMENT 8 for readback */
+#define GLC_CAPTURE_DWORD_ALIGNED      2048
 
 /**
  * \brief stream info structure
@@ -277,6 +279,8 @@ typedef struct {
 #define GLC_CTX_BGRA                      8
 /** planar YV12 420jpeg */
 #define GLC_CTX_YCBCR_420JPEG            16
+/** double-word aligned rows (GL_PACK_ALIGNMENT = 8) */
+#define GLC_CTX_DWORD_ALIGNED            32
 
 /**
  * \brief audio format message
