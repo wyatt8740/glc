@@ -233,11 +233,11 @@ void ycbcr_get_ctx(struct ycbcr_private_s *ycbcr, glc_ctx_i ctx_i, struct ycbcr_
 			break;
 		*ctx = (*ctx)->next;
 	}
-	
+
 	if (*ctx == NULL) {
 		*ctx = malloc(sizeof(struct ycbcr_ctx_s));
 		memset(*ctx, 0, sizeof(struct ycbcr_ctx_s));
-		
+
 		(*ctx)->next = ycbcr->ctx;
 		ycbcr->ctx = *ctx;
 		(*ctx)->ctx_i = ctx_i;
@@ -253,7 +253,7 @@ void ycbcr_bgr_to_jpeg420(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx
 	unsigned char Rd, Gd, Bd;
 	unsigned int ox, oy, Yy, Yx, row;
 	unsigned char *Y, *Cb, *Cr;
-	
+
 	Y = to;
 	Cb = &to[ctx->yw * ctx->yh];
 	Cr = &to[ctx->yw * ctx->yh + ctx->cw * ctx->ch];
@@ -276,7 +276,7 @@ void ycbcr_bgr_to_jpeg420(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx
 			/* CbCr */
 			Cb[Cpix  ] = RGB_TO_YCbCrJPEG_Cb(Rd, Gd, Bd);
 			Cr[Cpix++] = RGB_TO_YCbCrJPEG_Cr(Rd, Gd, Bd);
-			
+
 			/* Y' */
 			Y[(Yx + 0) + (Yy + 0) * ctx->yw] = RGB_TO_YCbCrJPEG_Y(from[op3 + 2],
 									      from[op3 + 1],
@@ -314,7 +314,7 @@ void ycbcr_bgr_to_jpeg420_half(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s
 	unsigned char Rd, Gd, Bd;
 	unsigned int ox, oy, Yy, Yx;
 	unsigned char *Y, *Cb, *Cr;
-	
+
 	Y = to;
 	Cb = &to[ctx->yw * ctx->yh];
 	Cr = &to[ctx->yw * ctx->yh + ctx->cw * ctx->ch];
@@ -329,7 +329,7 @@ void ycbcr_bgr_to_jpeg420_half(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s
 			CALC_BILINEAR_RGB(ctx->bpp, ctx->bpp * 2, ctx->bpp, ctx->bpp * 2)
 			Cb[Cpix  ] = RGB_TO_YCbCrJPEG_Cb(Rd, Gd, Bd);
 			Cr[Cpix++] = RGB_TO_YCbCrJPEG_Cr(Rd, Gd, Bd);
-			
+
 			/* Y' */
 			CALC_BILINEAR_RGB(0, ctx->bpp, ctx->bpp * 2, ctx->bpp * 3)
 			Y[(Yx + 0) + (Yy + 0) * ctx->yw] = RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd);
@@ -342,7 +342,7 @@ void ycbcr_bgr_to_jpeg420_half(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s
 
 			CALC_BILINEAR_RGB(ctx->bpp * 2, ctx->bpp * 3, 0, ctx->bpp)
 			Y[(Yx + 1) + (Yy + 1) * ctx->yw] = RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd);
-			
+
 			ox += ctx->bpp * 4;
 		}
 		ox = 0;
@@ -359,14 +359,14 @@ void ycbcr_bgr_to_jpeg420_scale(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_
 	unsigned char *Y, *Cb, *Cr;
 	unsigned int Cmap, Yy, Yx;
 	unsigned char Rd, Gd, Bd;
-	
+
 	Y = to;
 	Cb = &to[ctx->yw * ctx->yh];
 	Cr = &to[ctx->yw * ctx->yh + ctx->cw * ctx->ch];
-	
+
 	Cpix = 0;
 	Cmap = ctx->yw * ctx->yh;
-	
+
 #define CALC_Rd(m) (from[ctx->pos[m + 0] + 2] * ctx->factor[m + 0] \
 		  + from[ctx->pos[m + 1] + 2] * ctx->factor[m + 1] \
 		  + from[ctx->pos[m + 2] + 2] * ctx->factor[m + 2] \
@@ -391,7 +391,7 @@ void ycbcr_bgr_to_jpeg420_scale(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_
 			CALC_RdBdGd(Cmap + Cpix)
 			Cb[Cpix  ] = RGB_TO_YCbCrJPEG_Cb(Rd, Gd, Bd);
 			Cr[Cpix++] = RGB_TO_YCbCrJPEG_Cr(Rd, Gd, Bd);
-			
+
 			/* Y' */
 			CALC_RdBdGd((Yx + 0) + (Yy + 0) * ctx->yw)
 			Y[(Yx + 0) + (Yy + 0) * ctx->yw] = RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd);
@@ -414,7 +414,7 @@ void ycbcr_bgr_to_jpeg420_scale(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_
 int ycbcr_ctx_msg(struct ycbcr_private_s *ycbcr, glc_ctx_message_t *ctx_msg)
 {
 	struct ycbcr_ctx_s *ctx;
-	
+
 	ycbcr_get_ctx(ycbcr, ctx_msg->ctx, &ctx);
 	pthread_rwlock_wrlock(&ctx->update);
 
@@ -431,7 +431,7 @@ int ycbcr_ctx_msg(struct ycbcr_private_s *ycbcr, glc_ctx_message_t *ctx_msg)
 	ctx->w = ctx_msg->w;
 	ctx->h = ctx_msg->h;
 	ctx->scale = ycbcr->glc->scale;
-	
+
 	ctx->yw = ctx->w * ctx->scale;
 	ctx->yh = ctx->h * ctx->scale;
 	ctx->yw -= ctx->yw % 2; /* safer and faster             */
@@ -439,7 +439,7 @@ int ycbcr_ctx_msg(struct ycbcr_private_s *ycbcr, glc_ctx_message_t *ctx_msg)
 
 	ctx->cw = ctx->yw / 2;
 	ctx->ch = ctx->yh / 2;
-	
+
 	ctx_msg->flags &= ~GLC_CTX_BGR;
 	ctx_msg->flags |= GLC_CTX_YCBCR_420JPEG;
 	ctx_msg->w = ctx->yw;
@@ -467,83 +467,82 @@ int ycbcr_generate_map(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx)
 	size_t scale_maps_size;
 	unsigned int tp, x, y;
 	float d, ofx, ofy, fx0, fx1, fy0, fy1;
-	
+
 	scale_maps_size = ctx->yw * ctx->yh * 4 + ctx->cw * ctx->ch * 4;
 
 	if (ctx->pos)
 		ctx->pos = (unsigned int *) realloc(ctx->pos, sizeof(unsigned int) * scale_maps_size);
 	else
 		ctx->pos = (unsigned int *) malloc(sizeof(unsigned int) * scale_maps_size);
+
 	if (ctx->factor)
 		ctx->factor = (float *) realloc(ctx->factor, sizeof(float) * scale_maps_size);
 	else
 		ctx->factor = (float *) malloc(sizeof(float) * scale_maps_size);
 
 	/* Y' */
-	d = (float) ctx->w / (float) ctx->yw;
-	ofx = 0;
-	ofy = (float) ctx->h - d;
-	
+	d = (float) (ctx->w - 1) / (float) ctx->yw;
+	ofx = ofy = 0;
+
 	for (y = 0; y < ctx->yh; y++) {
 		for (x = 0; x < ctx->yw; x++) {
 			tp = (x + y * ctx->yw) * 4;
 
-			ctx->pos[tp + 2] = (((unsigned int) ofx + 0) +
-			                    ((unsigned int) ofy + 0) * ctx->w) * ctx->bpp;
-			ctx->pos[tp + 3] = (((unsigned int) ofx + 1) +
-			                    ((unsigned int) ofy + 0) * ctx->w) * ctx->bpp;
 			ctx->pos[tp + 0] = (((unsigned int) ofx + 0) +
-			                    ((unsigned int) ofy + 1) * ctx->w) * ctx->bpp;
+			                    (ctx->h - 1 - (unsigned int) ofy) * ctx->w) * ctx->bpp;
 			ctx->pos[tp + 1] = (((unsigned int) ofx + 1) +
-			                    ((unsigned int) ofy + 1) * ctx->w) * ctx->bpp;
+			                    (ctx->h - 1 - (unsigned int) ofy) * ctx->w) * ctx->bpp;
+			ctx->pos[tp + 2] = (((unsigned int) ofx + 0) +
+			                    (ctx->h - 2 - (unsigned int) ofy) * ctx->w) * ctx->bpp;
+			ctx->pos[tp + 3] = (((unsigned int) ofx + 1) +
+			                    (ctx->h - 2 - (unsigned int) ofy) * ctx->w) * ctx->bpp;
 
 			fx1 = (float) x * d - (float) ((unsigned int) ofx);
 			fx0 = 1.0 - fx1;
-			fy1 = (float) y * d - (float) ((unsigned int) ((float) ctx->h - d - ofy));
+			fy1 = (float) y * d - (float) ((unsigned int) ofy);
 			fy0 = 1.0 - fy1;
-			
-			ctx->factor[tp + 2] = fx0 * fy0;
-			ctx->factor[tp + 3] = fx1 * fy0;
-			ctx->factor[tp + 0] = fx0 * fy1;
-			ctx->factor[tp + 1] = fx1 * fy1;
-			
+
+			ctx->factor[tp + 0] = fx0 * fy0;
+			ctx->factor[tp + 1] = fx1 * fy0;
+			ctx->factor[tp + 2] = fx0 * fy1;
+			ctx->factor[tp + 3] = fx1 * fy1;
+
 			ofx += d;
 		}
-		ofy -= d;
+		ofy += d;
 		ofx = 0;
 	}
 
 	/* CbCr */
-	d = (float) ctx->w / (float) ctx->cw;
-	ofx = 0;
-	ofy = (float) ctx->h - d;
+	d = (float) (ctx->w - 1) / (float) ctx->cw;
+	ofx = ofy = 0;
 
 	for (y = 0; y < ctx->ch; y++) {
 		for (x = 0; x < ctx->cw; x++) {
 			tp = (ctx->yw * ctx->yh * 4) + (x + y * ctx->cw) * 4;
 
-			ctx->pos[tp + 2] = (((unsigned int) ofx + 0) +
-			                    ((unsigned int) ofy + 0) * ctx->w) * ctx->bpp;
-			ctx->pos[tp + 3] = (((unsigned int) ofx + 1) +
-			                    ((unsigned int) ofy + 0) * ctx->w) * ctx->bpp;
 			ctx->pos[tp + 0] = (((unsigned int) ofx + 0) +
-			                    ((unsigned int) ofy + 1) * ctx->w) * ctx->bpp;
+			                    (ctx->h - 1 - (unsigned int) ofy) * ctx->w) * ctx->bpp;
 			ctx->pos[tp + 1] = (((unsigned int) ofx + 1) +
-			                    ((unsigned int) ofy + 1) * ctx->w) * ctx->bpp;
+			                    (ctx->h - 1 - (unsigned int) ofy) * ctx->w) * ctx->bpp;
+			ctx->pos[tp + 2] = (((unsigned int) ofx + 0) +
+			                    (ctx->h - 2 - (unsigned int) ofy) * ctx->w) * ctx->bpp;
+			ctx->pos[tp + 3] = (((unsigned int) ofx + 1) +
+			                    (ctx->h - 2 - (unsigned int) ofy) * ctx->w) * ctx->bpp;
 
 			fx1 = (float) x * d - (float) ((unsigned int) ofx);
 			fx0 = 1.0 - fx1;
-			fy1 = (float) y * d - (float) ((unsigned int) ((float) ctx->h - d - ofy));
+			fy1 = (float) y * d - (float) ((unsigned int) ofy);
 			fy0 = 1.0 - fy1;
-			
-			ctx->factor[tp + 2] = fx0 * fy0;
-			ctx->factor[tp + 3] = fx1 * fy0;
-			ctx->factor[tp + 0] = fx0 * fy1;
-			ctx->factor[tp + 1] = fx1 * fy1;
-			
+
+			ctx->factor[tp + 0] = fx0 * fy0;
+			ctx->factor[tp + 1] = fx1 * fy0;
+			ctx->factor[tp + 2] = fx0 * fy1;
+			ctx->factor[tp + 3] = fx1 * fy1;
+
 			ofx += d;
 		}
-		ofy -= d;
+		ofy += d;
 		ofx = 0;
 	}
 

@@ -38,7 +38,7 @@ struct scale_ctx_s {
 	unsigned int w, h, sw, sh, bpp;
 	double scale;
 	int process;
-	
+
 	unsigned int *pos;
 	float *factor;
 
@@ -64,16 +64,16 @@ int scale_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 {
 	struct scale_private_s *scale = malloc(sizeof(struct scale_private_s));
 	memset(scale, 0, sizeof(struct scale_private_s));
-	
+
 	scale->glc = glc;
-	
+
 	scale->thread.flags = GLC_THREAD_READ | GLC_THREAD_WRITE;
 	scale->thread.read_callback = &scale_read_callback;
 	scale->thread.write_callback = &scale_write_callback;
 	scale->thread.finish_callback = &scale_finish_callback;
 	scale->thread.ptr = scale;
 	scale->thread.threads = util_cpus();
-	
+
 	return glc_thread_create(glc, &scale->thread, from, to);
 }
 
@@ -84,11 +84,11 @@ void scale_finish_callback(void *ptr, int err)
 
 	if (err)
 		fprintf(stderr, "scale failed: %s (%d)\n", strerror(err), err);
-	
+
 	while (scale->ctx != NULL) {
 		del = scale->ctx;
 		scale->ctx = scale->ctx->next;
-		
+
 		if (del->pos)
 			free(del->pos);
 		if (del->factor)
@@ -97,7 +97,7 @@ void scale_finish_callback(void *ptr, int err)
 		pthread_rwlock_destroy(&del->update);
 		free(del);
 	}
-	
+
 	sem_post(&scale->glc->signal[GLC_SIGNAL_SCALE_FINISHED]);
 	free(scale);
 }
@@ -144,23 +144,23 @@ int scale_write_callback(glc_thread_state_t *state) {
 int scale_get_ctx(struct scale_private_s *scale, glc_ctx_i ctx_i, struct scale_ctx_s **ctx)
 {
 	struct scale_ctx_s *list = scale->ctx;
-	
+
 	while (list != NULL) {
 		if (list->ctx == ctx_i)
 			break;
 		list = list->next;
 	}
-	
+
 	if (list == NULL) {
 		list = (struct scale_ctx_s *) malloc(sizeof(struct scale_ctx_s));
 		memset(list, 0, sizeof(struct scale_ctx_s));
-		
+
 		list->next = scale->ctx;
 		scale->ctx = list;
 		list->ctx = ctx_i;
 		pthread_rwlock_init(&list->update, NULL);
 	}
-	
+
 	*ctx = list;
 	return 0;
 }
@@ -187,7 +187,7 @@ int scale_pic_msg(struct scale_private_s *scale, struct scale_ctx_s *ctx, unsign
 		}
 		return 0;
 	}
-	
+
 	if (ctx->scale == 0.5) { /* special case... */
 		for (y = 0; y < shi; y += 3) {
 			for (x = 0; x < swi; x += 3) {
@@ -197,7 +197,7 @@ int scale_pic_msg(struct scale_private_s *scale, struct scale_ctx_s *ctx, unsign
 				op3 = (ox +        0) + (oy + ctx->bpp) * ctx->w;
 				op4 = (ox + ctx->bpp) + (oy + ctx->bpp) * ctx->w;
 				ox += 2 * ctx->bpp;
-				
+
 				to[tp + 0] = (from[op1 + 0]
 					    + from[op2 + 0]
 					    + from[op3 + 0]
@@ -210,20 +210,20 @@ int scale_pic_msg(struct scale_private_s *scale, struct scale_ctx_s *ctx, unsign
 					    + from[op2 + 2]
 					    + from[op3 + 2]
 					    + from[op4 + 2]) >> 2;
-				
+
 			}
 			oy += 2 * ctx->bpp;
 			ox = 0;
 		}
-		
+
 		return 0;
 	}
-	
+
 	for (y = 0; y < ctx->sh; y++) {
 		for (x = 0; x < ctx->sw; x++) {
 			sp = (x + y * ctx->sw) * 4;
 			tp = (x + y * ctx->sw) * 3;
-			
+
 			to[tp + 0] = from[ctx->pos[sp + 0] + 0] * ctx->factor[sp + 0]
 				   + from[ctx->pos[sp + 1] + 0] * ctx->factor[sp + 1]
 				   + from[ctx->pos[sp + 2] + 0] * ctx->factor[sp + 2]
@@ -238,7 +238,7 @@ int scale_pic_msg(struct scale_private_s *scale, struct scale_ctx_s *ctx, unsign
 				   + from[ctx->pos[sp + 3] + 2] * ctx->factor[sp + 3];
 		}
 	}
-	
+
 	return 0;
 }
 
@@ -252,7 +252,7 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 	ctx->flags = ctx_msg->flags;
 	ctx->w = ctx_msg->w;
 	ctx->h = ctx_msg->h;
-	
+
 	if (ctx_msg->flags & GLC_CTX_BGRA) {
 		ctx_msg->flags &= ~GLC_CTX_BGR; /* do at least conversion */
 		ctx_msg->flags |= GLC_CTX_BGR;
@@ -270,15 +270,15 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 	ctx->scale = scale->glc->scale;
 	ctx->sw = ctx->scale * ctx->w;
 	ctx->sh = ctx->scale * ctx->h;
-	
-	ctx_msg->w *= scale->glc->scale;
-	ctx_msg->h *= scale->glc->scale;
-	
+
+	ctx_msg->w = ctx->sw;
+	ctx_msg->h = ctx->sh;
+
 	if ((ctx->scale == 0.5) | (ctx->scale == 1.0)) {
 		pthread_rwlock_unlock(&ctx->update);
 		return 0; /* don't generate scale maps */
 	}
-	
+
 	size_t smap_size = ctx->sw * ctx->sh * 3 * 4;
 	if (ctx->pos)
 		ctx->pos = (unsigned int *) realloc(ctx->pos, sizeof(unsigned int) * smap_size);
@@ -288,15 +288,15 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 		ctx->factor = (float *) realloc(ctx->factor, sizeof(float) * smap_size);
 	else
 		ctx->factor = (float *) malloc(sizeof(float) * smap_size);
-	
+
 	unsigned int tp, x, y;
-	float d = 1.0 / ctx->scale;
+	float d = (float) (ctx->w - 1) / (float) ctx->sw;
 	float ofx, ofy, fx0, fx1, fy0, fy1;
 	ofx = ofy = 0;
 	for (y = 0; y < ctx->sh; y++) {
 		for (x = 0; x < ctx->sw; x++) {
 			tp = (x + y * ctx->sw) * 4;
-			
+
 			ctx->pos[tp + 0] = (((unsigned int) ofx + 0) +
 			                    ((unsigned int) ofy + 0) * ctx->w) * ctx->bpp;
 			ctx->pos[tp + 1] = (((unsigned int) ofx + 1) +
@@ -305,17 +305,17 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 			                    ((unsigned int) ofy + 1) * ctx->w) * ctx->bpp;
 			ctx->pos[tp + 3] = (((unsigned int) ofx + 1) +
 			                    ((unsigned int) ofy + 1) * ctx->w) * ctx->bpp;
-			
+
 			fx1 = (float) x * d - (float) ((unsigned int) ofx);
 			fx0 = 1.0 - fx1;
 			fy1 = (float) y * d - (float) ((unsigned int) ofy);
 			fy0 = 1.0 - fy1;
-			
+
 			ctx->factor[tp + 0] = fx0 * fy0;
 			ctx->factor[tp + 1] = fx1 * fy0;
 			ctx->factor[tp + 2] = fx0 * fy1;
 			ctx->factor[tp + 3] = fx1 * fy1;
-			
+
 			ofx += d;
 		}
 		ofy += d;
