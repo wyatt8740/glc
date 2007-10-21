@@ -97,6 +97,7 @@ struct ycbcr_ctx_s {
 	unsigned int w, h, bpp;
 	unsigned int yw, yh;
 	unsigned int cw, ch;
+	unsigned int row;
 	double scale;
 	size_t size;
 
@@ -251,7 +252,7 @@ void ycbcr_bgr_to_jpeg420(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx
 	unsigned int Cpix;
 	unsigned int op1, op2, op3, op4;
 	unsigned char Rd, Gd, Bd;
-	unsigned int ox, oy, Yy, Yx, row;
+	unsigned int ox, oy, Yy, Yx;
 	unsigned char *Y, *Cb, *Cr;
 
 	Y = to;
@@ -259,16 +260,15 @@ void ycbcr_bgr_to_jpeg420(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx
 	Cr = &to[ctx->yw * ctx->yh + ctx->cw * ctx->ch];
 
 	Cpix = 0;
-	oy = (ctx->h - 2) * ctx->bpp * ctx->w;
+	oy = (ctx->h - 2) * ctx->row;
 	ox = 0;
-	row = ctx->w * ctx->bpp;
 
 	for (Yy = 0; Yy < ctx->yh; Yy += 2) {
 		for (Yx = 0; Yx < ctx->yw; Yx += 2) {
 			op1 = ox + oy;
 			op2 = ox + oy + ctx->bpp;
-			op3 = ox + oy + row;
-			op4 = ox + oy + row + ctx->bpp;
+			op3 = ox + oy + ctx->row;
+			op4 = ox + oy + ctx->row + ctx->bpp;
 			Rd = (from[op1 + 2] + from[op2 + 2] + from[op3 + 2] + from[op4 + 2]) >> 2;
 			Gd = (from[op1 + 1] + from[op2 + 1] + from[op3 + 1] + from[op4 + 1]) >> 2;
 			Bd = (from[op1 + 0] + from[op2 + 0] + from[op3 + 0] + from[op4 + 0]) >> 2;
@@ -293,15 +293,15 @@ void ycbcr_bgr_to_jpeg420(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx
 			ox += ctx->bpp * 2;
 		}
 		ox = 0;
-		oy -= 2 * row;
+		oy -= 2 * ctx->row;
 	}
 }
 
 #define CALC_BILINEAR_RGB(x0, x1, y0, y1) \
-	op1 = (ox + x0) + (oy + y0) * ctx->w; \
-	op2 = (ox + x1) + (oy + y0) * ctx->w; \
-	op3 = (ox + x0) + (oy + y1) * ctx->w; \
-	op4 = (ox + x1) + (oy + y1) * ctx->w; \
+	op1 = (ox + x0) + (oy + y0) * ctx->row; \
+	op2 = (ox + x1) + (oy + y0) * ctx->row; \
+	op3 = (ox + x0) + (oy + y1) * ctx->row; \
+	op4 = (ox + x1) + (oy + y1) * ctx->row; \
 	Rd = (from[op1 + 2] + from[op2 + 2] + from[op3 + 2] + from[op4 + 2]) >> 2; \
 	Gd = (from[op1 + 1] + from[op2 + 1] + from[op3 + 1] + from[op4 + 1]) >> 2; \
 	Bd = (from[op1 + 0] + from[op2 + 0] + from[op3 + 0] + from[op4 + 0]) >> 2;
@@ -320,33 +320,33 @@ void ycbcr_bgr_to_jpeg420_half(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s
 	Cr = &to[ctx->yw * ctx->yh + ctx->cw * ctx->ch];
 
 	Cpix = 0;
-	oy = (ctx->h - 4) * ctx->bpp;
+	oy = (ctx->h - 4);
 	ox = 0;
 
 	for (Yy = 0; Yy < ctx->yh; Yy += 2) {
 		for (Yx = 0; Yx < ctx->yw; Yx += 2) {
 			/* CbCr */
-			CALC_BILINEAR_RGB(ctx->bpp, ctx->bpp * 2, ctx->bpp, ctx->bpp * 2)
+			CALC_BILINEAR_RGB(ctx->bpp, ctx->bpp * 2, 1, 2)
 			Cb[Cpix  ] = RGB_TO_YCbCrJPEG_Cb(Rd, Gd, Bd);
 			Cr[Cpix++] = RGB_TO_YCbCrJPEG_Cr(Rd, Gd, Bd);
 
 			/* Y' */
-			CALC_BILINEAR_RGB(0, ctx->bpp, ctx->bpp * 2, ctx->bpp * 3)
+			CALC_BILINEAR_RGB(0, ctx->bpp, 2, 3)
 			Y[(Yx + 0) + (Yy + 0) * ctx->yw] = RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd);
 
-			CALC_BILINEAR_RGB(ctx->bpp * 2, ctx->bpp * 3, ctx->bpp * 2, ctx->bpp * 3)
+			CALC_BILINEAR_RGB(ctx->bpp * 2, ctx->bpp * 3, 2, 3)
 			Y[(Yx + 1) + (Yy + 0) * ctx->yw] = RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd);
 
-			CALC_BILINEAR_RGB(0, ctx->bpp, 0, ctx->bpp)
+			CALC_BILINEAR_RGB(0, ctx->bpp, 0, 1)
 			Y[(Yx + 0) + (Yy + 1) * ctx->yw] = RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd);
 
-			CALC_BILINEAR_RGB(ctx->bpp * 2, ctx->bpp * 3, 0, ctx->bpp)
+			CALC_BILINEAR_RGB(ctx->bpp * 2, ctx->bpp * 3, 0, 1)
 			Y[(Yx + 1) + (Yy + 1) * ctx->yw] = RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd);
 
 			ox += ctx->bpp * 4;
 		}
 		ox = 0;
-		oy -= ctx->bpp * 4;
+		oy -= 4;
 	}
 }
 
@@ -432,6 +432,13 @@ int ycbcr_ctx_msg(struct ycbcr_private_s *ycbcr, glc_ctx_message_t *ctx_msg)
 	ctx->h = ctx_msg->h;
 	ctx->scale = ycbcr->glc->scale;
 
+	ctx->row = ctx->w * ctx->bpp;
+
+	if (ctx_msg->flags & GLC_CTX_DWORD_ALIGNED) {
+		if (ctx->row % 8 != 0)
+			ctx->row += 8 - ctx->row % 8;
+	}
+
 	ctx->yw = ctx->w * ctx->scale;
 	ctx->yh = ctx->h * ctx->scale;
 	ctx->yw -= ctx->yw % 2; /* safer and faster             */
@@ -441,6 +448,7 @@ int ycbcr_ctx_msg(struct ycbcr_private_s *ycbcr, glc_ctx_message_t *ctx_msg)
 	ctx->ch = ctx->yh / 2;
 
 	ctx_msg->flags &= ~GLC_CTX_BGR;
+	ctx_msg->flags &= ~GLC_CTX_DWORD_ALIGNED; /* never */
 	ctx_msg->flags |= GLC_CTX_YCBCR_420JPEG;
 	ctx_msg->w = ctx->yw;
 	ctx_msg->h = ctx->yh;
@@ -488,14 +496,14 @@ int ycbcr_generate_map(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx)
 		for (x = 0; x < ctx->yw; x++) {
 			tp = (x + y * ctx->yw) * 4;
 
-			ctx->pos[tp + 0] = (((unsigned int) ofx + 0) +
-			                    (ctx->h - 1 - (unsigned int) ofy) * ctx->w) * ctx->bpp;
-			ctx->pos[tp + 1] = (((unsigned int) ofx + 1) +
-			                    (ctx->h - 1 - (unsigned int) ofy) * ctx->w) * ctx->bpp;
-			ctx->pos[tp + 2] = (((unsigned int) ofx + 0) +
-			                    (ctx->h - 2 - (unsigned int) ofy) * ctx->w) * ctx->bpp;
-			ctx->pos[tp + 3] = (((unsigned int) ofx + 1) +
-			                    (ctx->h - 2 - (unsigned int) ofy) * ctx->w) * ctx->bpp;
+			ctx->pos[tp + 0] = ((unsigned int) ofx + 0) * ctx->bpp +
+			                   (ctx->h - 1 - (unsigned int) ofy) * ctx->row;
+			ctx->pos[tp + 1] = ((unsigned int) ofx + 1) * ctx->bpp +
+			                   (ctx->h - 1 - (unsigned int) ofy) * ctx->row;
+			ctx->pos[tp + 2] = ((unsigned int) ofx + 0) * ctx->bpp +
+			                   (ctx->h - 2 - (unsigned int) ofy) * ctx->row;
+			ctx->pos[tp + 3] = ((unsigned int) ofx + 1) * ctx->bpp +
+			                   (ctx->h - 2 - (unsigned int) ofy) * ctx->row;
 
 			fx1 = (float) x * d - (float) ((unsigned int) ofx);
 			fx0 = 1.0 - fx1;
@@ -521,14 +529,14 @@ int ycbcr_generate_map(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx)
 		for (x = 0; x < ctx->cw; x++) {
 			tp = (ctx->yw * ctx->yh * 4) + (x + y * ctx->cw) * 4;
 
-			ctx->pos[tp + 0] = (((unsigned int) ofx + 0) +
-			                    (ctx->h - 1 - (unsigned int) ofy) * ctx->w) * ctx->bpp;
-			ctx->pos[tp + 1] = (((unsigned int) ofx + 1) +
-			                    (ctx->h - 1 - (unsigned int) ofy) * ctx->w) * ctx->bpp;
-			ctx->pos[tp + 2] = (((unsigned int) ofx + 0) +
-			                    (ctx->h - 2 - (unsigned int) ofy) * ctx->w) * ctx->bpp;
-			ctx->pos[tp + 3] = (((unsigned int) ofx + 1) +
-			                    (ctx->h - 2 - (unsigned int) ofy) * ctx->w) * ctx->bpp;
+			ctx->pos[tp + 0] = ((unsigned int) ofx + 0) * ctx->bpp +
+			                   (ctx->h - 1 - (unsigned int) ofy) * ctx->row;
+			ctx->pos[tp + 1] = ((unsigned int) ofx + 1) * ctx->bpp +
+			                   (ctx->h - 1 - (unsigned int) ofy) * ctx->row;
+			ctx->pos[tp + 2] = ((unsigned int) ofx + 0) * ctx->bpp +
+			                   (ctx->h - 2 - (unsigned int) ofy) * ctx->row;
+			ctx->pos[tp + 3] = ((unsigned int) ofx + 1) * ctx->bpp +
+			                   (ctx->h - 2 - (unsigned int) ofy) * ctx->row;
 
 			fx1 = (float) x * d - (float) ((unsigned int) ofx);
 			fx0 = 1.0 - fx1;
