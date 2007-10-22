@@ -116,6 +116,12 @@ void *glc_thread(void *argptr)
 			goto err;
 	}
 
+	/* create callback */
+	if (thread->thread_create_callback) {
+		if ((ret = thread->thread_create_callback(state.ptr, &state.threadptr)))
+			goto err;
+	}
+
 	do {
 		/* open callback */
 		if (thread->open_callback) {
@@ -247,6 +253,10 @@ finish:
 		if ((ret) && (thread->flags & GLC_THREAD_WRITE))
 			ps_buffer_cancel(private->to);
 	}
+
+	/* thread finish callback */
+	if (thread->thread_finish_callback)
+		thread->thread_finish_callback(state.ptr, state.threadptr, ret);
 
 	pthread_mutex_lock(&private->finish);
 	thread->threads--;
