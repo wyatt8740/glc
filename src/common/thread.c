@@ -170,9 +170,9 @@ void *glc_thread(void *argptr)
 				pthread_mutex_unlock(&private->open);
 			}
 
-			if ((ret = ps_packet_write(&write, &state.header, GLC_MESSAGE_HEADER_SIZE)))
+			/* reserve space for header */
+			if ((ret = ps_packet_seek(&write, GLC_MESSAGE_HEADER_SIZE)))
 				goto err;
-
 
 			if (!(state.flags & GLC_THREAD_STATE_UNKNOWN_FINAL_SIZE)) {
 				/* 'unlock' write */
@@ -197,6 +197,12 @@ void *glc_thread(void *argptr)
 						goto err;
 				}
 			}
+
+			/* write header */
+			if ((ret = ps_packet_seek(&write, 0)))
+				goto err;
+			if ((ret = ps_packet_write(&write, &state.header, GLC_MESSAGE_HEADER_SIZE)))
+				goto err;
 		}
 
 		/* in case of we skipped writing */
