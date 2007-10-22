@@ -92,7 +92,7 @@ typedef struct {
 	/** thread create callback is called when a thread starts */
 	int (*thread_create_callback)(void *, void **);
 	/** thread finish callback is called when a thread is finished */
-	int (*thread_finish_callback)(void *, void *, int);
+	void (*thread_finish_callback)(void *, void *, int);
 	/** open callback is called before thread tries to
 	    open read (or write if GLC_THREAD_READ is not specified)
 	    packet */
