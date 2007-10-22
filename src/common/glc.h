@@ -122,6 +122,10 @@ typedef u_int32_t glc_flags_t;
 #define GLC_CROP                       1024
 /** use GL_PACK_ALIGNMENT 8 for readback */
 #define GLC_CAPTURE_DWORD_ALIGNED      2048
+/** compress stream with LZO */
+#define GLC_COMPRESS_LZO               4096
+/** compress stream with QuickLZ */
+#define GLC_COMPRESS_QUICKLZ           8192
 
 /**
  * \brief stream info structure
