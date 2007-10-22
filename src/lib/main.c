@@ -58,6 +58,7 @@ __PRIVATE glc_lib_t lib = {NULL, /* dlopen */
 			   NULL, /* dlvsym */
 			   0, /* initialized */
 			   0, /* running */
+			   PTHREAD_MUTEX_INITIALIZER, /* init_lock */
 			   };
 __PRIVATE struct main_private_s mpriv;
 
@@ -70,6 +71,9 @@ void init_glc()
 {
 	struct sigaction new_sighandler, old_sighandler;
 	int ret;
+
+	if ((ret = pthread_mutex_lock(&lib.init_lock)))
+		goto err;
 
 	if (lib.initialized)
 		return;
@@ -116,6 +120,9 @@ void init_glc()
 		sigaction(SIGTERM, &new_sighandler, &old_sighandler);
 		mpriv.sigterm_handler = old_sighandler.sa_handler;
 	}
+
+	if ((ret = pthread_mutex_unlock(&lib.init_lock)))
+		goto err;
 	return;
 err:
 	fprintf(stderr, "glc: %s (%d)\n", strerror(ret), ret);

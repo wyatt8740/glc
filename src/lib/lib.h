@@ -20,6 +20,7 @@
 #include <GL/glx.h>
 #include <alsa/asoundlib.h>
 #include <packetstream.h>
+#include <pthread.h>
 
 /**
  * \addtogroup lib
@@ -32,6 +33,7 @@ typedef struct {
 	void *(*dlvsym)(void *, const char *, const char *);
 	int initialized;
 	int running;
+	pthread_mutex_t init_lock;
 } glc_lib_t;
 
 #define __PRIVATE __attribute__ ((visibility ("hidden")))
