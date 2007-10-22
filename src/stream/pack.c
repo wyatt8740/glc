@@ -36,13 +36,13 @@
 # include <minilzo.h>
 # define __lzo_compress lzo1x_1_compress
 # define __lzo_decompress lzo1x_decompress
-# define __lzo_mem(size) size + (size / 16) + 64 + 3
+# define __lzo_worstcase(size) size + (size / 16) + 64 + 3
 # define __lzo_wrk_mem LZO1X_1_MEM_COMPRESS
 #else
 # include <lzo/lzo1x.h>
 # define __lzo_compress lzo1x_1_11_compress
 # define __lzo_decompress lzo1x_decompress
-# define __lzo_mem(size) size + (size / 16) + 64 + 3
+# define __lzo_worstcase(size) size + (size / 16) + 64 + 3
 # define __lzo_wrk_mem LZO1X_1_11_MEM_COMPRESS
 #endif
 
@@ -87,7 +87,7 @@ int pack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 	pack->thread.read_callback = &pack_read_callback;
 	pack->thread.write_callback = &pack_write_callback;
 	pack->thread.finish_callback = &pack_finish_callback;
-	pack->thread.threads = 1; /* can't currently take advantage of threading */
+	pack->thread.threads = 1; /* compression can't currently take advantage of threading */
 
 	lzo_init();
 	return glc_thread_create(glc, &pack->thread, from, to);
@@ -101,7 +101,7 @@ void pack_finish_callback(void *ptr, int err)
 		fprintf(stderr, "pack failed: %s (%d)\n", strerror(err), err);
 
 	sem_post(&pack->glc->signal[GLC_SIGNAL_PACK_FINISHED]);
-	/*free(pack->lzo_wrk_mem);*/
+	/* free(pack->lzo_wrk_mem); */
 	free(pack);
 }
 
@@ -231,6 +231,13 @@ int unpack_write_callback(glc_thread_state_t *state)
 
 	return 0;
 }
+
+/*
+ Based on QuickLZ (http://www.quicklz.com,
+                   http://neopsis.com/projects/seom/)
+ Copyright 2006, Lasse Reinhold (lar@quicklz.com)
+           2007, Tomas Carnecky (tom@dbservice.com)
+*/
 
 #define u8ptr(ptr) ((u_int8_t *) ptr)
 #define u8(ptr) *u8ptr(ptr)
