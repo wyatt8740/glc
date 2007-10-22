@@ -56,6 +56,12 @@ B'd = Y' + (Cb - 128) * (2 - 2 * Kb)
 #define YCbCrJPEG_TO_RGB_Bd(Y, Cb, Cr) \
 	((Y) + ((1814 * (Cb)) >> 10) - 227)*/
 
+#define LOOKUP_BITS 7
+#define LOOKUP_POS(Rd, Gd, Bd) \
+	(((((Rd) >> (8 - LOOKUP_BITS)) << (LOOKUP_BITS * 2)) + \
+	  (((Gd) >> (8 - LOOKUP_BITS)) << LOOKUP_BITS) + \
+	  ( (Bd) >> (8 - LOOKUP_BITS))) * 3)
+
 /* FIXME why do overflows occur? */
 #define CLAMP_256(val) \
 	(val) < 0 ? 0 : ((val) > 255 ? 255 : (val))
@@ -77,7 +83,6 @@ unsigned char YCbCrJPEG_TO_RGB_Bd(unsigned char Y, unsigned char Cb, unsigned ch
 	int B = Y + 1.772 * (Cb - 128);
 	return CLAMP_256(B);
 }
-
 
 struct rgb_ctx_s {
 	glc_ctx_i ctx_i;
@@ -281,14 +286,14 @@ int rgb_convert(struct rgb_private_s *rgb, struct rgb_ctx_s *ctx,
 int rgb_init_lookup(struct rgb_private_s *rgb)
 {
 	unsigned int Y, Cb, Cr, color;
-	unsigned int lookup_size = 128 * 128 * 128 * 3;
+	unsigned int lookup_size = (1 << LOOKUP_BITS) * (1 << LOOKUP_BITS) * (1 << LOOKUP_BITS) * 3;
 
 	rgb->lookup_table = malloc(lookup_size);
 
 	color = 0;
-	for (Y = 0; Y < 256; Y += 2) {
-		for (Cb = 0; Cb < 256; Cb += 2) {
-			for (Cr = 0; Cr < 256; Cr += 2) {
+	for (Y = 0; Y < 256; Y += (1 << (8 - LOOKUP_BITS))) {
+		for (Cb = 0; Cb < 256; Cb += (1 << (8 - LOOKUP_BITS))) {
+			for (Cr = 0; Cr < 256; Cr += (1 << (8 - LOOKUP_BITS))) {
 				rgb->lookup_table[color + 0] = YCbCrJPEG_TO_RGB_Rd(Y, Cb, Cr);
 				rgb->lookup_table[color + 1] = YCbCrJPEG_TO_RGB_Gd(Y, Cb, Cr);
 				rgb->lookup_table[color + 2] = YCbCrJPEG_TO_RGB_Bd(Y, Cb, Cr);
@@ -312,8 +317,8 @@ int rgb_convert_lookup(struct rgb_private_s *rgb, struct rgb_ctx_s *ctx,
 	Cpix = 0;
 
 #define CONVERT(xadd, yrgbadd, yadd) 						\
-	color = (((Y[(x + (xadd)) + (y + (yadd)) * ctx->w] >> 1) << 14) +	\
-		 ((Cb[Cpix] >> 1) << 7) + (Cr[Cpix] >> 1)) * 3;			\
+	color = LOOKUP_POS(Y[(x + (xadd)) + (y + (yadd)) * ctx->w],		\
+			   Cb[Cpix], Cr[Cpix]);					\
 	to[((x + (xadd)) + ((ctx->h - y) + (yrgbadd)) * ctx->w) * 3 + 2] =	\
 		rgb->lookup_table[color + 0];					\
 	to[((x + (xadd)) + ((ctx->h - y) + (yrgbadd)) * ctx->w) * 3 + 1] =	\
