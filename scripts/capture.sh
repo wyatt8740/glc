@@ -34,7 +34,7 @@ export GLC_CAPTURE_GLFINISH=0
 # take picture from front or back buffer
 export GLC_CAPTURE=back
 
-# compress stream with 'lzo', 'quicklz' or 'none'
+# compress stream using 'lzo', 'quicklz' or 'none'
 export GLC_COMPRESS=quicklz
 
 # capture as BGRA, do sw conversion to BGR

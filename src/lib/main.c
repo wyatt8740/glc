@@ -271,10 +271,10 @@ int load_environ()
 		mpriv.glc->flags |= GLC_DRAW_INDICATOR;
 
 	if (getenv("GLC_COMPRESS")) {
-		if (strcmp(getenv("GLC_COMPRESS"), "lzo")) {
+		if (!strcmp(getenv("GLC_COMPRESS"), "lzo")) {
 			mpriv.compress = 1;
 			mpriv.glc->flags |= GLC_COMPRESS_LZO;
-		} else if (strcmp(getenv("GLC_COMPRESS"), "quicklz")) {
+		} else if (!strcmp(getenv("GLC_COMPRESS"), "quicklz")) {
 			mpriv.compress = 1;
 			mpriv.glc->flags |= GLC_COMPRESS_QUICKLZ;
 		}
