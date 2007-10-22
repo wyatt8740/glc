@@ -278,8 +278,10 @@ int load_environ()
 			mpriv.compress = 1;
 			mpriv.glc->flags |= GLC_COMPRESS_QUICKLZ;
 		}
-	} else
+	} else {
 		mpriv.compress = 1;
+		mpriv.glc->flags |= GLC_COMPRESS_QUICKLZ;
+	}
 
 	return 0;
 }
