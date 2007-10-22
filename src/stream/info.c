@@ -93,7 +93,7 @@ void info_finish_callback(void *ptr, int err)
 	struct info_private_s *info = (struct info_private_s *) ptr;
 	
 	if (err)
-		fprintf(stderr, "info failed: %s (%d)", strerror(err), err);
+		fprintf(stderr, "info failed: %s (%d)\n", strerror(err), err);
 	
 	struct info_ctx_s *del;
 	while (info->ctx_list != NULL) {
