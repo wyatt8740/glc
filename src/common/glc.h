@@ -218,6 +218,8 @@ typedef char glc_message_type_t;
 #define GLC_MESSAGE_AUDIO_FORMAT       0x05
 /** audio data message */
 #define GLC_MESSAGE_AUDIO              0x06
+/** quicklz-compressed packet */
+#define GLC_MESSAGE_QUICKLZ            0x07
 
 /**
  * \brief stream message header
@@ -238,8 +240,20 @@ typedef struct {
 	/** original message header */
 	glc_message_header_t header;
 } glc_lzo_header_t;
-/** sizeof(glc_lzo_header_size) */
+/** sizeof(glc_lzo_header_t) */
 #define GLC_LZO_HEADER_SIZE               9
+
+/**
+ * \brief quicklz-compressed message header
+ */
+typedef struct {
+	/** uncompressed data size */
+	glc_size_t size;
+	/** original message header */
+	glc_message_header_t header;
+} glc_quicklz_header_t;
+/** sizeof(glc_quicklz_header_t) */
+#define GLC_QUICKLZ_HEADER_SIZE           9
 
 /**
  * \brief picture header
