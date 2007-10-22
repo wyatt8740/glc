@@ -43,15 +43,6 @@ R'd, G'd, B'd   in {0, 1, 2, ..., 255}
 Y', Cb, Cr      in {0, 1, 2, ..., 255}
 */
 
-/* Make your choice... */
-
-#define RGB_TO_YCbCrJPEG_Y_CALC(Rd, Gd, Bd) \
-	(    + 0.299    * (Rd) +    0.587 * (Gd) + 0.114 *    (Bd))
-#define RGB_TO_YCbCrJPEG_Cb_CALC(Rd, Gd, Bd) \
-	(128 - 0.168736 * (Rd) - 0.331264 * (Gd) + 0.5      * (Bd))
-#define RGB_TO_YCbCrJPEG_Cr_CALC(Rd, Gd, Bd) \
-	(128 + 0.5      * (Rd) - 0.418688 * (Gd) - 0.081312 * (Bd))
-
 /*
 #define RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd) \
 	(    + 0.299    * (Rd) +    0.587 * (Gd) + 0.114 *    (Bd))
@@ -60,7 +51,6 @@ Y', Cb, Cr      in {0, 1, 2, ..., 255}
 #define RGB_TO_YCbCrJPEG_Cr(Rd, Gd, Bd) \
 	(128 + 0.5      * (Rd) - 0.418688 * (Gd) - 0.081312 * (Bd))
 */
-
 
 #define RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd) \
 	(    + ((306 * (Rd) + 601 * (Gd) + 117 * (Bd)) >> 10))
@@ -68,21 +58,6 @@ Y', Cb, Cr      in {0, 1, 2, ..., 255}
 	(128 - ((173 * (Rd) + 339 * (Gd) - 512 * (Bd)) >> 10))
 #define RGB_TO_YCbCrJPEG_Cr(Rd, Gd, Bd) \
 	(128 + ((512 * (Rd) - 429 * (Gd) -  83 * (Bd)) >> 10))
-
-
-#define LOOKUP_BITS 7
-#define LOOKUP_POS(Rd, Gd, Bd) \
-	(((((Rd) >> (8 - LOOKUP_BITS)) << (LOOKUP_BITS * 2)) + \
-	  (((Gd) >> (8 - LOOKUP_BITS)) << LOOKUP_BITS) + \
-	  ( (Bd) >> (8 - LOOKUP_BITS))) * 3)
-/*
-#define RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd) \
-	(ycbcr->lookup_table[LOOKUP_POS(Rd, Gd, Bd) + 0])
-#define RGB_TO_YCbCrJPEG_Cb(Rd, Gd, Bd) \
-	(ycbcr->lookup_table[LOOKUP_POS(Rd, Gd, Bd) + 1])
-#define RGB_TO_YCbCrJPEG_Cr(Rd, Gd, Bd) \
-	(ycbcr->lookup_table[LOOKUP_POS(Rd, Gd, Bd) + 2])
-*/
 
 struct ycbcr_ctx_s;
 struct ycbcr_private_s;
@@ -114,8 +89,6 @@ struct ycbcr_private_s {
 	glc_t *glc;
 	glc_thread_t thread;
 
-	unsigned char *lookup_table;
-
 	struct ycbcr_ctx_s *ctx;
 };
 
@@ -127,7 +100,6 @@ int ycbcr_ctx_msg(struct ycbcr_private_s *ycbcr, glc_ctx_message_t *ctx_msg);
 void ycbcr_get_ctx(struct ycbcr_private_s *ycbcr, glc_ctx_i ctx_i, struct ycbcr_ctx_s **ctx);
 
 int ycbcr_generate_map(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx);
-int ycbcr_init_lookup(struct ycbcr_private_s *ycbcr);
 
 void ycbcr_bgr_to_jpeg420(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx,
 			  unsigned char *from, unsigned char *to);
@@ -149,8 +121,6 @@ int ycbcr_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 	ycbcr->thread.finish_callback = &ycbcr_finish_callback;
 	ycbcr->thread.ptr = ycbcr;
 	ycbcr->thread.threads = util_cpus();
-
-	/* ycbcr_init_lookup(ycbcr); */
 
 	return glc_thread_create(glc, &ycbcr->thread, from, to);
 }
@@ -177,9 +147,6 @@ void ycbcr_finish_callback(void *ptr, int err)
 	}
 
 	sem_post(&ycbcr->glc->signal[GLC_SIGNAL_YCBCR_FINISHED]);
-
-	if (ycbcr->lookup_table)
-		free(ycbcr->lookup_table);
 	free(ycbcr);
 }
 
@@ -554,27 +521,6 @@ int ycbcr_generate_map(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx)
 		ofx = 0;
 	}
 
-	return 0;
-}
-
-int ycbcr_init_lookup(struct ycbcr_private_s *ycbcr)
-{
-	unsigned int Rd, Gd, Bd, color;
-	unsigned int lookup_size = (1 << LOOKUP_BITS) * (1 << LOOKUP_BITS) * (1 << LOOKUP_BITS) * 3;
-
-	ycbcr->lookup_table = malloc(lookup_size);
-
-	color = 0;
-	for (Rd = 0; Rd < 256; Rd += (1 << (8 - LOOKUP_BITS))) {
-		for (Gd = 0; Gd < 256; Gd += (1 << (8 - LOOKUP_BITS))) {
-			for (Bd = 0; Bd < 256; Bd += (1 << (8 - LOOKUP_BITS))) {
-				ycbcr->lookup_table[color + 0] = RGB_TO_YCbCrJPEG_Y_CALC(Rd, Gd, Bd);
-				ycbcr->lookup_table[color + 1] = RGB_TO_YCbCrJPEG_Cb_CALC(Rd, Gd, Bd);
-				ycbcr->lookup_table[color + 2] = RGB_TO_YCbCrJPEG_Cr_CALC(Rd, Gd, Bd);
-				color += 3;
-			}
-		}
-	}
 	return 0;
 }
 
