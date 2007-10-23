@@ -86,7 +86,7 @@ $(BUILD)/libglc-capture.so.$(RELEASE): $(BUILD)/libglc.so.$(RELEASE) $(CAPT_OBJS
 	ln -sf libglc-capture.so.$(RELEASE) $(BUILD)/libglc-capture.so
 
 $(BUILD)/main.o: $(LIB)/main.c $(LIB)/lib.h $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/main.o -c $(LIB)/main.c
+	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/main.o -c $(LIB)/main.c $(USE_LZO) $(USE_QUICKLZ)
 
 $(BUILD)/alsa.o: $(LIB)/alsa.c $(LIB)/lib.h $(HEADERS)
 	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/alsa.o -c $(LIB)/alsa.c
@@ -137,7 +137,7 @@ $(BUILD)/gl_play.o: $(STREAM)/gl_play.c $(HEADERS)
 	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/gl_play.o -c $(STREAM)/gl_play.c
 
 $(BUILD)/pack.o: $(STREAM)/pack.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/pack.o -c $(STREAM)/pack.c $(USE_LZO)
+	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/pack.o -c $(STREAM)/pack.c $(USE_LZO) $(USE_QUICKLZ)
 
 $(BUILD)/file.o: $(STREAM)/file.c $(HEADERS)
 	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/file.o -c $(STREAM)/file.c

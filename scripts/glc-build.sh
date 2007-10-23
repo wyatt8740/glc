@@ -83,13 +83,11 @@ read LDFLAGS
 [ "${LDFLAGS}" == "" ] && LDFLAGS="-Wl,-O1"
 
 info "Fetching sources..."
-download "http://www.oberhumer.com/opensource/lzo/download/minilzo-2.02.tar.gz"
 download "http://nullkey.ath.cx/~stuff/elfhacks/elfhacks.tar.gz"
 download "http://nullkey.ath.cx/~stuff/packetstream/packetstream.tar.gz"
 download "http://nullkey.ath.cx/~stuff/glc/glc.tar.gz"
 
 info "Unpacking sources..."
-unpack "minilzo-2.02.tar.gz"
 unpack "elfhacks.tar.gz"
 unpack "packetstream.tar.gz"
 unpack "glc.tar.gz"
@@ -120,10 +118,6 @@ LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:../elfhacks/build:../packetstream/build" \
 	make \
 	CFLAGS="${CFLAGS} -I../elfhacks/src -I../packetstream/src" \
 	LDFLAGS="${LDFLAGS} -L../elfhacks/build -L../packetstream/build" \
-	MINILZO="../minilzo.202/" \
-	LZO_OBJ="build/minilzo.o" \
-	LZO_LIB="" \
-	USE_LZO="-D__MINILZO -I../minilzo.202" \
 	> /dev/null || die "Can't compile glc"
 if [ $BUILD64 == 1 ]; then
 	LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:../elfhacks/build32:../packetstream/build32" \
@@ -131,10 +125,6 @@ if [ $BUILD64 == 1 ]; then
 		CFLAGS="${CFLAGS} -m32 -I../elfhacks/src -I../packetstream/src " \
 		LDFLAGS="${LDFLAGS} -m32 -L../elfhacks/build32 -L../packetstream/build32" \
 		BUILD="build32" \
-		MINILZO="../minilzo.202/" \
-		LZO_OBJ="build32/minilzo.o" \
-		LZO_LIB="" \
-		USE_LZO="-D__MINILZO -I../minilzo.202" \
 		> /dev/null || die "Can't compile 32-bit glc"
 fi
 cd ..
