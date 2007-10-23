@@ -1,3 +1,10 @@
+0.3.6 (2007/10/23)
+   Support for QuickLZ compression.
+   Use GL_PACK_ALIGNMENT 8 for faster readback.
+   Fullscreen playback support.
+   Made initialization thread-safe which fixes possible crash
+    when capturing multithreaded application.
+
 0.3.5 (2007/10/21)
    Scaler (both scale and ycbcr) bugfixes.
    Added sample build script (glc-build.sh).

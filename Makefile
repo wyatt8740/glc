@@ -15,7 +15,7 @@ STREAM = $(SRC)/stream
 SCRIPTS = scripts
 
 VERSION=0
-RELEASE=$(VERSION).3.5
+RELEASE=$(VERSION).3.6
 
 # minilzo is licenced under GPL
 # remove following lines to disable minilzo:
@@ -23,7 +23,7 @@ MINILZO = support/minilzo/
 LZO_OBJ = $(BUILD)/minilzo.o
 USE_LZO = -D__MINILZO -I$(MINILZO)
 
-# quicklz is licenced under GPL, uncomment following lines
+# quicklz is licenced under GPL
 # remove following lines to disable quicklz:
 QUICKLZ = support/quicklz/
 QUICKLZ_OBJ = $(BUILD)/quicklz.o
