@@ -17,18 +17,19 @@ SCRIPTS = scripts
 VERSION=0
 RELEASE=$(VERSION).3.5
 
-MINILZO = ../glc-support/minilzo/
+# minilzo is licenced under GPL
+# remove following lines to disable minilzo:
+MINILZO = support/minilzo/
 LZO_OBJ = $(BUILD)/minilzo.o
 USE_LZO = -D__MINILZO -I$(MINILZO)
-LZO_LIB =
-#USE_LZO = -D__LZO
-#LZO_LIB = -llzo2
 
-QUICKLZ = ../glc-support/quicklz/
+# quicklz is licenced under GPL, uncomment following lines
+# remove following lines to disable quicklz:
+QUICKLZ = support/quicklz/
 QUICKLZ_OBJ = $(BUILD)/quicklz.o
 USE_QUICKLZ = -D__QUICKLZ -I$(QUICKLZ)
 
-LIBS = -lpthread -lpacketstream -lGL -ldl -lelfhacks -lasound $(LZO_LIB)
+LIBS = -lpthread -lpacketstream -lGL -ldl -lelfhacks -lasound
 
 HEADERS = $(COMMON)/glc.h \
 	  $(COMMON)/util.h \
