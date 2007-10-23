@@ -257,12 +257,14 @@ int unpack_read_callback(glc_thread_state_t *state)
 	if (state->header.type == GLC_MESSAGE_LZO) {
 #ifdef __LZO
 		state->write_size = ((glc_lzo_header_t *) state->read_data)->size;
+		return 0;
 #else
 		goto copy;
 #endif
 	} else if (state->header.type == GLC_MESSAGE_QUICKLZ) {
 #ifdef __QUICKLZ
 		state->write_size = ((glc_quicklz_header_t *) state->read_data)->size;
+		return 0;
 #else
 		goto copy;
 #endif
