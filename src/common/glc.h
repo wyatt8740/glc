@@ -39,6 +39,7 @@
  * \defgroup lib wrapper library
  * \defgroup stream stream processing
  * \defgroup common common utilities and data structures
+ * \defgroup support optional support libraries
  */
 
 /**
