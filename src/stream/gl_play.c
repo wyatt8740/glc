@@ -268,12 +268,13 @@ int gl_play_toggle_fullscreen(struct gl_play_private_s *gl_play)
 	event.display = gl_play->dpy;
 	event.window = gl_play->drawable;
 	event.format = 32;
-	event.data.l[0] = gl_play->fullscreen; /* set property */
+	event.data.l[0] = gl_play->fullscreen;
 	event.data.l[1] = gl_play->net_wm_state_fullscreen_atom;
 
 	XSendEvent(gl_play->dpy, DefaultRootWindow(gl_play->dpy),
-			False, SubstructureRedirectMask,
-			(XEvent*) &event);
+		   False, SubstructureRedirectMask, (XEvent*) &event);
+
+	return 0;
 }
 
 int gl_handle_xevents(struct gl_play_private_s *gl_play, glc_thread_state_t *state)
