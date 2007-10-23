@@ -34,8 +34,8 @@ export GLC_CAPTURE_GLFINISH=0
 # take picture from front or back buffer
 export GLC_CAPTURE=back
 
-# compress stream with LZO
-export GLC_COMPRESS=1
+# compress stream using 'lzo', 'quicklz' or 'none'
+export GLC_COMPRESS=quicklz
 
 # capture as BGRA, do sw conversion to BGR
 export GLC_CAPTURE_BGRA=0
@@ -63,6 +63,9 @@ export GLC_COLORSPACE=420jpeg
 
 # crop capture area to WxH+X+Y
 # export GLC_CROP=WxH+X+Y
+
+# use GL_PACK_ALIGNMENT 8
+export GLC_CAPTURE_DWORD_ALIGNED=1
 
 # set SDL audiodriver to alsa
 export SDL_AUDIODRIVER=alsa

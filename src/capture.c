@@ -46,8 +46,9 @@ int main(int argc, char *argv[])
 		{"colorspace",		1, NULL, 'e'},
 		{"hotkey",		1, NULL, 'k'},
 		{"no-pbo",		0, NULL, 'p'},
-		{"disable-compression",	0, NULL, 'z'},
+		{"compression",		1, NULL, 'z'},
 		{"bgra",		0, NULL, 'j'},
+		{"byte-aligned",	0, NULL, 'm'},
 		{"disable-indicator",	0, NULL, 'n'},
 		{"no-audio-skip",	0, NULL, 'w'},
 		{"disable-audio",	0, NULL, 'a'},
@@ -69,7 +70,7 @@ int main(int argc, char *argv[])
 	   is encountered. */
 	setenv("POSIXLY_CORRECT", "1", 1);
 
-	while ((opt = getopt_long(argc, argv, "o:f:r:y:se:k:pzjnwaqgvb:c:u:d:h", long_options, &option_index)) != -1) {
+	while ((opt = getopt_long(argc, argv, "o:f:r:y:se:k:pz:jmnwaqgvb:c:u:d:h", long_options, &option_index)) != -1) {
 		switch(opt) {
 		case 'o':
 			setenv("GLC_FILE", optarg, 1);
@@ -96,10 +97,13 @@ int main(int argc, char *argv[])
 			setenv("GLC_TRY_PBO", "0", 1);
 			break;
 		case 'z':
-			setenv("GLC_COMPRESS", "0", 1);
+			setenv("GLC_COMPRESS", optarg, 1);
 			break;
 		case 'j':
 			setenv("GLC_CAPTURE_BGRA", "1", 1);
+			break;
+		case 'm':
+			setenv("GLC_CAPTURE_DWORD_ALIGNED", "0", 1);
 			break;
 		case 'n':
 			setenv("GLC_INDICATOR", "0", 1);
@@ -184,9 +188,11 @@ usage:
 	       "  -k, --hotkey=HOTKEY        capture hotkey, <Ctrl> and <Shift> modifiers are\n"
 	       "                               supported, default hotkey is '<Shift>F8'\n"
 	       "  -p, --no-pbo               don't try GL_ARB_pixel_buffer_object\n"
-	       "  -z, --disable-compression  don't compress stream\n"
-	       "                               by default stream is compressed with LZO\n"
+	       "  -z, --compression=METHOD   compress stream using METHOD\n"
+	       "                               'none', 'quicklz' and 'lzo' are supported\n"
+	       "                               'quicklz' is used by default\n"
 	       "  -j, --bgra                 capture as BGRA and convert to BGR\n"
+	       "  -m, --byte-aligned         use GL_PACK_ALIGNMENT 1 instead of 8\n"
 	       "  -n, --disable-indicator    disable drawing indicator while capturing\n"
 	       "  -w, --no-audio-skip        always capture audio data\n"
 	       "  -a, --disable-audio        don't capture audio\n"

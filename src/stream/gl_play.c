@@ -46,6 +46,7 @@ struct gl_play_private_s {
 	glc_ctx_i ctx_i;
 	GLenum format;
 	unsigned int w, h;
+	unsigned int pack_alignment;
 	glc_utime_t last, fps;
 
 	Display *dpy;
@@ -53,9 +54,13 @@ struct gl_play_private_s {
 	GLXContext ctx;
 	char name[100];
 	int created;
+	int fullscreen;
 	GLuint texture;
 
-	Atom delete_atom, wm_proto_atom;
+	Atom wm_proto_atom;
+	Atom wm_delete_window_atom;
+	Atom net_wm_state_atom;
+	Atom net_wm_state_fullscreen_atom;
 
 	int cancel;
 	sem_t *finished;
@@ -66,7 +71,9 @@ void gl_play_finish_callback(void *ptr, int err);
 
 int gl_play_create_ctx(struct gl_play_private_s *gl_play);
 int gl_play_update_ctx(struct gl_play_private_s *gl_play);
-int gl_play_update_viewport(struct gl_play_private_s *gl_play, unsigned int w, unsigned int h);
+int gl_play_update_viewport(struct gl_play_private_s *gl_play, int x, int y,
+			    unsigned int w, unsigned int h);
+int gl_play_toggle_fullscreen(struct gl_play_private_s *gl_play);
 
 int gl_play_draw_picture(struct gl_play_private_s *gl_play, char *from);
 
@@ -123,7 +130,7 @@ int gl_play_draw_picture(struct gl_play_private_s *gl_play, char *from)
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, gl_play->texture);
 
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, gl_play->pack_alignment);
 	glTexImage2D(GL_TEXTURE_2D, 0, 3, gl_play->w, gl_play->h, 0, GL_BGR,
 		     GL_UNSIGNED_BYTE, from);
 
@@ -170,9 +177,14 @@ int gl_play_create_ctx(struct gl_play_private_s *gl_play)
 
 	XFree(visinfo);
 
-	gl_play->delete_atom = XInternAtom(gl_play->dpy, "WM_DELETE_WINDOW", False);
 	gl_play->wm_proto_atom = XInternAtom(gl_play->dpy, "WM_PROTOCOLS", True);
-	XSetWMProtocols(gl_play->dpy, gl_play->drawable, &gl_play->delete_atom, 1);
+	gl_play->wm_delete_window_atom = XInternAtom(gl_play->dpy, "WM_DELETE_WINDOW", False);
+
+	gl_play->net_wm_state_atom = XInternAtom(gl_play->dpy, "_NET_WM_STATE", False);
+	gl_play->net_wm_state_fullscreen_atom = XInternAtom(gl_play->dpy,
+							    "_NET_WM_STATE_FULLSCREEN", False);
+
+	XSetWMProtocols(gl_play->dpy, gl_play->drawable, &gl_play->wm_delete_window_atom, 1);
 
 	return gl_play_update_ctx(gl_play);
 }
@@ -206,12 +218,18 @@ int gl_play_update_ctx(struct gl_play_private_s *gl_play)
 
 	glXMakeCurrent(gl_play->dpy, gl_play->drawable, gl_play->ctx);
 
-	return gl_play_update_viewport(gl_play, gl_play->w, gl_play->h);
+	return gl_play_update_viewport(gl_play, 0, 0, gl_play->w, gl_play->h);
 }
 
-int gl_play_update_viewport(struct gl_play_private_s *gl_play, unsigned int w, unsigned int h)
+int gl_play_update_viewport(struct gl_play_private_s *gl_play, int x, int y,
+			    unsigned int w, unsigned int h)
 {
-	glViewport(0, 0, (GLsizei) w, (GLsizei) h);
+	/* make sure old viewport is clear */
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glXSwapBuffers(gl_play->dpy, gl_play->drawable);
+
+	glViewport((GLint) x, (GLint) y, (GLsizei) w, (GLsizei) h);
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
@@ -234,11 +252,37 @@ int gl_play_update_viewport(struct gl_play_private_s *gl_play, unsigned int w, u
 	return 0;
 }
 
+int gl_play_toggle_fullscreen(struct gl_play_private_s *gl_play)
+{
+	XClientMessageEvent event;
+
+	if (gl_play->fullscreen)
+		gl_play->fullscreen = 0;
+	else
+		gl_play->fullscreen = 1;
+
+	memset(&event, 0, sizeof(XClientMessageEvent));
+
+	event.type = ClientMessage;
+	event.message_type = gl_play->net_wm_state_atom;
+	event.display = gl_play->dpy;
+	event.window = gl_play->drawable;
+	event.format = 32;
+	event.data.l[0] = gl_play->fullscreen;
+	event.data.l[1] = gl_play->net_wm_state_fullscreen_atom;
+
+	XSendEvent(gl_play->dpy, DefaultRootWindow(gl_play->dpy),
+		   False, SubstructureRedirectMask, (XEvent*) &event);
+
+	return 0;
+}
+
 int gl_handle_xevents(struct gl_play_private_s *gl_play, glc_thread_state_t *state)
 {
 	XEvent event;
 	XConfigureEvent *ce;
 	int code;
+	float xf, yf;
 
 	while (XPending(gl_play->dpy) > 0) {
 		XNextEvent(gl_play->dpy, &event);
@@ -249,6 +293,8 @@ int gl_handle_xevents(struct gl_play_private_s *gl_play, glc_thread_state_t *sta
 
 			if (code == XK_Right)
 				util_timediff(gl_play->glc, -100000);
+			else if (code == XK_f)
+				gl_play_toggle_fullscreen(gl_play);
 			break;
 		case KeyRelease:
 			code = XLookupKeysym(&event.xkey, 0);
@@ -261,13 +307,21 @@ int gl_handle_xevents(struct gl_play_private_s *gl_play, glc_thread_state_t *sta
 			break;
 		case ClientMessage:
 			if (event.xclient.message_type == gl_play->wm_proto_atom) {
-				if ((Atom) event.xclient.data.l[0] == gl_play->delete_atom)
+				if ((Atom) event.xclient.data.l[0] == gl_play->wm_delete_window_atom)
 					state->flags |= GLC_THREAD_STOP;
 			}
 			break;
 		case ConfigureNotify:
 			ce = (XConfigureEvent *) &event;
-			gl_play_update_viewport(gl_play, ce->width, ce->height);
+			xf = (float) ce->width / (float) gl_play->w;
+			yf = (float) ce->height / (float) gl_play->h;
+
+			if (xf < yf)
+				gl_play_update_viewport(gl_play, 0, (ce->height - gl_play->h * xf) / 2,
+							gl_play->w * xf, gl_play->h * xf);
+			else
+				gl_play_update_viewport(gl_play, (ce->width - gl_play->w * yf) / 2, 0,
+							gl_play->w * yf, gl_play->h * yf);
 
 			break;
 		}
@@ -308,6 +362,11 @@ int gl_play_read_callback(glc_thread_state_t *state)
 			fprintf(stderr, "ctx %d is in unsupported format\n", ctx_msg->ctx);
 			return EINVAL;
 		}
+
+		if (ctx_msg->flags & GLC_CTX_DWORD_ALIGNED)
+			gl_play->pack_alignment = 8;
+		else
+			gl_play->pack_alignment = 1;
 	} else if (state->header.type == GLC_MESSAGE_PICTURE) {
 		pic_hdr = (glc_picture_header_t *) state->read_data;
 

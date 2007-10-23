@@ -36,6 +36,7 @@ struct scale_ctx_s {
 	glc_ctx_i ctx;
 	glc_flags_t flags;
 	unsigned int w, h, sw, sh, bpp;
+	unsigned int row;
 	double scale;
 	int process;
 
@@ -175,12 +176,14 @@ int scale_pic_msg(struct scale_private_s *scale, struct scale_ctx_s *ctx, unsign
 	if ((ctx->scale == 1) && (ctx->flags & GLC_CTX_BGRA)) { /* just BGRA -> BGR */
 		for (y = 0; y < shi; y += 3) {
 			for (x = 0; x < swi; x += 3) {
-				*((unsigned int *) &to[x + y * ctx->w]) =
-					((unsigned int *) from)[ox + oy * ctx->w];
-				/*to[x + y * ctx->w + 0] = from[ox + oy * ctx->w + 0];
-				to[x + y * ctx->w + 1] = from[ox + oy * ctx->w + 1];
-				to[x + y * ctx->w + 2] = from[ox + oy * ctx->w + 2];*/
-				ox++;
+				tp = x + y * ctx->sw;
+				op1 = ox + oy * ctx->row;
+
+				to[tp + 0] = from[op1 + 0];
+				to[tp + 1] = from[op1 + 1];
+				to[tp + 2] = from[op1 + 2];
+
+				ox += ctx->bpp;
 			}
 			oy++;
 			ox = 0;
@@ -192,10 +195,10 @@ int scale_pic_msg(struct scale_private_s *scale, struct scale_ctx_s *ctx, unsign
 		for (y = 0; y < shi; y += 3) {
 			for (x = 0; x < swi; x += 3) {
 				tp = x + y * ctx->sw;
-				op1 = (ox +        0) + (oy +        0) * ctx->w;
-				op2 = (ox + ctx->bpp) + (oy +        0) * ctx->w;
-				op3 = (ox +        0) + (oy + ctx->bpp) * ctx->w;
-				op4 = (ox + ctx->bpp) + (oy + ctx->bpp) * ctx->w;
+				op1 = (ox +        0) + (oy + 0) * ctx->row;
+				op2 = (ox + ctx->bpp) + (oy + 0) * ctx->row;
+				op3 = (ox +        0) + (oy + 1) * ctx->row;
+				op4 = (ox + ctx->bpp) + (oy + 1) * ctx->row;
 				ox += 2 * ctx->bpp;
 
 				to[tp + 0] = (from[op1 + 0]
@@ -212,7 +215,7 @@ int scale_pic_msg(struct scale_private_s *scale, struct scale_ctx_s *ctx, unsign
 					    + from[op4 + 2]) >> 2;
 
 			}
-			oy += 2 * ctx->bpp;
+			oy += 2;
 			ox = 0;
 		}
 
@@ -270,6 +273,13 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 	ctx->scale = scale->glc->scale;
 	ctx->sw = ctx->scale * ctx->w;
 	ctx->sh = ctx->scale * ctx->h;
+	ctx->row = ctx->w * ctx->bpp;
+
+	if (ctx_msg->flags & GLC_CTX_DWORD_ALIGNED) {
+		if (ctx->row % 8 != 0)
+			ctx->row += 8 - ctx->row % 8;
+		ctx_msg->flags &= ~GLC_CTX_DWORD_ALIGNED;
+	}
 
 	ctx_msg->w = ctx->sw;
 	ctx_msg->h = ctx->sh;
@@ -297,14 +307,14 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 		for (x = 0; x < ctx->sw; x++) {
 			tp = (x + y * ctx->sw) * 4;
 
-			ctx->pos[tp + 0] = (((unsigned int) ofx + 0) +
-			                    ((unsigned int) ofy + 0) * ctx->w) * ctx->bpp;
-			ctx->pos[tp + 1] = (((unsigned int) ofx + 1) +
-			                    ((unsigned int) ofy + 0) * ctx->w) * ctx->bpp;
-			ctx->pos[tp + 2] = (((unsigned int) ofx + 0) +
-			                    ((unsigned int) ofy + 1) * ctx->w) * ctx->bpp;
-			ctx->pos[tp + 3] = (((unsigned int) ofx + 1) +
-			                    ((unsigned int) ofy + 1) * ctx->w) * ctx->bpp;
+			ctx->pos[tp + 0] = ((unsigned int) ofx + 0) * ctx->bpp +
+			                   ((unsigned int) ofy + 0) * ctx->row;
+			ctx->pos[tp + 1] = ((unsigned int) ofx + 1) * ctx->bpp +
+			                   ((unsigned int) ofy + 0) * ctx->row;
+			ctx->pos[tp + 2] = ((unsigned int) ofx + 0) * ctx->bpp +
+			                   ((unsigned int) ofy + 1) * ctx->row;
+			ctx->pos[tp + 3] = ((unsigned int) ofx + 1) * ctx->bpp +
+			                   ((unsigned int) ofy + 1) * ctx->row;
 
 			fx1 = (float) x * d - (float) ((unsigned int) ofx);
 			fx0 = 1.0 - fx1;

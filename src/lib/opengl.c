@@ -109,6 +109,12 @@ int opengl_init(glc_t *glc)
 	} else
 		opengl.glc->flags |= GLC_TRY_PBO;
 
+	if (getenv("GLC_CAPTURE_DWORD_ALIGNED")) {
+		if (atoi(getenv("GLC_CAPTURE_DWORD_ALIGNED")))
+			opengl.glc->flags |= GLC_CAPTURE_DWORD_ALIGNED;
+	} else
+		opengl.glc->flags |= GLC_CAPTURE_DWORD_ALIGNED;
+
 	if (getenv("GLC_CROP")) {
 		opengl.glc->crop_width = opengl.glc->crop_height = 0;
 		opengl.glc->crop_x = opengl.glc->crop_y = 0;

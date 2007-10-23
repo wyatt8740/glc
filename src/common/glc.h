@@ -6,7 +6,7 @@
  */
 
 /* glc.h -- OpenGL video capture tool
-  version 0.3.5, October 21th, 2007
+  version 0.3.6, October 23th, 2007
 
   Copyright (C) 2007 Pyry Haulos
 
@@ -39,6 +39,7 @@
  * \defgroup lib wrapper library
  * \defgroup stream stream processing
  * \defgroup common common utilities and data structures
+ * \defgroup support optional support libraries
  */
 
 /**
@@ -120,6 +121,12 @@ typedef u_int32_t glc_flags_t;
 #define GLC_CONVERT_420JPEG             512
 /** crop pictures */
 #define GLC_CROP                       1024
+/** use GL_PACK_ALIGNMENT 8 for readback */
+#define GLC_CAPTURE_DWORD_ALIGNED      2048
+/** compress stream with LZO */
+#define GLC_COMPRESS_LZO               4096
+/** compress stream with QuickLZ */
+#define GLC_COMPRESS_QUICKLZ           8192
 
 /**
  * \brief stream info structure
@@ -216,6 +223,8 @@ typedef char glc_message_type_t;
 #define GLC_MESSAGE_AUDIO_FORMAT       0x05
 /** audio data message */
 #define GLC_MESSAGE_AUDIO              0x06
+/** quicklz-compressed packet */
+#define GLC_MESSAGE_QUICKLZ            0x07
 
 /**
  * \brief stream message header
@@ -236,8 +245,20 @@ typedef struct {
 	/** original message header */
 	glc_message_header_t header;
 } glc_lzo_header_t;
-/** sizeof(glc_lzo_header_size) */
+/** sizeof(glc_lzo_header_t) */
 #define GLC_LZO_HEADER_SIZE               9
+
+/**
+ * \brief quicklz-compressed message header
+ */
+typedef struct {
+	/** uncompressed data size */
+	glc_size_t size;
+	/** original message header */
+	glc_message_header_t header;
+} glc_quicklz_header_t;
+/** sizeof(glc_quicklz_header_t) */
+#define GLC_QUICKLZ_HEADER_SIZE           9
 
 /**
  * \brief picture header
@@ -277,6 +298,8 @@ typedef struct {
 #define GLC_CTX_BGRA                      8
 /** planar YV12 420jpeg */
 #define GLC_CTX_YCBCR_420JPEG            16
+/** double-word aligned rows (GL_PACK_ALIGNMENT = 8) */
+#define GLC_CTX_DWORD_ALIGNED            32
 
 /**
  * \brief audio format message
