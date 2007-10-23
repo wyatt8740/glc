@@ -38,28 +38,26 @@
 # define __lzo_decompress lzo1x_decompress
 # define __lzo_worstcase(size) size + (size / 16) + 64 + 3
 # define __lzo_wrk_mem LZO1X_1_MEM_COMPRESS
+# define __LZO
 #else
-# include <lzo/lzo1x.h>
-# define __lzo_compress lzo1x_1_11_compress
-# define __lzo_decompress lzo1x_decompress
-# define __lzo_worstcase(size) size + (size / 16) + 64 + 3
-# define __lzo_wrk_mem LZO1X_1_11_MEM_COMPRESS
+# ifdef __LZO
+#  include <lzo/lzo1x.h>
+#  define __lzo_compress lzo1x_1_11_compress
+#  define __lzo_decompress lzo1x_decompress
+#  define __lzo_worstcase(size) size + (size / 16) + 64 + 3
+#  define __lzo_wrk_mem LZO1X_1_11_MEM_COMPRESS
+# endif
 #endif
 
-#define __quicklz_worstcase(size) (size) + ((size) / 8) + 1
-#define __quicklz_hashtable sizeof(uintptr_t) * 4096
+#ifdef __QUICKLZ
+# include <quicklz.h>
+#endif
 
 struct pack_private_s {
 	glc_t *glc;
 	glc_thread_t thread;
 	size_t compress_min;
 };
-
-int quicklz_compress(const unsigned char *from, unsigned char *to,
-		     size_t uncompressed_size, size_t *compressed_size,
-		     uintptr_t *hashtable);
-int quicklz_decompress(const unsigned char *from, unsigned char *to,
-		       size_t compressed_size);
 
 int pack_thread_create_callback(void *ptr, void **threadptr);
 void pack_thread_finish_callback(void *ptr, void *threadptr, int err);
@@ -88,11 +86,21 @@ int pack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 	pack->thread.finish_callback = &pack_finish_callback;
 	pack->thread.threads = 1; /* compression can't currently take advantage of threading */
 
-	if (pack->glc->flags & GLC_COMPRESS_QUICKLZ)
+	if (pack->glc->flags & GLC_COMPRESS_QUICKLZ) {
+#ifdef __QUICKLZ
 		pack->thread.write_callback = &pack_quicklz_write_callback;
-	else if (pack->glc->flags & GLC_COMPRESS_LZO) {
+#else
+		fprintf(stderr, "pack: QuickLZ not supported\n");
+		return ENOTSUP;
+#endif
+	} else if (pack->glc->flags & GLC_COMPRESS_LZO) {
+#ifdef __LZO
 		pack->thread.write_callback = &pack_lzo_write_callback;
 		lzo_init();
+#else
+		fprintf(stderr, "pack: LZO not supported\n");
+		return ENOTSUP;
+#endif
 	} else {
 		fprintf(stderr, "pack: no compression selected\n");
 		return EINVAL;
@@ -116,10 +124,15 @@ int pack_thread_create_callback(void *ptr, void **threadptr)
 {
 	struct pack_private_s *pack = ptr;
 
-	if (pack->glc->flags & GLC_COMPRESS_QUICKLZ)
+	if (pack->glc->flags & GLC_COMPRESS_QUICKLZ) {
+#ifdef __QUICKLZ
 		*threadptr = malloc(__quicklz_hashtable);
-	else
+#endif
+	} else if (pack->glc->flags & GLC_COMPRESS_LZO) {
+#ifdef __LZO
 		*threadptr = malloc(__lzo_wrk_mem);
+#endif
+	}
 
 	return 0;
 }
@@ -138,21 +151,34 @@ int pack_read_callback(glc_thread_state_t *state)
 	if ((state->read_size > pack->compress_min) &&
 	    ((state->header.type == GLC_MESSAGE_PICTURE) |
 	     (state->header.type == GLC_MESSAGE_AUDIO))) {
-		if (pack->glc->flags & GLC_COMPRESS_QUICKLZ)
+		if (pack->glc->flags & GLC_COMPRESS_QUICKLZ) {
+#ifdef __QUICKLZ
 			state->write_size = GLC_QUICKLZ_HEADER_SIZE
 					    + __quicklz_worstcase(state->read_size);
-		else
+#else
+			goto copy;
+#endif
+		} else if (pack->glc->flags & GLC_COMPRESS_LZO) {
+#ifdef __LZO
 			state->write_size = GLC_LZO_HEADER_SIZE
 			                    + __lzo_worstcase(state->read_size);
-		state->flags |= GLC_THREAD_STATE_UNKNOWN_FINAL_SIZE;
-	} else
-		state->flags |= GLC_THREAD_COPY;
+#else
+			goto copy;
+#endif
+		} else
+			goto copy;
 
+		state->flags |= GLC_THREAD_STATE_UNKNOWN_FINAL_SIZE;
+		return 0;
+	}
+copy:
+	state->flags |= GLC_THREAD_COPY;
 	return 0;
 }
 
 int pack_lzo_write_callback(glc_thread_state_t *state)
 {
+#ifdef __LZO
 	glc_lzo_header_t *lzo_header = (glc_lzo_header_t *) state->write_data;
 
 	__lzo_compress((unsigned char *) state->read_data, state->read_size,
@@ -167,10 +193,14 @@ int pack_lzo_write_callback(glc_thread_state_t *state)
 	state->write_size += GLC_LZO_HEADER_SIZE;
 
 	return 0;
+#else
+	return ENOTSUP;
+#endif
 }
 
 int pack_quicklz_write_callback(glc_thread_state_t *state)
 {
+#ifdef __QUICKLZ
 	glc_quicklz_header_t *quicklz_header = (glc_quicklz_header_t *) state->write_data;
 
 	quicklz_compress((const unsigned char *) state->read_data,
@@ -185,6 +215,9 @@ int pack_quicklz_write_callback(glc_thread_state_t *state)
 	state->write_size += GLC_QUICKLZ_HEADER_SIZE;
 
 	return 0;
+#else
+	return ENOTSUP;
+#endif
 }
 
 int unpack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
@@ -201,7 +234,10 @@ int unpack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 	pack->thread.finish_callback = &unpack_finish_callback;
 	pack->thread.threads = util_cpus();
 
+#ifdef __LZO
 	lzo_init();
+#endif
+
 	return glc_thread_create(glc, &pack->thread, from, to);
 }
 
@@ -218,19 +254,29 @@ void unpack_finish_callback(void *ptr, int err)
 
 int unpack_read_callback(glc_thread_state_t *state)
 {
-	if (state->header.type == GLC_MESSAGE_LZO)
+	if (state->header.type == GLC_MESSAGE_LZO) {
+#ifdef __LZO
 		state->write_size = ((glc_lzo_header_t *) state->read_data)->size;
-	else if (state->header.type == GLC_MESSAGE_QUICKLZ)
+#else
+		goto copy;
+#endif
+	} else if (state->header.type == GLC_MESSAGE_QUICKLZ) {
+#ifdef __QUICKLZ
 		state->write_size = ((glc_quicklz_header_t *) state->read_data)->size;
-	else
-		state->flags |= GLC_THREAD_COPY;
+#else
+		goto copy;
+#endif
+	}
 
+copy:
+	state->flags |= GLC_THREAD_COPY;
 	return 0;
 }
 
 int unpack_write_callback(glc_thread_state_t *state)
 {
 	if (state->header.type == GLC_MESSAGE_LZO) {
+#ifdef __LZO
 		memcpy(&state->header, &((glc_lzo_header_t *) state->read_data)->header,
 		       GLC_MESSAGE_HEADER_SIZE);
 		__lzo_decompress((unsigned char *) &state->read_data[GLC_LZO_HEADER_SIZE],
@@ -238,12 +284,19 @@ int unpack_write_callback(glc_thread_state_t *state)
 				(unsigned char *) state->write_data,
 				(lzo_uintp) &state->write_size,
 				NULL);
+#else
+		return ENOTSUP;
+#endif
 	} else if (state->header.type == GLC_MESSAGE_QUICKLZ) {
+#ifdef __QUICKLZ
 		memcpy(&state->header, &((glc_quicklz_header_t *) state->read_data)->header,
 		       GLC_MESSAGE_HEADER_SIZE);
 		quicklz_decompress((const unsigned char *) &state->read_data[GLC_QUICKLZ_HEADER_SIZE],
 				   (unsigned char *) state->write_data,
 				   state->write_size);
+#else
+		return ENOTSUP;
+#endif
 	} else {
 		fprintf(stderr, "unsupported compression: 0x%02x\n", state->header.type);
 		return ENOTSUP;

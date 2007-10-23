@@ -17,10 +17,16 @@ SCRIPTS = scripts
 VERSION=0
 RELEASE=$(VERSION).3.5
 
-#MINILZO = ../minilzo.202/
-#LZO_OBJ = build/minilzo.o
-#USE_LZO = -D__MINILZO -I$(MINILZO)
-LZO_LIB = -llzo2
+MINILZO = ../glc-support/minilzo/
+LZO_OBJ = $(BUILD)/minilzo.o
+USE_LZO = -D__MINILZO -I$(MINILZO)
+LZO_LIB =
+#USE_LZO = -D__LZO
+#LZO_LIB = -llzo2
+
+QUICKLZ = ../glc-support/quicklz/
+QUICKLZ_OBJ = $(BUILD)/quicklz.o
+USE_QUICKLZ = -D__QUICKLZ -I$(QUICKLZ)
 
 LIBS = -lpthread -lpacketstream -lGL -ldl -lelfhacks -lasound $(LZO_LIB)
 
@@ -58,7 +64,8 @@ LIB_OBJS = $(BUILD)/gl_capture.o \
            $(BUILD)/ycbcr.o \
            $(BUILD)/yuv4mpeg.o \
            $(BUILD)/rgb.o \
-           $(LZO_OBJ)
+           $(LZO_OBJ) \
+           $(QUICKLZ_OBJ)
 
 CAPT_OBJS = $(BUILD)/main.o \
             $(BUILD)/alsa.o \
@@ -164,8 +171,12 @@ $(BUILD)/yuv4mpeg.o: $(STREAM)/yuv4mpeg.c $(HEADERS)
 $(BUILD)/rgb.o: $(STREAM)/rgb.c $(HEADERS)
 	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/rgb.o -c $(STREAM)/rgb.c
 
+
 $(LZO_OBJ): $(MINILZO)minilzo.c $(MINILZO)lzoconf.h $(MINILZO)lzodefs.h $(MINILZO)minilzo.h
 	$(CC) $(CFLAGS) -fPIC -o $(LZO_OBJ) -c $(MINILZO)minilzo.c
+
+$(QUICKLZ_OBJ): $(QUICKLZ)quicklz.c $(QUICKLZ)quicklz.h
+	$(CC) $(CFLAGS) -fPIC -o $(QUICKLZ_OBJ) -c $(QUICKLZ)quicklz.c
 
 
 install-scripts: $(SCRIPTS)/glc-encode $(SCRIPTS)/glc-capture
