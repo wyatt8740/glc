@@ -15,7 +15,7 @@ STREAM = $(SRC)/stream
 SCRIPTS = scripts
 
 VERSION=0
-RELEASE=$(VERSION).3.6
+RELEASE=$(VERSION).3.7
 
 # minilzo is licenced under GPL
 # remove following lines to disable minilzo:
