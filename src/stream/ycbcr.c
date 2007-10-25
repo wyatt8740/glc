@@ -397,7 +397,6 @@ int ycbcr_ctx_msg(struct ycbcr_private_s *ycbcr, glc_ctx_message_t *ctx_msg)
 
 	ctx->w = ctx_msg->w;
 	ctx->h = ctx_msg->h;
-	ctx->scale = ycbcr->glc->scale;
 
 	ctx->row = ctx->w * ctx->bpp;
 
@@ -406,6 +405,7 @@ int ycbcr_ctx_msg(struct ycbcr_private_s *ycbcr, glc_ctx_message_t *ctx_msg)
 			ctx->row += 8 - ctx->row % 8;
 	}
 
+	ctx->scale = ycbcr->glc->scale;
 	ctx->yw = ctx->w * ctx->scale;
 	ctx->yh = ctx->h * ctx->scale;
 	ctx->yw -= ctx->yw % 2; /* safer and faster             */
@@ -414,8 +414,8 @@ int ycbcr_ctx_msg(struct ycbcr_private_s *ycbcr, glc_ctx_message_t *ctx_msg)
 	ctx->cw = ctx->yw / 2;
 	ctx->ch = ctx->yh / 2;
 
-	ctx_msg->flags &= ~GLC_CTX_BGR;
-	ctx_msg->flags &= ~GLC_CTX_DWORD_ALIGNED; /* never */
+	/* nuke old flags */
+	ctx_msg->flags &= ~(GLC_CTX_BGR | GLC_CTX_BGRA | GLC_CTX_DWORD_ALIGNED);
 	ctx_msg->flags |= GLC_CTX_YCBCR_420JPEG;
 	ctx_msg->w = ctx->yw;
 	ctx_msg->h = ctx->yh;
