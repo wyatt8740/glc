@@ -83,9 +83,9 @@ read LDFLAGS
 [ "${LDFLAGS}" == "" ] && LDFLAGS="-Wl,-O1"
 
 info "Fetching sources..."
-download "http://nullkey.ath.cx/~stuff/elfhacks/elfhacks.tar.gz"
-download "http://nullkey.ath.cx/~stuff/packetstream/packetstream.tar.gz"
-download "http://nullkey.ath.cx/~stuff/glc/glc.tar.gz"
+download "http://nullkey.ath.cx/elfhacks/elfhacks.tar.gz"
+download "http://nullkey.ath.cx/packetstream/packetstream.tar.gz"
+download "http://nullkey.ath.cx/glc/glc.tar.gz"
 
 info "Unpacking sources..."
 unpack "elfhacks.tar.gz"
