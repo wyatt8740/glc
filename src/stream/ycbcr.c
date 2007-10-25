@@ -440,7 +440,7 @@ int ycbcr_ctx_msg(struct ycbcr_private_s *ycbcr, glc_ctx_message_t *ctx_msg)
 int ycbcr_generate_map(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx)
 {
 	size_t scale_maps_size;
-	unsigned int tp, x, y;
+	unsigned int tp, x, y, r;
 	float d, ofx, ofy, fx0, fx1, fy0, fy1;
 
 	scale_maps_size = ctx->yw * ctx->yh * 4 + ctx->cw * ctx->ch * 4;
@@ -456,7 +456,11 @@ int ycbcr_generate_map(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx)
 		ctx->factor = (float *) malloc(sizeof(float) * scale_maps_size);
 
 	/* Y' */
-	d = (float) (ctx->w - 1) / (float) ctx->yw;
+	/* NEVER trust CPU with fp mathematics :/ */
+	r = 0;
+	do {
+		d = (float) (ctx->w - ++r) / (float) ctx->yw;
+	} while ((d * ctx->yh > ctx->h) | (d * ctx->yw > ctx->w));
 	ofx = ofy = 0;
 
 	for (y = 0; y < ctx->yh; y++) {
@@ -489,7 +493,10 @@ int ycbcr_generate_map(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx)
 	}
 
 	/* CbCr */
-	d = (float) (ctx->w - 1) / (float) ctx->cw;
+	r--; /* try to match Y */
+	do {
+		d = (float) (ctx->w - ++r) / (float) ctx->cw;
+	} while ((d * ctx->ch > ctx->h) | (d * ctx->cw > ctx->w));
 	ofx = ofy = 0;
 
 	for (y = 0; y < ctx->ch; y++) {

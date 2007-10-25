@@ -248,6 +248,10 @@ int scale_pic_msg(struct scale_private_s *scale, struct scale_ctx_s *ctx, unsign
 int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 {
 	struct scale_ctx_s *ctx;
+	float ofx, ofy, fx0, fx1, fy0, fy1;
+	unsigned int tp, x, y, r;
+	float d;
+
 	scale_get_ctx(scale, ctx_msg->ctx, &ctx);
 
 	pthread_rwlock_wrlock(&ctx->update);
@@ -299,9 +303,11 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 	else
 		ctx->factor = (float *) malloc(sizeof(float) * smap_size);
 
-	unsigned int tp, x, y;
-	float d = (float) (ctx->w - 1) / (float) ctx->sw;
-	float ofx, ofy, fx0, fx1, fy0, fy1;
+	r = 0;
+	do {
+		d = (float) (ctx->w - ++r) / (float) ctx->sw;
+	} while ((d * ctx->sh > ctx->h) | (d * ctx->sw > ctx->w));
+
 	ofx = ofy = 0;
 	for (y = 0; y < ctx->sh; y++) {
 		for (x = 0; x < ctx->sw; x++) {
