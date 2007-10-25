@@ -86,7 +86,7 @@ int opengl_init(glc_t *glc)
 		else /* back */
 			opengl.glc->flags |= GLC_CAPTURE_BACK;
 	} else
-		opengl.glc->flags |= GLC_CAPTURE_BACK;
+		opengl.glc->flags |= GLC_CAPTURE_FRONT;
 
 	if (getenv("GLC_CAPTURE_GLFINISH"))
 		opengl.capture_glfinish = atoi(getenv("GLC_CAPTURE_GLFINISH"));
@@ -97,11 +97,6 @@ int opengl_init(glc_t *glc)
 		opengl.glc->scale = atof(getenv("GLC_SCALE"));
 	else
 		opengl.glc->scale = 1.0;
-
-	if (getenv("GLC_CAPTURE_BGRA")) {
-		if (atoi(getenv("GLC_CAPTURE_BGRA")))
-			opengl.glc->flags |= GLC_CAPTURE_BGRA;
-	}
 
 	if (getenv("GLC_TRY_PBO")) {
 		if (atoi(getenv("GLC_TRY_PBO")))
@@ -137,11 +132,14 @@ int opengl_start(ps_buffer_t *buffer)
 
 	opengl.buffer = buffer;
 
-	if ((opengl.glc->scale == 1.0) && (!(opengl.glc->flags & GLC_CAPTURE_BGRA)) && (!(opengl.glc->flags & GLC_CONVERT_420JPEG)))
+	if ((opengl.glc->scale == 1.0) && (!(opengl.glc->flags & GLC_CONVERT_420JPEG)))
 		opengl.glc->flags &= ~GLC_SCALE; /* no scaling or conversion needed */
 
 	/* init unscaled buffer if it is needed */
 	if (opengl.glc->flags & GLC_SCALE) {
+		/* capture in GL_BGRA format if scaling is enabled */
+		opengl.glc->flags |= GLC_CAPTURE_BGRA;
+
 		ps_bufferattr_t attr;
 		ps_bufferattr_init(&attr);
 		ps_bufferattr_setsize(&attr, opengl.unscaled_size);

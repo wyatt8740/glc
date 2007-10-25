@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
 	   is encountered. */
 	setenv("POSIXLY_CORRECT", "1", 1);
 
-	while ((opt = getopt_long(argc, argv, "o:f:r:y:se:k:pz:jmnwaqgvb:c:u:d:h", long_options, &option_index)) != -1) {
+	while ((opt = getopt_long(argc, argv, "o:f:r:y:se:k:pz:mnwaqgvb:c:u:d:h", long_options, &option_index)) != -1) {
 		switch(opt) {
 		case 'o':
 			setenv("GLC_FILE", optarg, 1);
@@ -98,9 +98,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'z':
 			setenv("GLC_COMPRESS", optarg, 1);
-			break;
-		case 'j':
-			setenv("GLC_CAPTURE_BGRA", "1", 1);
 			break;
 		case 'm':
 			setenv("GLC_CAPTURE_DWORD_ALIGNED", "0", 1);
@@ -191,7 +188,6 @@ usage:
 	       "  -z, --compression=METHOD   compress stream using METHOD\n"
 	       "                               'none', 'quicklz' and 'lzo' are supported\n"
 	       "                               'quicklz' is used by default\n"
-	       "  -j, --bgra                 capture as BGRA and convert to BGR\n"
 	       "  -m, --byte-aligned         use GL_PACK_ALIGNMENT 1 instead of 8\n"
 	       "  -n, --disable-indicator    disable drawing indicator while capturing\n"
 	       "  -w, --no-audio-skip        always capture audio data\n"
