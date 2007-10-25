@@ -557,7 +557,7 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 finish:
 	if (gl_capture->glc->flags & GLC_DRAW_INDICATOR)
 		glCallList(ctx->indicator_list);
-	
+
 	return ret;
 cancel:
 	if (ret == EBUSY)

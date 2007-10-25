@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 		{"compression",		1, NULL, 'z'},
 		{"bgra",		0, NULL, 'j'},
 		{"byte-aligned",	0, NULL, 'm'},
-		{"disable-indicator",	0, NULL, 'n'},
+		{"draw-indicator",	0, NULL, 'n'},
 		{"no-audio-skip",	0, NULL, 'w'},
 		{"disable-audio",	0, NULL, 'a'},
 		{"sighandler",		0, NULL, 'q'},
@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
 			setenv("GLC_CAPTURE_DWORD_ALIGNED", "0", 1);
 			break;
 		case 'n':
-			setenv("GLC_INDICATOR", "0", 1);
+			setenv("GLC_INDICATOR", "1", 1);
 			break;
 		case 'w':
 			setenv("GLC_AUDIO_SKIP", "0", 1);
@@ -189,14 +189,15 @@ usage:
 	       "                               'none', 'quicklz' and 'lzo' are supported\n"
 	       "                               'quicklz' is used by default\n"
 	       "  -m, --byte-aligned         use GL_PACK_ALIGNMENT 1 instead of 8\n"
-	       "  -n, --disable-indicator    disable drawing indicator while capturing\n"
+	       "  -n, --draw-indicator       draw indicator when capturing\n"
+	       "                               indicator does not work with -b 'front'\n"
 	       "  -w, --no-audio-skip        always capture audio data\n"
 	       "  -a, --disable-audio        don't capture audio\n"
 	       "  -q, --sighandler           use custom signal handler\n"
 	       "  -g, --glfinish             capture at glFinish()\n"
 	       "  -v, --force-sdl-alsa-drv   force SDL to use ALSA audio driver\n"
 	       "  -b, --capture=BUFFER       capture 'front' or 'back' buffer\n"
-	       "                               default is 'back'\n"
+	       "                               default is 'front'\n"
 	       "  -c, --compressed=SIZE      compressed stream buffer size in MiB\n"
 	       "                               default is 50 MiB\n"
 	       "  -u, --uncompressed=SIZE    uncompressed stream buffer size in MiB\n"
