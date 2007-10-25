@@ -90,7 +90,7 @@ else
 		mencoder - \
 			-audiofile "${AUDIOTMP}" \
 			-ovc x264 \
-			-x264encopts "${X264_OPTS}:pass=1" \
+			-x264encopts "${X264_OPTS}:pass=2" \
 			-passlogfile "${PASSLOG}" \
 			-oac copy \
 			${OPTS} \
