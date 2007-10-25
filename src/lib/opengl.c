@@ -261,10 +261,10 @@ void glFinish(void)
 
 void opengl_capture_current()
 {
+	INIT_GLC
+
 	Display *dpy = glXGetCurrentDisplay();
 	GLXDrawable drawable = glXGetCurrentDrawable();
-
-	INIT_GLC
 
 	if ((opengl.glc->flags & GLC_CAPTURE) && (dpy != NULL) && (drawable != None))
 		gl_capture(opengl.gl, dpy, drawable);
