@@ -259,18 +259,19 @@ int unpack_read_callback(glc_thread_state_t *state)
 		state->write_size = ((glc_lzo_header_t *) state->read_data)->size;
 		return 0;
 #else
-		goto copy;
+		fprintf(stderr, "unpack: LZO not supported\n");
+		return ENOTSUP;
 #endif
 	} else if (state->header.type == GLC_MESSAGE_QUICKLZ) {
 #ifdef __QUICKLZ
 		state->write_size = ((glc_quicklz_header_t *) state->read_data)->size;
 		return 0;
 #else
-		goto copy;
+		fprintf(stderr, "unpack: QuickLZ not supported\n");
+		return ENOTSUP;
 #endif
 	}
 
-copy:
 	state->flags |= GLC_THREAD_COPY;
 	return 0;
 }
@@ -299,10 +300,8 @@ int unpack_write_callback(glc_thread_state_t *state)
 #else
 		return ENOTSUP;
 #endif
-	} else {
-		fprintf(stderr, "unsupported compression: 0x%02x\n", state->header.type);
+	} else
 		return ENOTSUP;
-	}
 
 	return 0;
 }
