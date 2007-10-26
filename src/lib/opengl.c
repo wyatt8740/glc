@@ -121,6 +121,11 @@ int opengl_init(glc_t *glc)
 			opengl.glc->flags |= GLC_CROP;
 	}
 
+	if (getenv("GLC_INDICATOR")) {
+		if (atoi(getenv("GLC_INDICATOR")))
+			opengl.glc->flags |= GLC_DRAW_INDICATOR;
+	}
+
 	get_real_opengl();
 	return 0;
 }

@@ -271,12 +271,6 @@ int load_environ()
 	else
 		mpriv.compressed_size = 1024 * 1024 * 50;
 
-	if (getenv("GLC_INDICATOR")) {
-		if (atoi(getenv("GLC_INDICATOR")))
-			mpriv.glc->flags |= GLC_DRAW_INDICATOR;
-	} else
-		mpriv.glc->flags |= GLC_DRAW_INDICATOR;
-
 	if (getenv("GLC_COMPRESS")) {
 		if (!strcmp(getenv("GLC_COMPRESS"), "lzo")) {
 			mpriv.compress = 1;
