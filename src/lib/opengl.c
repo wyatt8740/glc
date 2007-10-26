@@ -78,7 +78,7 @@ int opengl_init(glc_t *glc)
 	if (getenv("GLC_UNSCALED_BUFFER_SIZE"))
 		opengl.unscaled_size = atoi(getenv("GLC_UNSCALED_BUFFER_SIZE")) * 1024 * 1024;
 	else
-		opengl.unscaled_size = 1024 * 1024 * 10;
+		opengl.unscaled_size = 1024 * 1024 * 25;
 
 	if (getenv("GLC_CAPTURE")) {
 		if (!strcmp(getenv("GLC_CAPTURE"), "front"))

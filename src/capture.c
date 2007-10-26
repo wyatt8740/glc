@@ -201,9 +201,9 @@ usage:
 	       "  -c, --compressed=SIZE      compressed stream buffer size in MiB\n"
 	       "                               default is 50 MiB\n"
 	       "  -u, --uncompressed=SIZE    uncompressed stream buffer size in MiB\n"
-	       "                               default is 10 MiB\n"
+	       "                               default is 25 MiB\n"
 	       "  -d, --unscaled=SIZE        unscaled picture stream buffer size in MiB,\n"
-	       "                               default is 10 MiB\n"
+	       "                               default is 25 MiB\n"
 	       "  -h, --help                 show this help\n");
 	return EXIT_FAILURE;
 }
