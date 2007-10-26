@@ -305,8 +305,9 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 
 	r = 0;
 	do {
-		d = (float) (ctx->w - ++r) / (float) ctx->sw;
-	} while ((d * ctx->sh > ctx->h) | (d * ctx->sw > ctx->w));
+		d = (float) (ctx->w - r++) / (float) ctx->sw;
+	} while ((d * (float) (ctx->sh - 1) + 1.0 > ctx->h) |
+		 (d * (float) (ctx->sw - 1) + 1.0 > ctx->w));
 
 	ofx = ofy = 0;
 	for (y = 0; y < ctx->sh; y++) {

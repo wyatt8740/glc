@@ -459,8 +459,10 @@ int ycbcr_generate_map(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx)
 	/* NEVER trust CPU with fp mathematics :/ */
 	r = 0;
 	do {
-		d = (float) (ctx->w - ++r) / (float) ctx->yw;
-	} while ((d * ctx->yh > ctx->h) | (d * ctx->yw > ctx->w));
+		d = (float) (ctx->w - r++) / (float) ctx->yw;
+	} while ((d * (float) (ctx->yh - 1) + 1.0 > ctx->h) |
+		 (d * (float) (ctx->yw - 1) + 1.0 > ctx->w));
+
 	ofx = ofy = 0;
 
 	for (y = 0; y < ctx->yh; y++) {
@@ -493,10 +495,13 @@ int ycbcr_generate_map(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx)
 	}
 
 	/* CbCr */
-	r--; /* try to match Y */
+	/* try to match Y */
+	r = (r < 2) ? (0) : (r - 2);
 	do {
-		d = (float) (ctx->w - ++r) / (float) ctx->cw;
-	} while ((d * ctx->ch > ctx->h) | (d * ctx->cw > ctx->w));
+		d = (float) (ctx->w - r++) / (float) ctx->cw;
+	} while ((d * (float) (ctx->ch - 1) + 1.0 > ctx->h) |
+		 (d * (float) (ctx->cw - 1) + 1.0 > ctx->w));
+
 	ofx = ofy = 0;
 
 	for (y = 0; y < ctx->ch; y++) {
