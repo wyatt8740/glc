@@ -54,6 +54,9 @@ export GLC_START=0
 # capture hotkey, <Ctrl> and <Shift> mods are supported
 export GLC_HOTKEY="<Shift>F8"
 
+# lock fps when capturing
+export GLC_LOCK_FPS=0
+
 # saved stream colorspace, bgr or 420jpeg
 # set 420jpeg to convert to Y'CbCr (420JPEG) at capture
 # NOTE this is a lossy operation

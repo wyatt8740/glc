@@ -126,6 +126,11 @@ int opengl_init(glc_t *glc)
 			opengl.glc->flags |= GLC_DRAW_INDICATOR;
 	}
 
+	if (getenv("GLC_LOCK_FPS")) {
+		if (atoi(getenv("GLC_LOCK_FPS")))
+			opengl.glc->flags |= GLC_LOCK_FPS;
+	}
+
 	get_real_opengl();
 	return 0;
 }

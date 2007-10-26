@@ -521,38 +521,49 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 	else
 		pic.timestamp = now;
 	
-	if (now - ctx->last >= gl_capture->fps) {
-		if (ps_packet_open(&ctx->packet, PS_PACKET_WRITE | PS_PACKET_TRY))
-			goto finish;
-		if ((ret = ps_packet_write(&ctx->packet, &msg, GLC_MESSAGE_HEADER_SIZE)))
-			goto cancel;
-		if ((ret = ps_packet_write(&ctx->packet, &pic, GLC_PICTURE_HEADER_SIZE)))
-			goto cancel;
+	if ((now - ctx->last < gl_capture->fps) &&
+	    !(gl_capture->glc->flags & GLC_LOCK_FPS))
+		goto finish;
 
-		if (gl_capture->use_pbo) {
-			/* is this safe, what happens if this is called simultaneously? */
-			if ((ret = ps_packet_setsize(&ctx->packet, ctx->row * ctx->ch
-								   + GLC_MESSAGE_HEADER_SIZE
-								   + GLC_PICTURE_HEADER_SIZE)))
-				goto cancel;
+	if (ps_packet_open(&ctx->packet, gl_capture->glc->flags & GLC_LOCK_FPS ?
+					 PS_PACKET_WRITE :
+					 PS_PACKET_WRITE | PS_PACKET_TRY))
+		goto finish;
+	if ((ret = ps_packet_write(&ctx->packet, &msg, GLC_MESSAGE_HEADER_SIZE)))
+		goto cancel;
+	if ((ret = ps_packet_write(&ctx->packet, &pic, GLC_PICTURE_HEADER_SIZE)))
+		goto cancel;
 
-			if ((ret = gl_capture_read_pbo(gl_capture, ctx)))
-				goto cancel;
-
-			ret = gl_capture_start_pbo(gl_capture, ctx);
-			ctx->pbo_timestamp = now;
-		} else {
-			if ((ret = ps_packet_dma(&ctx->packet, (void *) &dma,
-					 ctx->row * ctx->ch, PS_ACCEPT_FAKE_DMA)))
+	if (gl_capture->use_pbo) {
+		/* is this safe, what happens if this is called simultaneously? */
+		if ((ret = ps_packet_setsize(&ctx->packet, ctx->row * ctx->ch
+								+ GLC_MESSAGE_HEADER_SIZE
+								+ GLC_PICTURE_HEADER_SIZE)))
 			goto cancel;
 
-			ret = gl_capture_get_pixels(gl_capture, ctx, dma);
-		}
-		
-		ctx->last += gl_capture->fps;
+		if ((ret = gl_capture_read_pbo(gl_capture, ctx)))
+			goto cancel;
 
-		ps_packet_close(&ctx->packet);
+		ret = gl_capture_start_pbo(gl_capture, ctx);
+		ctx->pbo_timestamp = now;
+	} else {
+		if ((ret = ps_packet_dma(&ctx->packet, (void *) &dma,
+					ctx->row * ctx->ch, PS_ACCEPT_FAKE_DMA)))
+		goto cancel;
+
+		ret = gl_capture_get_pixels(gl_capture, ctx, dma);
 	}
+
+	if (gl_capture->glc->flags & GLC_LOCK_FPS) {
+		now = util_timestamp(gl_capture->glc);
+
+		if (now - ctx->last < gl_capture->fps)
+			usleep(gl_capture->fps + ctx->last - now);
+	}
+
+	ctx->last += gl_capture->fps;
+
+	ps_packet_close(&ctx->packet);
 
 finish:
 	if (ret != 0)

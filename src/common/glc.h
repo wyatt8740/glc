@@ -127,6 +127,8 @@ typedef u_int32_t glc_flags_t;
 #define GLC_COMPRESS_LZO               4096
 /** compress stream with QuickLZ */
 #define GLC_COMPRESS_QUICKLZ           8192
+/** cap fps */
+#define GLC_LOCK_FPS                  16384
 
 /**
  * \brief stream info structure

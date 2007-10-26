@@ -45,11 +45,11 @@ int main(int argc, char *argv[])
 		{"start",		0, NULL, 's'},
 		{"colorspace",		1, NULL, 'e'},
 		{"hotkey",		1, NULL, 'k'},
+		{"lock-fps",		0, NULL, 'n'},
 		{"no-pbo",		0, NULL, 'p'},
 		{"compression",		1, NULL, 'z'},
-		{"bgra",		0, NULL, 'j'},
 		{"byte-aligned",	0, NULL, 'm'},
-		{"draw-indicator",	0, NULL, 'n'},
+		{"draw-indicator",	0, NULL, 'i'},
 		{"no-audio-skip",	0, NULL, 'w'},
 		{"disable-audio",	0, NULL, 'a'},
 		{"sighandler",		0, NULL, 'q'},
@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
 	   is encountered. */
 	setenv("POSIXLY_CORRECT", "1", 1);
 
-	while ((opt = getopt_long(argc, argv, "o:f:r:y:se:k:pz:mnwaqgvb:c:u:d:h", long_options, &option_index)) != -1) {
+	while ((opt = getopt_long(argc, argv, "o:f:r:y:se:k:npz:miwaqgvb:c:u:d:h", long_options, &option_index)) != -1) {
 		switch(opt) {
 		case 'o':
 			setenv("GLC_FILE", optarg, 1);
@@ -93,6 +93,9 @@ int main(int argc, char *argv[])
 		case 'k':
 			setenv("GLC_HOTKEY", optarg, 1);
 			break;
+		case 'n':
+			setenv("GLC_LOCK_FPS", "1", 1);
+			break;
 		case 'p':
 			setenv("GLC_TRY_PBO", "0", 1);
 			break;
@@ -102,7 +105,7 @@ int main(int argc, char *argv[])
 		case 'm':
 			setenv("GLC_CAPTURE_DWORD_ALIGNED", "0", 1);
 			break;
-		case 'n':
+		case 'i':
 			setenv("GLC_INDICATOR", "1", 1);
 			break;
 		case 'w':
@@ -184,12 +187,13 @@ usage:
 	       "                               default value is '420jpeg'\n"
 	       "  -k, --hotkey=HOTKEY        capture hotkey, <Ctrl> and <Shift> modifiers are\n"
 	       "                               supported, default hotkey is '<Shift>F8'\n"
+	       "  -n, --lock-fps             lock fps when capturing\n"
 	       "  -p, --no-pbo               don't try GL_ARB_pixel_buffer_object\n"
 	       "  -z, --compression=METHOD   compress stream using METHOD\n"
 	       "                               'none', 'quicklz' and 'lzo' are supported\n"
 	       "                               'quicklz' is used by default\n"
 	       "  -m, --byte-aligned         use GL_PACK_ALIGNMENT 1 instead of 8\n"
-	       "  -n, --draw-indicator       draw indicator when capturing\n"
+	       "  -i, --draw-indicator       draw indicator when capturing\n"
 	       "                               indicator does not work with -b 'front'\n"
 	       "  -w, --no-audio-skip        always capture audio data\n"
 	       "  -a, --disable-audio        don't capture audio\n"
