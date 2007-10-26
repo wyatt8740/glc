@@ -555,6 +555,9 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 	}
 
 finish:
+	if (ret != 0)
+		fprintf(stderr, "gl_capture: %s (%d)\n", strerror(ret), ret);
+
 	if (gl_capture->glc->flags & GLC_DRAW_INDICATOR)
 		glCallList(ctx->indicator_list);
 

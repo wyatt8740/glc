@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
 			setenv("GLC_UNCOMPRESSED_BUFFER_SIZE", optarg, 1);
 			break;
 		case 'd':
-			setenv("GLC_UNSCALED", optarg, 1);
+			setenv("GLC_UNSCALED_BUFFER_SIZE", optarg, 1);
 			break;
 		case 'h':
 		default:

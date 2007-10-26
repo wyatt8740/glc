@@ -261,8 +261,8 @@ int load_environ()
 	else
 		mpriv.sighandler = 0;
 
-	if (getenv("GLC_COMPRESSED_BUFFER_SIZE"))
-		mpriv.uncompressed_size = atoi(getenv("GLC_COMPRESSED_BUFFER_SIZE")) * 1024 * 1024;
+	if (getenv("GLC_UNCOMPRESSED_BUFFER_SIZE"))
+		mpriv.uncompressed_size = atoi(getenv("GLC_UNCOMPRESSED_BUFFER_SIZE")) * 1024 * 1024;
 	else
 		mpriv.uncompressed_size = 1024 * 1024 * 10;
 
