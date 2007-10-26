@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
 	glc->flags = 0;
 	glc->fps = 0;
 	glc->filename_format = NULL;
-	glc->silence_threshold = 2000000;
+	glc->silence_threshold = 200000;
 	glc->compressed_size = 10 * 1024 * 1024;
 	glc->uncompressed_size = 10 * 1024 * 1024;
 
