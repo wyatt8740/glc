@@ -20,10 +20,10 @@ export GLC_AUDIO=1
 export GLC_SIGHANDLER=0
 
 # captured pictures and audio buffer size, in MiB
-export GLC_UNCOMPRESSED_BUFFER_SIZE=10
+export GLC_UNCOMPRESSED_BUFFER_SIZE=25
 
 # unscaled pictures buffer size, in MiB
-export GLC_UNSCALED_BUFFER_SIZE=10
+export GLC_UNSCALED_BUFFER_SIZE=25
 
 # compressed data buffer size, in MiB
 export GLC_COMPRESSED_BUFFER_SIZE=50
@@ -32,13 +32,10 @@ export GLC_COMPRESSED_BUFFER_SIZE=50
 export GLC_CAPTURE_GLFINISH=0
 
 # take picture from front or back buffer
-export GLC_CAPTURE=back
+export GLC_CAPTURE=front
 
 # compress stream using 'lzo', 'quicklz' or 'none'
 export GLC_COMPRESS=quicklz
-
-# capture as BGRA, do sw conversion to BGR
-export GLC_CAPTURE_BGRA=0
 
 # try GL_ARB_pixel_buffer_object to speed up readback
 export GLC_TRY_PBO=1
@@ -48,7 +45,8 @@ export GLC_TRY_PBO=1
 export GLC_AUDIO_SKIP=1
 
 # show indicator when capturing
-export GLC_INDICATOR=1
+# NOTE this doesn't work properly when capturing front buffer
+export GLC_INDICATOR=0
 
 # start capturing immediately
 export GLC_START=0
