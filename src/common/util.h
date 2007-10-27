@@ -14,6 +14,7 @@
 #define _UTIL_H
 
 #include <packetstream.h>
+#include <stdarg.h>
 #include "glc.h"
 
 /**
@@ -31,6 +32,10 @@ int glc_destroy(glc_t *glc);
 
 int util_init(glc_t *glc);
 int util_free(glc_t *glc);
+
+int util_log_init(glc_t *glc);
+void util_log(glc_t *glc, int level, const char *module, const char *format, ...);
+int util_log_close(glc_t *glc);
 
 glc_utime_t util_timestamp(glc_t *glc);
 int util_timediff(glc_t *glc, glc_stime_t diff);

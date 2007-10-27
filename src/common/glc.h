@@ -100,35 +100,37 @@ typedef u_int64_t glc_size_t;
 typedef u_int32_t glc_flags_t;
 
 /** glc is capturing */
-#define GLC_CAPTURE                       1
+#define GLC_CAPTURE                     0x1
 /** glc is cancelled */
-#define GLC_CANCEL                        2
+#define GLC_CANCEL                      0x2
 /** scaling (ycbcr or scale) is active */
-#define GLC_SCALE                         4
+#define GLC_SCALE                       0x4
 /** capture from GL_BACK */
-#define GLC_CAPTURE_BACK                  8
+#define GLC_CAPTURE_BACK                0x8
 /** capture from GL_FRONT */
-#define GLC_CAPTURE_FRONT                16
+#define GLC_CAPTURE_FRONT              0x10
 /** draw indicator when capturing */
-#define GLC_DRAW_INDICATOR               32
+#define GLC_DRAW_INDICATOR             0x20
 /** allow skipping audio capture if not ready */
-#define GLC_AUDIO_ALLOW_SKIP             64
+#define GLC_AUDIO_ALLOW_SKIP           0x40
 /** capture as BGRA frames, convert to BGR/Y'CbCr */
-#define GLC_CAPTURE_BGRA                128
+#define GLC_CAPTURE_BGRA               0x80
 /** try GL_ARB_pixel_buffer_object */
-#define GLC_TRY_PBO                     256
+#define GLC_TRY_PBO                   0x100
 /** do colorspace conversion to Y'CbCr 420jpeg */
-#define GLC_CONVERT_420JPEG             512
+#define GLC_CONVERT_420JPEG           0x200
 /** crop pictures */
-#define GLC_CROP                       1024
+#define GLC_CROP                      0x400
 /** use GL_PACK_ALIGNMENT 8 for readback */
-#define GLC_CAPTURE_DWORD_ALIGNED      2048
+#define GLC_CAPTURE_DWORD_ALIGNED     0x800
 /** compress stream with LZO */
-#define GLC_COMPRESS_LZO               4096
+#define GLC_COMPRESS_LZO             0x1000
 /** compress stream with QuickLZ */
-#define GLC_COMPRESS_QUICKLZ           8192
+#define GLC_COMPRESS_QUICKLZ         0x2000
 /** cap fps */
-#define GLC_LOCK_FPS                  16384
+#define GLC_LOCK_FPS                 0x4000
+/** enable log */
+#define GLC_LOG                      0x8000
 
 /**
  * \brief stream info structure
@@ -168,8 +170,12 @@ typedef struct {
 	glc_flags_t flags;
 	/** signals */
 	sem_t signal[GLC_SIGNALS];
-	/** stream file path */
+	/** stream file */
 	char *stream_file;
+	/** log file */
+	char *log_file;
+	/** log verbosity */
+	int log_level;
 	/** fps */
 	double fps;
 	/** scale for rescaling */
@@ -210,6 +216,17 @@ typedef struct {
 	/** compressed data buffer size */
 	size_t compressed_size;
 } glc_t;
+
+/** error */
+#define GLC_ERROR                         0
+/** warning */
+#define GLC_WARNING                       1
+/** performance information */
+#define GLC_PERFORMANCE                   2
+/** information */
+#define GLC_INFORMATION                   3
+/** debug */
+#define GLC_DEBUG                         4
 
 /** stream message type */
 typedef char glc_message_type_t;

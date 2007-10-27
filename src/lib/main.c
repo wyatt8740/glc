@@ -82,6 +82,11 @@ void init_glc()
 	load_environ();
 	util_init(mpriv.glc);
 
+	if (mpriv.glc->flags & GLC_LOG) {
+		if (util_log_init(mpriv.glc))
+			mpriv.glc->flags &= ~GLC_LOG;
+	}
+
 	if ((ret = init_buffers()))
 		goto err;
 
@@ -230,6 +235,9 @@ void lib_close()
 	ps_buffer_destroy(mpriv.uncompressed);
 	free(mpriv.uncompressed);
 
+	if (mpriv.glc->flags & GLC_LOG)
+		util_log_close(mpriv.glc);
+
 	util_free_info(mpriv.glc);
 	util_free(mpriv.glc);
 
@@ -255,6 +263,18 @@ int load_environ()
 		snprintf(mpriv.glc->stream_file, 1023, getenv("GLC_FILE"), getpid());
 	else
 		snprintf(mpriv.glc->stream_file, 1023, "pid-%d.glc", getpid());
+
+	mpriv.glc->log_file = malloc(1024);
+	if (getenv("GLC_LOG_FILE"))
+		snprintf(mpriv.glc->log_file, 1023, getenv("GLC_LOG_FILE"), getpid());
+	else
+		snprintf(mpriv.glc->log_file, 1023, "pid-%d.log", getpid());
+
+	if (getenv("GLC_LOG")) {
+		mpriv.glc->log_level = atoi(getenv("GLC_LOG"));
+		if (mpriv.glc->log_level >= 0)
+			mpriv.glc->flags |= GLC_LOG;
+	}
 
 	if (getenv("GLC_SIGHANDLER"))
 		mpriv.sighandler = atoi(getenv("GLC_SIGHANDLER"));

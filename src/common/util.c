@@ -18,6 +18,7 @@
 #include <time.h>
 #include <errno.h>
 #include <packetstream.h>
+#include <pthread.h>
 
 #include "glc.h"
 #include "util.h"
@@ -34,10 +35,14 @@ struct util_private_s {
 	glc_t *glc;
 	struct timeval init_time;
 	glc_stime_t timediff;
+	FILE *log_file;
+	pthread_mutex_t log_mutex;
 };
 
 int util_app_name(char **path, u_int32_t *path_size);
 int util_utc_date(char **date, u_int32_t *date_size);
+
+void util_write_time(glc_t *glc, FILE *stream);
 
 /**
  * \brief create glc_t
@@ -82,12 +87,12 @@ int glc_destroy(glc_t *glc)
  */
 int util_init(glc_t *glc)
 {
-	struct util_private_s *util;
-	
-	util = (struct util_private_s *) malloc(sizeof(struct util_private_s));
+	struct util_private_s *util = malloc(sizeof(struct util_private_s));
 	memset(util, 0, sizeof(struct util_private_s));
+
 	util->glc = glc;
 	gettimeofday(&util->init_time, NULL);
+	pthread_mutex_init(&util->log_mutex, NULL);
 	
 	glc->util = util;
 	return 0;
@@ -101,6 +106,7 @@ int util_init(glc_t *glc)
 int util_free(glc_t *glc)
 {
 	struct util_private_s *util = (struct util_private_s *) glc->util;
+	pthread_mutex_destroy(&util->log_mutex);
 	free(util);
 	return 0;
 }
@@ -142,6 +148,7 @@ glc_utime_t util_timestamp(glc_t *glc)
 int util_timediff(glc_t *glc, glc_stime_t diff)
 {
 	struct util_private_s *util = (struct util_private_s *) glc->util;
+	util_log(glc, GLC_INFORMATION, "util", "applying %ld usec time difference", diff);
 	util->timediff += diff;
 	return 0;
 }
@@ -305,26 +312,110 @@ long int util_cpus()
  */
 int util_write_end_of_stream(glc_t *glc, ps_buffer_t *to)
 {
-	int ret;
+	int ret = 0;
 	ps_packet_t packet;
 	glc_message_header_t header;
 	header.type = GLC_MESSAGE_CLOSE;
 	
 	if ((ret = ps_packet_init(&packet, to)))
-		goto err;
+		goto finish;
 	if ((ret = ps_packet_open(&packet, PS_PACKET_WRITE)))
-		goto err;
+		goto finish;
 	if ((ret = ps_packet_write(&packet, &header, GLC_MESSAGE_HEADER_SIZE)))
-		goto err;
+		goto finish;
 	if ((ret = ps_packet_close(&packet)))
-		goto err;
+		goto finish;
 	if ((ret = ps_packet_destroy(&packet)))
-		goto err;
+		goto finish;
+
+finish:
+	return ret;
+}
+
+/**
+ * \brief initialize log
+ * \param glc glc
+ * \return 0 on success otherwise an error code
+ */
+int util_log_init(glc_t *glc)
+{
+	struct util_private_s *util = glc->util;
+
+	if (!(util->log_file = fopen(glc->log_file, "w")))
+		return errno;
+
+	util_log(glc, GLC_INFORMATION, "util", "opened %s for log", glc->log_file);
+	return 0;
+}
+
+/**
+ * \brief write message to log
+ *
+ * Message is actually written to log if level is
+ * lesser than, or equal to current log verbosity level and
+ * logging is enabled.
+ *
+ * Errors are always written to stderr also.
+ * \param glc glc
+ * \param level message level
+ * \param format passed to fprintf()
+ * \param ... passed to fprintf()
+ */
+void util_log(glc_t *glc, int level, const char *module, const char *format, ...)
+{
+	struct util_private_s *util = glc->util;
+	va_list ap;
+
+	if (((!(glc->flags & GLC_LOG)) && (level > GLC_ERROR)) |
+	    (level > glc->log_level))
+		return;
+
+	va_start(ap, format);
+
+	if (level <= GLC_ERROR) {
+		util_write_time(glc, stderr);
+		fprintf(stderr, " (glc:%s) ", module);
+		vfprintf(stderr, format, ap);
+		fputc('\n', util->log_file);
+	}
+
+	if (!(glc->flags & GLC_LOG))
+		return;
+
+	/* this is highly threaded application and we want
+	   non-corrupted logs */
+	pthread_mutex_lock(&util->log_mutex);
+
+	util_write_time(glc, util->log_file);
+	fprintf(util->log_file, " (%s) ", module);
+	vfprintf(util->log_file, format, ap);
+	fputc('\n', util->log_file);
+
+	pthread_mutex_unlock(&util->log_mutex);
+}
+
+/**
+ * \brief close log
+ * \param glc glc
+ * \return 0 on success otherwise an error code
+ */
+int util_log_close(glc_t *glc)
+{
+	struct util_private_s *util = glc->util;
+
+	if (!(glc->flags & GLC_LOG))
+		return EINVAL;
+
+	util_log(glc, GLC_INFORMATION, "util", "log closed");
+	if (fclose(util->log_file))
+		return errno;
 
 	return 0;
-err:
-	/*fprintf(stderr, "glc: can't write end of stream: %s (%d)\n", strerror(ret), ret);*/
-	return ret;
+}
+
+void util_write_time(glc_t *glc, FILE *stream)
+{
+	fprintf(stream, "[%7.2fs]", (double) util_timestamp(glc) / 1000000.0);
 }
 
 /**  \} */

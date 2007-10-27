@@ -50,11 +50,13 @@ int main(int argc, char *argv[])
 		{"compression",		1, NULL, 'z'},
 		{"byte-aligned",	0, NULL, 'm'},
 		{"draw-indicator",	0, NULL, 'i'},
+		{"log",			1, NULL, 'v'},
+		{"log-file",		1, NULL, 'l'},
 		{"no-audio-skip",	0, NULL, 'w'},
 		{"disable-audio",	0, NULL, 'a'},
 		{"sighandler",		0, NULL, 'q'},
 		{"glfinish",		0, NULL, 'g'},
-		{"force-sdl-alsa-drv",	1, NULL, 'v'},
+		{"force-sdl-alsa-drv",	1, NULL, 'j'},
 		{"capture",		1, NULL, 'b'},
 		{"compressed",		1, NULL, 'c'},
 		{"uncompressed",	1, NULL, 'u'},
@@ -70,7 +72,7 @@ int main(int argc, char *argv[])
 	   is encountered. */
 	setenv("POSIXLY_CORRECT", "1", 1);
 
-	while ((opt = getopt_long(argc, argv, "o:f:r:y:se:k:npz:miwaqgvb:c:u:d:h", long_options, &option_index)) != -1) {
+	while ((opt = getopt_long(argc, argv, "o:f:r:y:se:k:npz:miv:l:waqgjb:c:u:d:h", long_options, &option_index)) != -1) {
 		switch(opt) {
 		case 'o':
 			setenv("GLC_FILE", optarg, 1);
@@ -108,6 +110,12 @@ int main(int argc, char *argv[])
 		case 'i':
 			setenv("GLC_INDICATOR", "1", 1);
 			break;
+		case 'v':
+			setenv("GLC_LOG", optarg, 1);
+			break;
+		case 'l':
+			setenv("GLC_LOG_FILE", optarg, 1);
+			break;
 		case 'w':
 			setenv("GLC_AUDIO_SKIP", "0", 1);
 			break;
@@ -120,7 +128,7 @@ int main(int argc, char *argv[])
 		case 'g':
 			setenv("GLC_CAPTURE_GLFINISH", "1", 1);
 			break;
-		case 'v':
+		case 'j':
 			setenv("SDL_AUDIODRIVER", "alsa", 1);
 			break;
 		case 'b':
@@ -195,11 +203,18 @@ usage:
 	       "  -m, --byte-aligned         use GL_PACK_ALIGNMENT 1 instead of 8\n"
 	       "  -i, --draw-indicator       draw indicator when capturing\n"
 	       "                               indicator does not work with -b 'front'\n"
+	       "  -v, --log=LEVEL            log >=LEVEL messages\n"
+	       "                               0: errors\n"
+	       "                               1: warnings\n"
+	       "                               2: performance information\n"
+	       "                               3: information\n"
+	       "                               4: debug\n"
+	       "  -l, --log-file=FILE        write log to FILE, pid-%%d.log by default\n"
 	       "  -w, --no-audio-skip        always capture audio data\n"
 	       "  -a, --disable-audio        don't capture audio\n"
 	       "  -q, --sighandler           use custom signal handler\n"
 	       "  -g, --glfinish             capture at glFinish()\n"
-	       "  -v, --force-sdl-alsa-drv   force SDL to use ALSA audio driver\n"
+	       "  -j, --force-sdl-alsa-drv   force SDL to use ALSA audio driver\n"
 	       "  -b, --capture=BUFFER       capture 'front' or 'back' buffer\n"
 	       "                               default is 'front'\n"
 	       "  -c, --compressed=SIZE      compressed stream buffer size in MiB\n"
