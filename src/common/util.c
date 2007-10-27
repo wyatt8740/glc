@@ -372,7 +372,8 @@ void util_log(glc_t *glc, int level, const char *module, const char *format, ...
 
 	va_start(ap, format);
 
-	if (level <= GLC_ERROR) {
+	if ((level <= GLC_ERROR) &&
+	    (!(glc->flags & GLC_NOERR))) {
 		util_write_time(glc, stderr);
 		fprintf(stderr, " (glc:%s) ", module);
 		vfprintf(stderr, format, ap);

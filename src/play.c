@@ -55,6 +55,7 @@ int main(int argc, char *argv[])
 		{"compressed",		1, NULL, 'c'},
 		{"uncompressed",	1, NULL, 'u'},
 		{"show",		1, NULL, 's'},
+		{"verbosity",		1, NULL, 'v'},
 		{"statistics",		0, NULL, 't'},
 		{"help",		0, NULL, 'h'},
 		{0, 0, 0, 0}
@@ -75,8 +76,9 @@ int main(int argc, char *argv[])
 	glc->compressed_size = 10 * 1024 * 1024;
 	glc->uncompressed_size = 10 * 1024 * 1024;
 	glc->log_file = "/dev/stderr";
+	glc->log_level = 0;
 
-	while ((opt = getopt_long(argc, argv, "i:a:p:y:o:f:l:c:u:s:th",
+	while ((opt = getopt_long(argc, argv, "i:a:p:y:o:f:l:c:u:s:v:th",
 				  long_options, &optind)) != -1) {
 		switch (opt) {
 		case 'i':
@@ -117,7 +119,7 @@ int main(int argc, char *argv[])
 			glc->silence_threshold = atof(optarg) * 1000000;
 			break;
 		case 'o':
-			if (!strcmp(optarg, "-"))
+			if (!strcmp(optarg, "-")) /* TODO fopen(1) */
 				glc->filename_format = "/dev/stdout";
 			else
 				glc->filename_format = optarg;
@@ -135,6 +137,12 @@ int main(int argc, char *argv[])
 		case 's':
 			summary_val = optarg;
 			break;
+		case 'v':
+			glc->log_level = atoi(optarg);
+			if (glc->log_level < 0)
+				goto usage;
+			glc->flags |= GLC_LOG | GLC_NOERR;
+			break;
 		case 't':
 			show_stats = 1;
 			break;
@@ -147,6 +155,10 @@ int main(int argc, char *argv[])
 	if (optind >= argc)
 		goto usage;
 	glc->stream_file = argv[optind];
+
+	util_init(glc);
+	if (glc->flags & GLC_LOG)
+		util_log_init(glc);
 
 	if ((img | wav | yuv4mpeg) && (glc->filename_format == NULL))
 		goto usage;
@@ -181,8 +193,6 @@ int main(int argc, char *argv[])
 	ps_buffer_init(compressed, &attr);
 
 	ps_bufferattr_destroy(&attr);
-
-	util_init(glc);
 
 	if (img) {
 		rgb_init(glc, uncompressed, rgb);
@@ -269,6 +279,7 @@ usage:
 	       "  -u, --uncompressed=SIZE  uncompressed stream buffer size in MiB, default is 10\n"
 	       "  -s, --show=VAL           show stream summary value, possible values are:\n"
 	       "                             signature, version, flags, fps, pid, name, date\n"
+	       "  -v, --verbosity=LEVEL    verbosity level\n"
 	       "  -t, --statistics         show stream statistics\n"
 	       "  -h, --help               show help\n");
 

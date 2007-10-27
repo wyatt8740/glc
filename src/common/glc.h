@@ -131,6 +131,8 @@ typedef u_int32_t glc_flags_t;
 #define GLC_LOCK_FPS                 0x4000
 /** enable log */
 #define GLC_LOG                      0x8000
+/** disable writing errors to stderr */
+#define GLC_NOERR                   0x10000
 
 /**
  * \brief stream info structure
