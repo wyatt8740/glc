@@ -425,11 +425,11 @@ void util_log_info(glc_t *glc)
 		return;
 
 	util_write_time(glc, util->log_file);
-	fprintf(util->log_file, " (glc:util) system information\n");
+	fprintf(util->log_file, " (util) system information\n");
 	fprintf(util->log_file, "  processors  = %ld\n", util_cpus());
 
 	util_write_time(glc, util->log_file);
-	fprintf(util->log_file, " (glc:util) stream information\n");
+	fprintf(util->log_file, " (util) stream information\n");
 	fprintf(util->log_file, "  signature   = 0x%08x\n", glc->info->signature);
 	fprintf(util->log_file, "  version     = 0x%02x\n", glc->info->version);
 	fprintf(util->log_file, "  flags       = %d\n", glc->info->flags);

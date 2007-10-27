@@ -18,6 +18,7 @@
 
 #include "../common/glc.h"
 #include "../common/thread.h"
+#include "../common/util.h"
 #include "img.h"
 
 /**
