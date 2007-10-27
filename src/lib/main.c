@@ -296,29 +296,29 @@ int load_environ()
 
 void get_real_dlsym()
 {
-	eh_obj_t *libdl;
+	eh_obj_t libdl;
 
-	if (eh_find_obj("*libdl.so*", &libdl)) {
+	if (eh_init_obj(&libdl, "*libdl.so*")) {
 		fprintf(stderr, "glc: libdl.so is not present in memory\n");
 		exit(1);
 	}
 
-	if (eh_find_sym(libdl, "dlopen", (void *) &lib.dlopen)) {
+	if (eh_find_sym(&libdl, "dlopen", (void *) &lib.dlopen)) {
 		fprintf(stderr, "glc: can't get real dlopen()\n");
 		exit(1);
 	}
 
-	if (eh_find_sym(libdl, "dlsym", (void *) &lib.dlsym)) {
+	if (eh_find_sym(&libdl, "dlsym", (void *) &lib.dlsym)) {
 		fprintf(stderr, "glc: can't get real dlsym()\n");
 		exit(1);
 	}
 
-	if (eh_find_sym(libdl, "dlvsym", (void *) &lib.dlvsym)) {
+	if (eh_find_sym(&libdl, "dlvsym", (void *) &lib.dlvsym)) {
 		fprintf(stderr, "glc: can't get real dlvsym()\n");
 		exit(1);
 	}
 
-	eh_free_obj(libdl);
+	eh_destroy_obj(&libdl);
 }
 
 void *wrapped_func(const char *symbol)
