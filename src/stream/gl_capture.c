@@ -71,7 +71,6 @@ struct gl_capture_ctx_s {
 
 	GLuint pbo;
 	int pbo_active;
-	int use_pbo;
 };
 
 struct gl_capture_private_s {
@@ -86,6 +85,7 @@ struct gl_capture_private_s {
 	ps_buffer_t *to;
 
 	int init_pbo;
+	int use_pbo;
 	pthread_mutex_t init_pbo_mutex;
 
 	unsigned int bpp;
@@ -475,7 +475,7 @@ int gl_capture_update_ctx(struct gl_capture_private_s *gl_capture,
 	if (gl_capture->init_pbo) {
 		pthread_mutex_lock(&gl_capture->init_pbo_mutex);
 		if (!gl_capture_init_pbo(gl_capture))
-			ctx->use_pbo = 1;
+			gl_capture->use_pbo = 1;
 		gl_capture->init_pbo = 0;
 		pthread_mutex_unlock(&gl_capture->init_pbo_mutex);
 	}
@@ -511,12 +511,12 @@ int gl_capture_update_ctx(struct gl_capture_private_s *gl_capture,
 		ps_packet_write(&ctx->packet, &ctx_msg, GLC_CTX_MESSAGE_SIZE);
 		ps_packet_close(&ctx->packet);
 
-		if (ctx->use_pbo) {
+		if (gl_capture->use_pbo) {
 			if (ctx->pbo)
 				gl_capture_destroy_pbo(gl_capture, ctx);
 
 			if (gl_capture_create_pbo(gl_capture, ctx))
-				ctx->use_pbo = 0;
+				gl_capture->use_pbo = 0;
 		}
 	}
 
@@ -549,7 +549,7 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 	pic.ctx = ctx->ctx_i;
 
 	now = util_timestamp(gl_capture->glc);
-	if (ctx->use_pbo)
+	if (gl_capture->use_pbo)
 		pic.timestamp = ctx->pbo_timestamp;
 	else
 		pic.timestamp = now;
@@ -561,7 +561,7 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 	/* not really needed until now */
 	gl_capture_update_ctx(gl_capture, ctx);
 
-	if ((ctx->use_pbo) && (!ctx->pbo_active)) {
+	if ((gl_capture->use_pbo) && (!ctx->pbo_active)) {
 		ret = gl_capture_start_pbo(gl_capture, ctx);
 		ctx->pbo_timestamp = util_timestamp(gl_capture->glc);
 		goto finish;
@@ -576,7 +576,7 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 	if ((ret = ps_packet_write(&ctx->packet, &pic, GLC_PICTURE_HEADER_SIZE)))
 		goto cancel;
 
-	if (ctx->use_pbo) {
+	if (gl_capture->use_pbo) {
 		/* is this safe, what happens if this is called simultaneously? */
 		if ((ret = ps_packet_setsize(&ctx->packet, ctx->row * ctx->ch
 								+ GLC_MESSAGE_HEADER_SIZE
