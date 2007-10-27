@@ -24,8 +24,10 @@
  */
 
 void *gl_capture_init(glc_t *glc, ps_buffer_t *to);
-int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable);
 void gl_capture_close(void *glpriv);
+
+int gl_capture_frame(void *glpriv, Display *dpy, GLXDrawable drawable);
+int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable);
 
 /**  \} */
 
