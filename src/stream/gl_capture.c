@@ -140,16 +140,25 @@ void *gl_capture_init(glc_t *glc, ps_buffer_t *to)
 
 	if (gl_capture->glc->flags & GLC_CAPTURE_BGRA) {
 		gl_capture->format = GL_BGRA;
+		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+			 "reading frames in GL_BGRA format");
 		gl_capture->bpp = 4;
 	} else {
 		gl_capture->format = GL_BGR;
+		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+			 "reading frames in GL_BGR format");
 		gl_capture->bpp = 3;
 	}
 	
-	if (gl_capture->glc->flags & GLC_CAPTURE_FRONT)
+	if (gl_capture->glc->flags & GLC_CAPTURE_FRONT) {
 		gl_capture->capture_buffer = GL_FRONT;
-	else
+		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+			 "reading frames from GL_FRONT");
+	} else {
 		gl_capture->capture_buffer = GL_BACK;
+		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+			 "reading frames from GL_BACK");
+	}
 
 	pthread_mutex_init(&gl_capture->init_pbo_mutex, NULL);
 	pthread_rwlock_init(&gl_capture->ctxlist_lock, NULL);
@@ -243,6 +252,8 @@ int gl_capture_calc_geometry(struct gl_capture_private_s *gl_capture, struct gl_
 
 int gl_capture_get_pixels(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx, char *to)
 {
+	util_log(gl_capture->glc, GLC_DEBUG, "gl_capture", "reading pixels");
+
 	glPushAttrib(GL_PIXEL_MODE_BIT);
 	glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);
 
@@ -344,6 +355,8 @@ int gl_capture_init_pbo(struct gl_capture_private_s *gl_capture)
 
 int gl_capture_create_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
 {
+	util_log(gl_capture->glc, GLC_DEBUG, "gl_capture", "creating PBO");
+
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 
 	gl_capture->glGenBuffers(1, &ctx->pbo);
@@ -357,6 +370,8 @@ int gl_capture_create_pbo(struct gl_capture_private_s *gl_capture, struct gl_cap
 
 int gl_capture_destroy_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
 {
+	util_log(gl_capture->glc, GLC_DEBUG, "gl_capture", "destroying PBO");
+
 	gl_capture->glDeleteBuffers(1, &ctx->pbo);
 	return 0;
 }
@@ -364,6 +379,8 @@ int gl_capture_destroy_pbo(struct gl_capture_private_s *gl_capture, struct gl_ca
 int gl_capture_start_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
 {
 	GLint binding;
+	util_log(gl_capture->glc, GLC_DEBUG, "gl_capture", "starting PBO transfer");
+
 	if (ctx->pbo_active)
 		return EAGAIN;
 
@@ -390,6 +407,7 @@ int gl_capture_read_pbo(struct gl_capture_private_s *gl_capture, struct gl_captu
 {
 	GLvoid *buf;
 	GLint binding;
+	util_log(gl_capture->glc, GLC_DEBUG, "gl_capture", "reading PBO");
 	
 	if (!ctx->pbo_active)
 		return EAGAIN;
@@ -497,7 +515,7 @@ int gl_capture_update_ctx(struct gl_capture_private_s *gl_capture,
 			if (ctx->pbo)
 				gl_capture_destroy_pbo(gl_capture, ctx);
 
-			if (!gl_capture_create_pbo(gl_capture, ctx))
+			if (gl_capture_create_pbo(gl_capture, ctx))
 				ctx->use_pbo = 0;
 		}
 	}
