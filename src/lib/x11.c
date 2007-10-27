@@ -10,7 +10,6 @@
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-#include <stdio.h>
 #include <dlfcn.h>
 #include <string.h>
 #include <unistd.h>
@@ -71,7 +70,10 @@ int x11_init(glc_t *glc)
 
 	if (getenv("GLC_HOTKEY")) {
 		if (x11_parse_hotkey(getenv("GLC_HOTKEY"))) {
-			fprintf(stderr, "x11: invalid hotkey %s\n     using default <Shift>F8\n", getenv("GLC_HOTKEY"));
+			util_log(x11.glc, GLC_WARNING, "x11",
+				 "invalid hotkey '%s'", getenv("GLC_HOTKEY"));
+			util_log(x11.glc, GLC_WARNING, "x11",
+				 "using default <Shift>F8\n");
 			x11.key_mask = X11_KEY_SHIFT;
 			x11.capture = XK_F8;
 		}
@@ -115,8 +117,6 @@ int x11_parse_hotkey(const char *hotkey)
 
 int x11_close()
 {
-	/*if (x11.libX11_handle)
-		dlclose(x11.libX11_handle);*/
 	return 0;
 }
 
@@ -140,15 +140,20 @@ void x11_event(Display *dpy, XEvent *event)
 			if (x11.glc->flags & GLC_CAPTURE) { /* stop */
 				x11.glc->flags &= ~GLC_CAPTURE;
 				x11.stop = util_timestamp(x11.glc);
+				util_log(x11.glc, GLC_INFORMATION, "x11", "stopped capturing");
 			} else { /* start */
 				if (!lib.running) {
 					if ((ret = start_glc())) {
-						fprintf(stderr, "glc: can't start capturing: %s (%d)\n", strerror(ret), ret);
+						util_log(x11.glc, GLC_ERROR, "x11",
+							 "can't start capturing: %s (%d)",
+							 strerror(ret), ret);
 						return; /* don't set GLC_CAPTURE flag */
 					}
 				}
+
 				util_timediff(x11.glc, util_timestamp(x11.glc) - x11.stop);
 				x11.glc->flags |= GLC_CAPTURE;
+				util_log(x11.glc, GLC_INFORMATION, "x11", "started capturing");
 
 			}
 			x11.last_event_time = event->xkey.time;
@@ -223,7 +228,7 @@ void get_real_x11()
 
 	return;
 err:
-	fprintf(stderr, "can't get real X11\n");
+	fprintf(stderr, "(glc:x11) can't get real X11\n");
 	exit(1);
 }
 

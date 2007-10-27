@@ -131,7 +131,7 @@ void ycbcr_finish_callback(void *ptr, int err)
 	struct ycbcr_ctx_s *del;
 
 	if (err)
-		fprintf(stderr, "ycbcr failed: %s (%d)\n", strerror(err), err);
+		util_log(ycbcr->glc, GLC_ERROR, "ycbcr", "%s (%d)", strerror(err), err);
 
 	while (ycbcr->ctx != NULL) {
 		del = ycbcr->ctx;
@@ -460,6 +460,7 @@ int ycbcr_generate_map(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx)
 	r = 0;
 	do {
 		d = (float) (ctx->w - r++) / (float) ctx->yw;
+		util_log(ycbcr->glc, GLC_DEBUG, "ycbcr", "Y: d = %f", d);
 	} while ((d * (float) (ctx->yh - 1) + 1.0 > ctx->h) |
 		 (d * (float) (ctx->yw - 1) + 1.0 > ctx->w));
 
@@ -499,6 +500,7 @@ int ycbcr_generate_map(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx)
 	r = (r < 2) ? (0) : (r - 2);
 	do {
 		d = (float) (ctx->w - r++) / (float) ctx->cw;
+		util_log(ycbcr->glc, GLC_DEBUG, "ycbcr", "C: d = %f", d);
 	} while ((d * (float) (ctx->ch - 1) + 1.0 > ctx->h) |
 		 (d * (float) (ctx->cw - 1) + 1.0 > ctx->w));
 

@@ -413,6 +413,32 @@ int util_log_close(glc_t *glc)
 	return 0;
 }
 
+/**
+ * \brief write stream and system information to log
+ * \param glc glc
+ */
+void util_log_info(glc_t *glc)
+{
+	struct util_private_s *util = glc->util;
+
+	if ((!(glc->flags & GLC_LOG)) | (glc->log_level < GLC_INFORMATION))
+		return;
+
+	util_write_time(glc, util->log_file);
+	fprintf(util->log_file, " (glc:util) system information\n");
+	fprintf(util->log_file, "  processors  = %ld\n", util_cpus());
+
+	util_write_time(glc, util->log_file);
+	fprintf(util->log_file, " (glc:util) stream information\n");
+	fprintf(util->log_file, "  signature   = 0x%08x\n", glc->info->signature);
+	fprintf(util->log_file, "  version     = 0x%02x\n", glc->info->version);
+	fprintf(util->log_file, "  flags       = %d\n", glc->info->flags);
+	fprintf(util->log_file, "  fps         = %f\n", glc->info->fps);
+	fprintf(util->log_file, "  pid         = %d\n", glc->info->pid);
+	fprintf(util->log_file, "  name        = %s\n", glc->info_name);
+	fprintf(util->log_file, "  date        = %s\n", glc->info_date);
+}
+
 void util_write_time(glc_t *glc, FILE *stream)
 {
 	fprintf(stream, "[%7.2fs]", (double) util_timestamp(glc) / 1000000.0);

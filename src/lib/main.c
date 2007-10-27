@@ -10,7 +10,6 @@
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <dlfcn.h>
 #include <string.h>
@@ -112,6 +111,9 @@ void init_glc()
 
 	/* TODO hook sigaction() ? */
 	if (mpriv.sighandler) {
+		util_log(mpriv.glc, GLC_INFORMATION, "main",
+			 "setting signal handler");
+
 		new_sighandler.sa_handler = signal_handler;
 		sigemptyset(&new_sighandler.sa_mask);
 		new_sighandler.sa_flags = 0;
@@ -128,6 +130,9 @@ void init_glc()
 
 	if ((ret = pthread_mutex_unlock(&lib.init_lock)))
 		goto err;
+
+	util_log_info(mpriv.glc);
+	util_log(mpriv.glc, GLC_INFORMATION, "main", "glc initialized");
 	return;
 err:
 	fprintf(stderr, "glc: %s (%d)\n", strerror(ret), ret);
@@ -159,6 +164,9 @@ int init_buffers()
 int start_glc()
 {
 	int ret;
+
+	util_log(mpriv.glc, GLC_INFORMATION, "main", "starting glc");
+
 	if (lib.running)
 		return EINVAL;
 
@@ -179,6 +187,8 @@ int start_glc()
 		return ret;
 
 	lib.running = 1;
+	util_log(mpriv.glc, GLC_INFORMATION, "main", "glc running");
+
 	return 0;
 }
 
@@ -207,7 +217,7 @@ void signal_handler(int signum)
 	         (mpriv.sigterm_handler != NULL))
 		mpriv.sigterm_handler(signum);
 
-	printf("glc: got C-c, will now exit...");
+	fprintf(stderr, "(glc:main) got C-c, will now exit...");
 	exit(0); /* may cause lots of damage... */
 }
 
@@ -319,22 +329,22 @@ void get_real_dlsym()
 	eh_obj_t libdl;
 
 	if (eh_init_obj(&libdl, "*libdl.so*")) {
-		fprintf(stderr, "glc: libdl.so is not present in memory\n");
+		fprintf(stderr, "(glc) libdl.so is not present in memory\n");
 		exit(1);
 	}
 
 	if (eh_find_sym(&libdl, "dlopen", (void *) &lib.dlopen)) {
-		fprintf(stderr, "glc: can't get real dlopen()\n");
+		fprintf(stderr, "(glc) can't get real dlopen()\n");
 		exit(1);
 	}
 
 	if (eh_find_sym(&libdl, "dlsym", (void *) &lib.dlsym)) {
-		fprintf(stderr, "glc: can't get real dlsym()\n");
+		fprintf(stderr, "(glc) can't get real dlsym()\n");
 		exit(1);
 	}
 
 	if (eh_find_sym(&libdl, "dlvsym", (void *) &lib.dlvsym)) {
-		fprintf(stderr, "glc: can't get real dlvsym()\n");
+		fprintf(stderr, "(glc) can't get real dlvsym()\n");
 		exit(1);
 	}
 

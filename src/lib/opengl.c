@@ -10,7 +10,6 @@
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <dlfcn.h>
@@ -71,7 +70,8 @@ int opengl_init(glc_t *glc)
 		if (!strcmp(getenv("GLC_COLORSPACE"), "420jpeg"))
 			opengl.glc->flags |= GLC_CONVERT_420JPEG;
 		else if (strcmp(getenv("GLC_COLORSPACE"), "bgr"))
-			fprintf(stderr, "glc: unknown colorspace '%s'\n", getenv("GLC_COLORSPACE"));
+			util_log(opengl.glc, GLC_WARNING, "opengl",
+				 "unknown colorspace '%s'", getenv("GLC_COLORSPACE"));
 	} else
 		opengl.glc->flags |= GLC_CONVERT_420JPEG;
 
@@ -83,8 +83,11 @@ int opengl_init(glc_t *glc)
 	if (getenv("GLC_CAPTURE")) {
 		if (!strcmp(getenv("GLC_CAPTURE"), "front"))
 			opengl.glc->flags |= GLC_CAPTURE_FRONT;
-		else /* back */
+		else if (!strcmp(getenv("GLC_CAPTURE"), "back"))
 			opengl.glc->flags |= GLC_CAPTURE_BACK;
+		else
+			util_log(opengl.glc, GLC_WARNING, "opengl",
+				 "unknown capture buffer '%s'", getenv("GLC_CAPTURE"));
 	} else
 		opengl.glc->flags |= GLC_CAPTURE_FRONT;
 
@@ -201,8 +204,6 @@ int opengl_close()
 		free(opengl.unscaled);
 	}
 
-	/*if (opengl.libGL_handle)
-		dlclose(opengl.libGL_handle);*/
 	return 0;
 }
 
@@ -230,7 +231,7 @@ void get_real_opengl()
 	if (opengl.glXGetProcAddressARB)
 		return;
 err:
-	fprintf(stderr, "can't get real OpenGL\n");
+	fprintf(stderr, "(glc:opengl) can't get real OpenGL\n");
 	exit(1);
 }
 

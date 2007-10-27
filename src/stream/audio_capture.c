@@ -265,7 +265,8 @@ int audio_capture_alsa_n(void *audiopriv, snd_pcm_t *pcm, void **bufs, snd_pcm_u
 	}
 
 	if (stream->flags & GLC_AUDIO_INTERLEAVED) {
-		fprintf(stderr, "audio: stream format (interleaved) incompatible with snd_pcm_writen()\n");
+		util_log(audio_capture->glc, GLC_ERROR, "audio",
+			 "stream format (interleaved) incompatible with snd_pcm_writen()");
 		return EINVAL;
 	}
 
@@ -314,7 +315,9 @@ int audio_capture_alsa_mmap_commit(void *audiopriv, snd_pcm_t *pcm, snd_pcm_ufra
 		return 0; /* 0 channels :P */
 
 	if (!stream->mmap_areas) {
-		fprintf(stderr, "audio: snd_pcm_mmap_commit() before snd_pcm_mmap_begin()\n");
+		/* this might actually happen */
+		util_log(audio_capture->glc, GLC_WARNING, "audio",
+			 "snd_pcm_mmap_commit() before snd_pcm_mmap_begin()");
 		return EINVAL;
 	}
 	
@@ -394,7 +397,8 @@ int audio_capture_alsa_fmt(struct audio_capture_private_s *audio_capture, struct
 	stream->flags = 0; /* zero flags */
 	stream->flags |= pcm_fmt_to_glc_fmt(format);
 	if (stream->flags & GLC_AUDIO_FORMAT_UNKNOWN) {
-		fprintf(stderr, "audio: unsupported audio format\n");
+		util_log(audio_capture->glc, GLC_ERROR, "audio",
+			 "unsupported audio format 0x%02x", format);
 		return ENOTSUP;
 	}
 	if ((ret = snd_pcm_hw_params_get_rate(params, &stream->rate, &dir)) < 0)
@@ -411,7 +415,8 @@ int audio_capture_alsa_fmt(struct audio_capture_private_s *audio_capture, struct
 		stream->flags |= GLC_AUDIO_INTERLEAVED; /* convert to interleaved */
 		stream->complex = 1; /* do conversion */
 	} else {
-		fprintf(stderr, "audio: unsupported access mode\n");
+		util_log(audio_capture->glc, GLC_ERROR, "audio",
+			 "unsupported access mode 0x%02x", access);
 		return ENOTSUP;
 	}
 
@@ -440,7 +445,8 @@ int audio_capture_alsa_fmt(struct audio_capture_private_s *audio_capture, struct
 err:
 	if (params)
 		snd_pcm_hw_params_free(params);
-	fprintf(stderr, "audio: can't extract hardware configuration: %s (%d)\n", snd_strerror(ret), ret);
+	util_log(audio_capture->glc, GLC_ERROR, "audio",
+		 "can't extract hardware configuration: %s (%d)", snd_strerror(ret), ret);
 	return ret;
 }
 

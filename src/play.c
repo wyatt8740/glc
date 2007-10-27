@@ -10,7 +10,6 @@
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <semaphore.h>
@@ -75,6 +74,7 @@ int main(int argc, char *argv[])
 	glc->silence_threshold = 200000;
 	glc->compressed_size = 10 * 1024 * 1024;
 	glc->uncompressed_size = 10 * 1024 * 1024;
+	glc->log_file = "/dev/stderr";
 
 	while ((opt = getopt_long(argc, argv, "i:a:p:y:o:f:l:c:u:s:th",
 				  long_options, &optind)) != -1) {

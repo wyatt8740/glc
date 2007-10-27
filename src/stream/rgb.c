@@ -144,7 +144,7 @@ void rgb_finish_callback(void *ptr, int err)
 	struct rgb_ctx_s *del;
 
 	if (err)
-		fprintf(stderr, "rgb failed: %s (%d)\n", strerror(err), err);
+		util_log(rgb->glc, GLC_ERROR, "rgb", "%s (%d)", strerror(err), err);
 
 	while (rgb->ctx != NULL) {
 		del = rgb->ctx;
@@ -286,8 +286,10 @@ int rgb_convert(struct rgb_private_s *rgb, struct rgb_ctx_s *ctx,
 int rgb_init_lookup(struct rgb_private_s *rgb)
 {
 	unsigned int Y, Cb, Cr, color;
-	unsigned int lookup_size = (1 << LOOKUP_BITS) * (1 << LOOKUP_BITS) * (1 << LOOKUP_BITS) * 3;
+	size_t lookup_size = (1 << LOOKUP_BITS) * (1 << LOOKUP_BITS) * (1 << LOOKUP_BITS) * 3;
 
+	util_log(rgb->glc, GLC_INFORMATION, "rgb",
+		 "using %d bit lookup table (%zd bytes)", LOOKUP_BITS, lookup_size);
 	rgb->lookup_table = malloc(lookup_size);
 
 	color = 0;

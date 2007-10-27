@@ -12,7 +12,6 @@
 
 
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -21,6 +20,7 @@
 
 #include "glc.h"
 #include "thread.h"
+#include "util.h"
 
 /**
  * \addtogroup thread
@@ -292,7 +292,7 @@ err:
 	if (ret == EINTR)
 		ret = 0;
 	else
-		fprintf(stderr, "glc_thread(): %s (%d)\n", strerror(ret), ret);
+		util_log(private->glc, GLC_ERROR, "glc_thread", "%s (%d)\n", strerror(ret), ret);
 
 	goto finish;
 }

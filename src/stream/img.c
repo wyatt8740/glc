@@ -69,10 +69,10 @@ void img_finish_callback(void *ptr, int err)
 {
 	struct img_private_s *img = (struct img_private_s *) ptr;
 
-	printf("%d images written\n", img->total);
+	util_log(img->glc, GLC_INFORMATION, "img", "%d images written", img->total);
 
 	if (err)
-		fprintf(stderr, "img failed: %s (%d)\n", strerror(err), err);
+		util_log(img->glc, GLC_ERROR, "img", "%s (%d)", strerror(err), err);
 
 	if (img->prev_pic)
 		free(img->prev_pic);
@@ -95,7 +95,8 @@ int img_read_callback(glc_thread_state_t *state)
 			return 0;
 
 		if (!(ctx_msg->flags & GLC_CTX_BGR)) {
-			fprintf(stderr, "ctx %d is in unsupported format\n", ctx_msg->ctx);
+			util_log(img->glc, GLC_ERROR, "img",
+				 "ctx %d is in unsupported format", ctx_msg->ctx);
 			return ENOTSUP;
 		}
 

@@ -10,7 +10,6 @@
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-#include <stdio.h>
 #include <dlfcn.h>
 #include <elfhacks.h>
 #include <alsa/asoundlib.h>
@@ -127,7 +126,7 @@ void get_real_alsa()
 	if (alsa.snd_pcm_mmap_commit)
 		return;
 err:
-	fprintf(stderr, "can't get real alsa\n");
+	fprintf(stderr, "(glc:alsa) can't get real alsa");
 	exit(1);
 }
 

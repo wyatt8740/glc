@@ -97,7 +97,8 @@ int gl_play_init(glc_t *glc, ps_buffer_t *from, glc_ctx_i ctx, sem_t *finished)
 	gl_play->dpy = XOpenDisplay(NULL);
 
 	if (!gl_play->dpy) {
-		fprintf(stderr, "can't open display\n");
+		util_log(gl_play->glc, GLC_ERROR, "gl_play",
+			 "can't open display");
 		return 1;
 	}
 
@@ -355,11 +356,13 @@ int gl_play_read_callback(glc_thread_state_t *state)
 			gl_play_create_ctx(gl_play);
 		else if ((ctx_msg->flags & GLC_CTX_BGR) && (ctx_msg->flags & GLC_CTX_UPDATE)) {
 			if (gl_play_update_ctx(gl_play)) {
-				fprintf(stderr, "broken ctx %d\n", ctx_msg->ctx);
+				util_log(gl_play->glc, GLC_ERROR, "gl_play",
+					 "broken ctx %d", ctx_msg->ctx);
 				return EINVAL;
 			}
 		} else {
-			fprintf(stderr, "ctx %d is in unsupported format\n", ctx_msg->ctx);
+			util_log(gl_play->glc, GLC_ERROR, "gl_play",
+				 "ctx %d is in unsupported format", ctx_msg->ctx);
 			return EINVAL;
 		}
 
@@ -374,7 +377,8 @@ int gl_play_read_callback(glc_thread_state_t *state)
 			return 0;
 
 		if (!gl_play->created) {
-			fprintf(stderr, "picture refers to uninitalized ctx %d\n", pic_hdr->ctx);
+			util_log(gl_play->glc, GLC_ERROR, "gl_play",
+				 "picture refers to uninitalized ctx %d", pic_hdr->ctx);
 			return EINVAL;
 		}
 

@@ -45,6 +45,8 @@ int util_create_info(glc_t *glc);
 int util_init_info(glc_t *glc);
 int util_free_info(glc_t *glc);
 
+void util_log_info(glc_t *glc);
+
 long int util_cpus();
 
 int util_write_end_of_stream(glc_t *glc, ps_buffer_t *to);

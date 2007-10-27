@@ -84,7 +84,7 @@ void scale_finish_callback(void *ptr, int err)
 	struct scale_ctx_s *del;
 
 	if (err)
-		fprintf(stderr, "scale failed: %s (%d)\n", strerror(err), err);
+		util_log(scale->glc, GLC_ERROR, "scale", "%s (%d)", strerror(err), err);
 
 	while (scale->ctx != NULL) {
 		del = scale->ctx;
@@ -306,6 +306,7 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 	r = 0;
 	do {
 		d = (float) (ctx->w - r++) / (float) ctx->sw;
+		util_log(scale->glc, GLC_DEBUG, "scale", "d = %f", d);
 	} while ((d * (float) (ctx->sh - 1) + 1.0 > ctx->h) |
 		 (d * (float) (ctx->sw - 1) + 1.0 > ctx->w));
 

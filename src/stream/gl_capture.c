@@ -85,7 +85,9 @@ struct gl_capture_private_s {
 
 	ps_buffer_t *to;
 
-	int try_pbo;
+	int init_pbo;
+	pthread_mutex_t init_pbo_mutex;
+
 	unsigned int bpp;
 	GLenum format;
 	unsigned int pack_alignment;
@@ -134,7 +136,7 @@ void *gl_capture_init(glc_t *glc, ps_buffer_t *to)
 		gl_capture->pack_alignment = 1;
 	
 	if (gl_capture->glc->flags & GLC_TRY_PBO)
-		gl_capture->try_pbo = 1;
+		gl_capture->init_pbo = 1;
 
 	if (gl_capture->glc->flags & GLC_CAPTURE_BGRA) {
 		gl_capture->format = GL_BGRA;
@@ -148,7 +150,8 @@ void *gl_capture_init(glc_t *glc, ps_buffer_t *to)
 		gl_capture->capture_buffer = GL_FRONT;
 	else
 		gl_capture->capture_buffer = GL_BACK;
-	
+
+	pthread_mutex_init(&gl_capture->init_pbo_mutex, NULL);
 	pthread_rwlock_init(&gl_capture->ctxlist_lock, NULL);
 	
 	return (void *) gl_capture;
@@ -174,6 +177,10 @@ void gl_capture_close(void *glpriv)
 	}
 
 	sem_post(&gl_capture->glc->signal[GLC_SIGNAL_GL_CAPTURE_FINISHED]);
+
+	pthread_rwlock_destroy(&gl_capture->ctxlist_lock);
+	pthread_mutex_destroy(&gl_capture->init_pbo_mutex);
+
 	if (gl_capture->libGL_handle)
 		dlclose(gl_capture->libGL_handle);
 	free(gl_capture);
@@ -329,6 +336,9 @@ int gl_capture_init_pbo(struct gl_capture_private_s *gl_capture)
 	if (!gl_capture->glUnmapBuffer)
 		return ENOTSUP;
 
+	util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+		 "using GL_ARB_pixel_buffer_object");
+
 	return 0;
 }
 
@@ -444,10 +454,12 @@ int gl_capture_update_ctx(struct gl_capture_private_s *gl_capture,
 	glc_ctx_message_t ctx_msg;
 	unsigned int w, h;
 
-	if (gl_capture->try_pbo) {
-		/* TODO set gl_capture->try_pbo = 0 ? */
+	if (gl_capture->init_pbo) {
+		pthread_mutex_lock(&gl_capture->init_pbo_mutex);
 		if (!gl_capture_init_pbo(gl_capture))
 			ctx->use_pbo = 1;
+		gl_capture->init_pbo = 0;
+		pthread_mutex_unlock(&gl_capture->init_pbo_mutex);
 	}
 
 	gl_capture_get_geometry(gl_capture, ctx->dpy, ctx->drawable, &w, &h);
@@ -579,7 +591,8 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 
 finish:
 	if (ret != 0)
-		fprintf(stderr, "gl_capture: %s (%d)\n", strerror(ret), ret);
+		util_log(gl_capture->glc, GLC_ERROR, "gl_capture",
+			 "%s (%d)", strerror(ret), ret);
 
 	if (gl_capture->glc->flags & GLC_DRAW_INDICATOR) {
 		if (!ctx->indicator_list)

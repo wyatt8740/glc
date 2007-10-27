@@ -20,6 +20,7 @@
 
 #include "../common/glc.h"
 #include "../common/thread.h"
+#include "../common/util.h"
 #include "gl_play.h"
 #include "audio_play.h"
 
@@ -172,7 +173,7 @@ err:
 	if (ret == EINTR) /* just _cancel() */
 		ret = 0;
 	else
-		fprintf(stderr, "demux(): %s (%d)\n", strerror(ret), ret);
+		util_log(demux->glc, GLC_ERROR, "demux", "%s (%d)", strerror(ret), ret);
 	goto finish;
 }
 

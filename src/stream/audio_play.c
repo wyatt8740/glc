@@ -98,7 +98,7 @@ void audio_play_finish_callback(void *priv, int err)
 	struct audio_play_private_s *audio_play = (struct audio_play_private_s *) priv;
 
 	if (err)
-		fprintf(stderr, "audio failed: %s (%d)\n", strerror(err), err);
+		util_log(audio_play->glc, GLC_ERROR, "audio", "%s (%d)", strerror(err), err);
 	
 	if (audio_play->pcm)
 		snd_pcm_close(audio_play->pcm);
@@ -190,7 +190,7 @@ int audio_play_play(struct audio_play_private_s *audio_play, glc_audio_header_t 
 		return 0;
 
 	if (!audio_play->pcm) {
-		fprintf(stderr, "audio: broken stream %d\n", audio_play->audio_i);
+		util_log(audio_play->glc, GLC_ERROR, "audio", "broken stream %d", audio_play->audio_i);
 		return EINVAL;
 	}
 	
@@ -228,7 +228,8 @@ int audio_play_play(struct audio_play_private_s *audio_play, glc_audio_header_t 
 			break;
 		else if (ret < 0) {
 			if ((ret = audio_play_xrun(audio_play, ret))) {
-				fprintf(stderr, "audio: xrun recovery failed: %s\n", snd_strerror(-ret));
+				util_log(audio_play->glc, GLC_ERROR, "audio",
+					 "xrun recovery failed: %s", snd_strerror(-ret));
 				return ret;
 			}
 		} else
@@ -240,7 +241,7 @@ int audio_play_play(struct audio_play_private_s *audio_play, glc_audio_header_t 
 
 int audio_play_xrun(struct audio_play_private_s *audio_play, int err)
 {
-	/* fprintf(stderr, "audio: xrun\n"); */
+	util_log(audio_play->glc, GLC_WARNING, "audio", "xrun");
 	if (err == -EPIPE) {
 		if ((err = snd_pcm_prepare(audio_play->pcm)) < 0)
 			return -err;

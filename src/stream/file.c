@@ -22,6 +22,7 @@
 
 #include "../common/glc.h"
 #include "../common/thread.h"
+#include "../common/util.h"
 #include "file.h"
 
 /**
@@ -51,15 +52,19 @@ int file_init(glc_t *glc, ps_buffer_t *from)
 	memset(file, 0, sizeof(struct file_private_s));
 
 	file->glc = glc;
+
+	util_log(file->glc, GLC_INFORMATION, "file",
+		 "opening %s for stream", file->glc->stream_file);
+
 	file->to = fopen(file->glc->stream_file, "w");
 
 	if (!file->to) {
-		fprintf(stderr, "glc: can't open %s\n", file->glc->stream_file);
+		util_log(file->glc, GLC_ERROR, "file", "can't open %s", file->glc->stream_file);
 		goto cancel;
 	}
 
 	if (!file->glc->info) {
-		fprintf(stderr, "glc: stream info not available\n");
+		util_log(file->glc, GLC_ERROR, "file", "stream info not available");
 		goto cancel;
 	}
 
@@ -87,10 +92,11 @@ void file_finish_callback(void *ptr, int err)
 	struct file_private_s *file = (struct file_private_s *) ptr;
 
 	if (err)
-		fprintf(stderr, "file failed: %s (%d)\n", strerror(err), err);
+		util_log(file->glc, GLC_ERROR, "file", "%s (%d)", strerror(err), err);
 
 	if (fclose(file->to))
-		fprintf(stderr, "can't close file: %s (%d)\n", strerror(errno), errno);
+		util_log(file->glc, GLC_ERROR, "file",
+			 "can't close file: %s (%d)", strerror(errno), errno);
 
 	sem_post(&file->glc->signal[GLC_SIGNAL_FILE_FINISHED]);
 	free(file);
@@ -124,7 +130,8 @@ int file_read(glc_t *glc, ps_buffer_t *to)
 
 	from = fopen(glc->stream_file, "r");
 	if (from == NULL) {
-		fprintf(stderr, "can't open %s: %s (%d)\n", glc->stream_file, strerror(errno), errno);
+		util_log(glc, GLC_ERROR, "file",
+			 "can't open %s: %s (%d)", glc->stream_file, strerror(errno), errno);
 		return -1;
 	}
 
@@ -133,12 +140,13 @@ int file_read(glc_t *glc, ps_buffer_t *to)
 	fread(info, 1, GLC_STREAM_INFO_SIZE, from);
 
 	if (info->signature != GLC_SIGNATURE) {
-		fprintf(stderr, "file: signature does not match\n");
+		util_log(glc, GLC_ERROR, "file", "signature does not match");
 		goto err;
 	}
 
 	if (info->version != GLC_STREAM_VERSION) {
-		fprintf(stderr, "file: unsupported stream version 0x%02x\n", glc->info->version);
+		util_log(glc, GLC_ERROR, "file",
+			 "unsupported stream version 0x%02x", glc->info->version);
 		goto err;
 	}
 
@@ -184,7 +192,7 @@ err:
 	if (ret == EINTR)
 		goto finish; /* just cancel */
 
-	fprintf(stderr, "file (%s): %s (%d)\n", glc->stream_file, strerror(ret), ret);
+	util_log(glc, GLC_ERROR, "file", "%s (%d)", strerror(ret), ret);
 	fclose(from);
 	ps_buffer_cancel(to);
 	return ret;
