@@ -15,6 +15,7 @@
 #include <alsa/asoundlib.h>
 
 #include "../stream/audio_capture.h"
+#include "../common/util.h"
 #include "lib.h"
 
 /**
@@ -51,6 +52,8 @@ int alsa_init(glc_t *glc)
 	alsa.glc = glc;
 	alsa.started = 0;
 
+	util_log(alsa.glc, GLC_INFORMATION, "alsa", "initializing");
+
 	if (getenv("GLC_AUDIO"))
 		alsa.capture = atoi(getenv("GLC_AUDIO"));
 	else
@@ -84,6 +87,8 @@ int alsa_close()
 {
 	if (!alsa.started)
 		return 0;
+
+	util_log(alsa.glc, GLC_INFORMATION, "alsa", "closing");
 
 	if (alsa.capture)
 		audio_capture_close(alsa.audio);

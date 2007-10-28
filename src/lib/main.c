@@ -226,6 +226,8 @@ void lib_close()
 	int ret;
 	mpriv.glc->flags &= ~GLC_CAPTURE; /* disable capturing */
 
+	util_log(mpriv.glc, GLC_INFORMATION, "main", "closing glc");
+
 	if ((ret = alsa_close()))
 		goto err;
 	if ((ret = opengl_close()))

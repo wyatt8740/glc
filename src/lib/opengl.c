@@ -60,6 +60,8 @@ int opengl_init(glc_t *glc)
 	opengl.glc->flags |= GLC_SCALE;
 	opengl.started = 0;
 
+	util_log(opengl.glc, GLC_INFORMATION, "opengl", "initializing");
+
 	/* load environment variables */
 	if (getenv("GLC_FPS"))
 		opengl.glc->fps = atof(getenv("GLC_FPS"));
@@ -179,6 +181,8 @@ int opengl_close()
 	int ret;
 	if (!opengl.started)
 		return 0;
+
+	util_log(opengl.glc, GLC_INFORMATION, "opengl", "closing");
 
 	gl_capture_close(opengl.gl);
 
