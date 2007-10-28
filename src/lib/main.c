@@ -55,6 +55,7 @@ struct main_private_s {
 __PRIVATE glc_lib_t lib = {NULL, /* dlopen */
 			   NULL, /* dlsym */
 			   NULL, /* dlvsym */
+			   NULL, /* __libc_dlsym */
 			   0, /* initialized */
 			   0, /* running */
 			   PTHREAD_MUTEX_INITIALIZER, /* init_lock */
@@ -65,6 +66,7 @@ __PRIVATE int init_buffers();
 __PRIVATE void lib_close();
 __PRIVATE int load_environ();
 __PRIVATE void signal_handler(int signum);
+__PRIVATE void get_real_libc_dlsym();
 
 void init_glc()
 {
@@ -354,6 +356,23 @@ void get_real_dlsym()
 	eh_destroy_obj(&libdl);
 }
 
+void get_real_libc_dlsym()
+{
+	eh_obj_t libc;
+
+	if (eh_init_obj(&libc, "*libc*")) {
+		fprintf(stderr, "(glc) libc-*.so is not present in memory\n");
+		exit(1);
+	}
+
+	if (eh_find_sym(&libc, "__libc_dlsym", (void *) &lib.__libc_dlsym)) {
+		fprintf(stderr, "(glc) can't get real __libc_dlsym()\n");
+		exit(1);
+	}
+
+	eh_destroy_obj(&libc);
+}
+
 void *wrapped_func(const char *symbol)
 {
 	/* prog shouldn't dlsym() dlopen or dlsym :P */
@@ -436,6 +455,19 @@ void *dlvsym(void *handle, const char *symbol, const char *version)
 		return ret;
 
 	return lib.dlvsym(handle, symbol, version);
+}
+
+void *__libc_dlsym(void *handle, const char *symbol)
+{
+	if (lib.__libc_dlsym == NULL)
+		get_real_libc_dlsym();
+
+	fprintf(stderr, "(glc:main) __libc_dlsym(%p, %s)\n", handle, symbol);
+	void *ret = wrapped_func(symbol);
+	if (ret)
+		return ret;
+
+	return lib.__libc_dlsym(handle, symbol);
 }
 
 /**  \} */
