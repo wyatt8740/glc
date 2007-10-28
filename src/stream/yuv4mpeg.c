@@ -38,7 +38,7 @@ struct yuv4mpeg_private_s {
 	glc_thread_t thread;
 	unsigned int file_count;
 	FILE *to;
-	
+
 	glc_utime_t time;
 	glc_utime_t fps;
 
@@ -73,7 +73,7 @@ int yuv4mpeg_init(glc_t *glc, ps_buffer_t *from)
 void yuv4mpeg_finish_callback(void *priv, int err)
 {
 	struct yuv4mpeg_private_s *yuv4mpeg = (struct yuv4mpeg_private_s *) priv;
-	
+
 	if (err)
 		util_log(yuv4mpeg->glc, GLC_ERROR, "yuv4mpeg", "%s (%d)", strerror(err), err);
 
@@ -89,7 +89,7 @@ int yuv4mpeg_read_callback(glc_thread_state_t *state)
 		return yuv4mpeg_handle_hdr(yuv4mpeg, (glc_ctx_message_t *) state->read_data);
 	else if (state->header.type == GLC_MESSAGE_PICTURE)
 		return yuv4mpeg_handle_pic(yuv4mpeg, (glc_picture_header_t *) state->read_data, &state->read_data[GLC_PICTURE_HEADER_SIZE]);
-	
+
 	return 0;
 }
 
@@ -103,12 +103,12 @@ int yuv4mpeg_handle_hdr(struct yuv4mpeg_private_s *yuv4mpeg, glc_ctx_message_t *
 
 	if (!(ctx_msg->flags & GLC_CTX_YCBCR_420JPEG))
 		return ENOTSUP;
-	
+
 	if (yuv4mpeg->to) {
 		util_log(yuv4mpeg->glc, GLC_WARNING, "yuv4mpeg", "ctx update msg");
 		yuv4mpeg->time = 0; /* reset time */
 	}
-	
+
 	filename = (char *) malloc(1024);
 	snprintf(filename, 1023, yuv4mpeg->glc->filename_format, ++yuv4mpeg->file_count);
 	util_log(yuv4mpeg->glc, GLC_INFORMATION, "yuv4mpeg", "opening %s for writing", filename);
