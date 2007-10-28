@@ -161,9 +161,9 @@ int file_read(glc_t *glc, ps_buffer_t *to)
 
 	do {
 		if (fread(&header, 1, GLC_MESSAGE_HEADER_SIZE, from) != GLC_MESSAGE_HEADER_SIZE)
-			goto read_fail;
+			goto send_eof;
 		if (fread(&glc_ps, 1, GLC_SIZE_SIZE, from) != GLC_SIZE_SIZE)
-			goto read_fail;
+			goto send_eof;
 
 		packet_size = glc_ps;
 
@@ -186,6 +186,16 @@ finish:
 	fclose(from);
 
 	return 0;
+
+send_eof:
+	header.type = GLC_MESSAGE_CLOSE;
+	ps_packet_open(&packet, PS_PACKET_WRITE);
+	ps_packet_write(&packet, &header, GLC_MESSAGE_HEADER_SIZE);
+	ps_packet_close(&packet);
+
+	util_log(glc, GLC_ERROR, "file", "unexpected EOF");
+	goto finish;
+
 read_fail:
 	ret = EBADMSG;
 err:
