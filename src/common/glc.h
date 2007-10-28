@@ -6,7 +6,7 @@
  */
 
 /* glc.h -- OpenGL video capture tool
-  version 0.3.8, October 26th, 2007
+  version 0.3.9, October 28th, 2007
 
   Copyright (C) 2007 Pyry Haulos
 

@@ -1,3 +1,10 @@
+0.3.9 (2007/10/28)
+   Logging framework: should help in debugging and testing.
+   Support for locking fps when capturing.
+   elfhacks: no more need to read data from filesystem, API change.
+   Some gl_capture cleanups (finally).
+   A bunch of bugfixes (PBO, handle EOF gracefully...).
+
 0.3.8 (2007/10/26)
    Changed some default values for capture:
     Use GL_BGRA if ycbcr conversion or scaling is enabled.
