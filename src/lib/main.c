@@ -252,6 +252,7 @@ void lib_close()
 	util_free(mpriv.glc);
 
 	free(mpriv.glc->stream_file);
+	free(mpriv.glc->log_file);
 	glc_destroy(mpriv.glc);
 	return;
 err:
@@ -278,7 +279,7 @@ int load_environ()
 	if (getenv("GLC_LOG_FILE"))
 		snprintf(mpriv.glc->log_file, 1023, getenv("GLC_LOG_FILE"), getpid());
 	else
-		snprintf(mpriv.glc->log_file, 1023, "pid-%d.log", getpid());
+		snprintf(mpriv.glc->log_file, 1023, "/dev/stderr");
 
 	if (getenv("GLC_LOG")) {
 		mpriv.glc->log_level = atoi(getenv("GLC_LOG"));
