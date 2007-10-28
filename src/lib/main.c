@@ -452,8 +452,6 @@ void *dlsym(void *handle, const char *symbol)
 
 void *__main_dlsym(void *handle, const char *symbol)
 {
-	printf("__dlsym(%p, %s)\n", handle, symbol);
-
 	if (lib.dlsym == NULL)
 		get_real_dlsym();
 
@@ -488,8 +486,6 @@ void *__libc_dlsym(void *handle, const char *symbol)
 
 void *__main___libc_dlsym(void *handle, const char *symbol)
 {
-	fprintf(stderr, "(glc:main) __libc_dlsym(%p, %s)\n", handle, symbol);
-
 	if (lib.__libc_dlsym == NULL)
 		get_real_libc_dlsym();
 
