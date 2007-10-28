@@ -199,10 +199,14 @@ int audio_capture_wait_for_thread(struct audio_capture_private_s *audio_capture,
 	        signal handler (f.ex. async mode) */
 	while (!stream->capture_ready) {
 		if (audio_capture->glc->flags & GLC_AUDIO_ALLOW_SKIP)
-			return EBUSY;
+			goto busy;
 		sched_yield();
 	}
 	return 0;
+busy:
+	util_log(audio_capture->glc, GLC_WARNING, "audio_capture",
+		 "dropped audio data, capture thread not ready");
+	return EBUSY;
 }
 
 int audio_capture_set_data_size(struct audio_capture_stream_s *stream, size_t size)
@@ -385,6 +389,9 @@ int audio_capture_alsa_fmt(struct audio_capture_private_s *audio_capture, struct
 	glc_audio_format_message_t fmt_msg;
 	int dir, ret;
 
+	util_log(audio_capture->glc, GLC_INFORMATION, "audio_capture",
+		 "creating/updating configuration for stream %d", stream->audio_i);
+
 	/* read configuration */
 	if ((ret = snd_pcm_hw_params_malloc(&params)) < 0)
 		goto err;
@@ -441,6 +448,11 @@ int audio_capture_alsa_fmt(struct audio_capture_private_s *audio_capture, struct
 
 	stream->fmt = 1;
 	snd_pcm_hw_params_free(params);
+
+	util_log(audio_capture->glc, GLC_DEBUG, "audio_capture",
+		 "stream %d: %d channels, rate %d, flags 0x%02x",
+		 stream->audio_i, stream->channels, stream->rate, stream->flags);
+
 	return 0;
 err:
 	if (params)

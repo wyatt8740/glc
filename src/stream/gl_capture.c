@@ -243,6 +243,10 @@ int gl_capture_calc_geometry(struct gl_capture_private_s *gl_capture, struct gl_
 		ctx->cx = ctx->cy = 0;
 	}
 
+	util_log(gl_capture->glc, GLC_DEBUG, "gl_capture",
+		 "calculated capture area for ctx %d is %ux%u+%u+%u",
+		 ctx->ctx_i, ctx->cw, ctx->ch, ctx->cx, ctx->cy);
+
 	ctx->row = ctx->cw * gl_capture->bpp;
 	if (ctx->row % gl_capture->pack_alignment != 0)
 		ctx->row += gl_capture->pack_alignment - ctx->row % gl_capture->pack_alignment;
@@ -252,8 +256,6 @@ int gl_capture_calc_geometry(struct gl_capture_private_s *gl_capture, struct gl_
 
 int gl_capture_get_pixels(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx, char *to)
 {
-	util_log(gl_capture->glc, GLC_DEBUG, "gl_capture", "reading pixels");
-
 	glPushAttrib(GL_PIXEL_MODE_BIT);
 	glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);
 
@@ -379,7 +381,6 @@ int gl_capture_destroy_pbo(struct gl_capture_private_s *gl_capture, struct gl_ca
 int gl_capture_start_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
 {
 	GLint binding;
-	util_log(gl_capture->glc, GLC_DEBUG, "gl_capture", "starting PBO transfer");
 
 	if (ctx->pbo_active)
 		return EAGAIN;
@@ -407,7 +408,6 @@ int gl_capture_read_pbo(struct gl_capture_private_s *gl_capture, struct gl_captu
 {
 	GLvoid *buf;
 	GLint binding;
-	util_log(gl_capture->glc, GLC_DEBUG, "gl_capture", "reading PBO");
 	
 	if (!ctx->pbo_active)
 		return EAGAIN;
@@ -499,7 +499,10 @@ int gl_capture_update_ctx(struct gl_capture_private_s *gl_capture,
 
 	if ((w != ctx->w) | (h != ctx->h) | (ctx->flags & GLC_CTX_CREATE)) {
 		gl_capture_calc_geometry(gl_capture, ctx, w, h);
-		
+
+		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+			 "creating/updating configuration for ctx %d", ctx->ctx_i);
+
 		msg.type = GLC_MESSAGE_CTX;
 		ctx_msg.flags = ctx->flags;
 		ctx_msg.ctx = ctx->ctx_i;
@@ -510,6 +513,10 @@ int gl_capture_update_ctx(struct gl_capture_private_s *gl_capture,
 		ps_packet_write(&ctx->packet, &msg, GLC_MESSAGE_HEADER_SIZE);
 		ps_packet_write(&ctx->packet, &ctx_msg, GLC_CTX_MESSAGE_SIZE);
 		ps_packet_close(&ctx->packet);
+
+		util_log(gl_capture->glc, GLC_DEBUG, "gl_capture",
+			 "ctx %d: %ux%u (%ux%u), 0x%02x flags", ctx->ctx_i,
+			 ctx->cw, ctx->ch, ctx->w, ctx->h, ctx->flags);
 
 		if (gl_capture->use_pbo) {
 			if (ctx->pbo)
@@ -620,8 +627,11 @@ finish:
 
 	return ret;
 cancel:
-	if (ret == EBUSY)
+	if (ret == EBUSY) {
 		ret = 0;
+		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+			 "dropped frame, buffer not ready");
+	}
 	ps_packet_cancel(&ctx->packet);
 	goto finish;
 }

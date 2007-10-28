@@ -294,6 +294,9 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 	}
 
 	size_t smap_size = ctx->sw * ctx->sh * 3 * 4;
+	util_log(scale->glc, GLC_DEBUG, "scale", "generating %zd byte scale map for ctx %d",
+		 smap_size, ctx->ctx);
+
 	if (ctx->pos)
 		ctx->pos = (unsigned int *) realloc(ctx->pos, sizeof(unsigned int) * smap_size);
 	else

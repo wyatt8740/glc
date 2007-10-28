@@ -148,7 +148,7 @@ glc_utime_t util_timestamp(glc_t *glc)
 int util_timediff(glc_t *glc, glc_stime_t diff)
 {
 	struct util_private_s *util = (struct util_private_s *) glc->util;
-	util_log(glc, GLC_INFORMATION, "util", "applying %ld usec time difference", diff);
+	util_log(glc, GLC_DEBUG, "util", "applying %ld usec time difference", diff);
 	util->timediff += diff;
 	return 0;
 }
