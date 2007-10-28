@@ -370,18 +370,22 @@ void util_log(glc_t *glc, int level, const char *module, const char *format, ...
 	    (level > glc->log_level))
 		return;
 
-	va_start(ap, format);
-
 	if ((level <= GLC_ERROR) &&
 	    (!(glc->flags & GLC_NOERR))) {
+		va_start(ap, format);
+
 		util_write_time(glc, stderr);
 		fprintf(stderr, " (glc:%s) ", module);
 		vfprintf(stderr, format, ap);
-		fputc('\n', util->log_file);
+		fputc('\n', stderr);
+
+		va_end(ap);
 	}
 
 	if (!(glc->flags & GLC_LOG))
 		return;
+
+	va_start(ap, format);
 
 	/* this is highly threaded application and we want
 	   non-corrupted logs */
@@ -393,6 +397,8 @@ void util_log(glc_t *glc, int level, const char *module, const char *format, ...
 	fputc('\n', util->log_file);
 
 	pthread_mutex_unlock(&util->log_mutex);
+
+	va_end(ap);
 }
 
 /**
