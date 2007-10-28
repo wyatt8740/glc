@@ -4,6 +4,8 @@ CC = gcc
 
 CFLAGS = -g -Wall -ansi -D_XOPEN_SOURCE=500
 LDFLAGS = -Wall -ansi
+VISIBILITY = -fvisibility=hidden
+SO_CFLAGS = $(CFLAGS) $(VISIBILITY) -fPIC
 
 MLIBDIR = lib
 DESTDIR = 
@@ -86,16 +88,16 @@ $(BUILD)/libglc-capture.so.$(RELEASE): $(BUILD)/libglc.so.$(RELEASE) $(CAPT_OBJS
 	ln -sf libglc-capture.so.$(RELEASE) $(BUILD)/libglc-capture.so
 
 $(BUILD)/main.o: $(LIB)/main.c $(LIB)/lib.h $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/main.o -c $(LIB)/main.c $(USE_LZO) $(USE_QUICKLZ)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/main.o -c $(LIB)/main.c $(USE_LZO) $(USE_QUICKLZ)
 
 $(BUILD)/alsa.o: $(LIB)/alsa.c $(LIB)/lib.h $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/alsa.o -c $(LIB)/alsa.c
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/alsa.o -c $(LIB)/alsa.c
 
 $(BUILD)/opengl.o: $(LIB)/opengl.c $(LIB)/lib.h $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/opengl.o -c $(LIB)/opengl.c
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/opengl.o -c $(LIB)/opengl.c
 
 $(BUILD)/x11.o: $(LIB)/x11.c $(LIB)/lib.h $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/x11.o -c $(LIB)/x11.c
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/x11.o -c $(LIB)/x11.c
 
 # player / tool
 $(BUILD)/glc-play: $(BUILD)/play.o $(BUILD)/libglc.so.$(RELEASE)
@@ -123,61 +125,61 @@ $(BUILD)/libglc.so.$(RELEASE): $(LIB_OBJS)
 
 # common objects
 $(BUILD)/util.o: $(COMMON)/util.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/util.o -c $(COMMON)/util.c
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/util.o -c $(COMMON)/util.c
 
 $(BUILD)/thread.o: $(COMMON)/thread.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/thread.o -c $(COMMON)/thread.c
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/thread.o -c $(COMMON)/thread.c
 
 
 # stream processor objects
 $(BUILD)/gl_capture.o: $(STREAM)/gl_capture.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/gl_capture.o -c $(STREAM)/gl_capture.c
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/gl_capture.o -c $(STREAM)/gl_capture.c
 
 $(BUILD)/gl_play.o: $(STREAM)/gl_play.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/gl_play.o -c $(STREAM)/gl_play.c
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/gl_play.o -c $(STREAM)/gl_play.c
 
 $(BUILD)/pack.o: $(STREAM)/pack.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/pack.o -c $(STREAM)/pack.c $(USE_LZO) $(USE_QUICKLZ)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/pack.o -c $(STREAM)/pack.c $(USE_LZO) $(USE_QUICKLZ)
 
 $(BUILD)/file.o: $(STREAM)/file.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/file.o -c $(STREAM)/file.c
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/file.o -c $(STREAM)/file.c
 
 $(BUILD)/img.o: $(STREAM)/img.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/img.o -c $(STREAM)/img.c
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/img.o -c $(STREAM)/img.c
 
 $(BUILD)/scale.o: $(STREAM)/scale.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/scale.o -c $(STREAM)/scale.c
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/scale.o -c $(STREAM)/scale.c
 
 $(BUILD)/info.o: $(STREAM)/info.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/info.o -c $(STREAM)/info.c
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/info.o -c $(STREAM)/info.c
 
 $(BUILD)/audio_capture.o: $(STREAM)/audio_capture.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/audio_capture.o -c $(STREAM)/audio_capture.c
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/audio_capture.o -c $(STREAM)/audio_capture.c
 
 $(BUILD)/audio_play.o: $(STREAM)/audio_play.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/audio_play.o -c $(STREAM)/audio_play.c
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/audio_play.o -c $(STREAM)/audio_play.c
 
 $(BUILD)/wav.o: $(STREAM)/wav.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/wav.o -c $(STREAM)/wav.c
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/wav.o -c $(STREAM)/wav.c
 
 $(BUILD)/demux.o: $(STREAM)/demux.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/demux.o -c $(STREAM)/demux.c
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/demux.o -c $(STREAM)/demux.c
 
 $(BUILD)/ycbcr.o: $(STREAM)/ycbcr.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/ycbcr.o -c $(STREAM)/ycbcr.c
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/ycbcr.o -c $(STREAM)/ycbcr.c
 
 $(BUILD)/yuv4mpeg.o: $(STREAM)/yuv4mpeg.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/yuv4mpeg.o -c $(STREAM)/yuv4mpeg.c
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/yuv4mpeg.o -c $(STREAM)/yuv4mpeg.c
 
 $(BUILD)/rgb.o: $(STREAM)/rgb.c $(HEADERS)
-	$(CC) $(CFLAGS) -fPIC -o $(BUILD)/rgb.o -c $(STREAM)/rgb.c
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/rgb.o -c $(STREAM)/rgb.c
 
 
 $(LZO_OBJ): $(MINILZO)minilzo.c $(MINILZO)lzoconf.h $(MINILZO)lzodefs.h $(MINILZO)minilzo.h
-	$(CC) $(CFLAGS) -fPIC -o $(LZO_OBJ) -c $(MINILZO)minilzo.c
+	$(CC) $(SO_CFLAGS) -o $(LZO_OBJ) -c $(MINILZO)minilzo.c
 
 $(QUICKLZ_OBJ): $(QUICKLZ)quicklz.c $(QUICKLZ)quicklz.h
-	$(CC) $(CFLAGS) -fPIC -o $(QUICKLZ_OBJ) -c $(QUICKLZ)quicklz.c
+	$(CC) $(SO_CFLAGS) -o $(QUICKLZ_OBJ) -c $(QUICKLZ)quicklz.c
 
 
 install-scripts: $(SCRIPTS)/glc-encode $(SCRIPTS)/glc-capture

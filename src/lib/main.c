@@ -425,7 +425,7 @@ void *wrapped_func(const char *symbol)
 		return NULL;
 }
 
-void *dlopen(const char *filename, int flag)
+__PUBLIC void *dlopen(const char *filename, int flag)
 {
 	return __main_dlopen(filename, flag);
 }
@@ -445,7 +445,7 @@ void *__main_dlopen(const char *filename, int flag)
 	return ret;
 }
 
-void *dlsym(void *handle, const char *symbol)
+__PUBLIC void *dlsym(void *handle, const char *symbol)
 {
 	return __main_dlsym(handle, symbol);
 }
@@ -462,7 +462,7 @@ void *__main_dlsym(void *handle, const char *symbol)
 	return lib.dlsym(handle, symbol);
 }
 
-void *dlvsym(void *handle, const char *symbol, const char *version)
+__PUBLIC void *dlvsym(void *handle, const char *symbol, const char *version)
 {
 	return __main_dlvsym(handle, symbol, version);
 }
@@ -479,7 +479,7 @@ void *__main_dlvsym(void *handle, const char *symbol, const char *version)
 	return lib.dlvsym(handle, symbol, version);
 }
 
-void *__libc_dlsym(void *handle, const char *symbol)
+__PUBLIC void *__libc_dlsym(void *handle, const char *symbol)
 {
 	return __main___libc_dlsym(handle, symbol);
 }

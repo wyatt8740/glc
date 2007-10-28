@@ -21,7 +21,7 @@
  *  \{
  */
 
-int info_init(glc_t *glc, ps_buffer_t *from);
+__PUBLIC int info_init(glc_t *glc, ps_buffer_t *from);
 
 /**  \} */
 

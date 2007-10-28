@@ -21,6 +21,7 @@
 #include "../common/glc.h"
 #include "../common/thread.h"
 #include "../common/util.h"
+#include "demux.h"
 #include "gl_play.h"
 #include "audio_play.h"
 

@@ -47,6 +47,11 @@
  *  \{
  */
 
+/** always export this object  */
+#define __PUBLIC __attribute__ ((visibility ("default")))
+/** always hide this object */
+#define __PRIVATE __attribute__ ((visibility ("hidden")))
+
 /** stream version */
 #define GLC_STREAM_VERSION              0x2
 /** file signature = "GLC" */

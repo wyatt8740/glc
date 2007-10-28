@@ -113,7 +113,7 @@ typedef struct {
 	void (*finish_callback)(void *, int);
 } glc_thread_t;
 
-int glc_thread_create(glc_t *glc, glc_thread_t *thread, ps_buffer_t *from, ps_buffer_t *to);
+__PUBLIC int glc_thread_create(glc_t *glc, glc_thread_t *thread, ps_buffer_t *from, ps_buffer_t *to);
 
 /**  \} */
 /**  \} */

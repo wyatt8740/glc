@@ -21,9 +21,9 @@
  *  \{
  */
 
-int pack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
+__PUBLIC int pack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
 
-int unpack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
+__PUBLIC int unpack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
 
 /**  \} */
 

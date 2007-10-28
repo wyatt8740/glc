@@ -37,8 +37,6 @@ typedef struct {
 	pthread_mutex_t init_lock;
 } glc_lib_t;
 
-#define __PRIVATE __attribute__ ((visibility ("hidden")))
-
 #define INIT_GLC \
 	if (!lib.initialized) \
 		init_glc();

@@ -239,7 +239,7 @@ err:
 	exit(1);
 }
 
-GLXextFuncPtr glXGetProcAddressARB(const GLubyte *proc_name)
+__PUBLIC GLXextFuncPtr glXGetProcAddressARB(const GLubyte *proc_name)
 {
 	return __opengl_glXGetProcAddressARB(proc_name);
 }
@@ -255,7 +255,7 @@ GLXextFuncPtr __opengl_glXGetProcAddressARB(const GLubyte *proc_name)
 	return opengl.glXGetProcAddressARB(proc_name);
 }
 
-void glXSwapBuffers(Display *dpy, GLXDrawable drawable)
+__PUBLIC void glXSwapBuffers(Display *dpy, GLXDrawable drawable)
 {
 	return __opengl_glXSwapBuffers(dpy, drawable);
 }
@@ -275,7 +275,7 @@ void __opengl_glXSwapBuffers(Display *dpy, GLXDrawable drawable)
 		opengl.glXSwapBuffers(dpy, drawable);
 }
 
-void glFinish(void)
+__PUBLIC void glFinish(void)
 {
 	__opengl_glFinish();
 }

@@ -21,7 +21,7 @@
  *  \{
  */
 
-int audio_play_init(glc_t *glc, ps_buffer_t *from, glc_audio_i audio, sem_t *finished);
+__PUBLIC int audio_play_init(glc_t *glc, ps_buffer_t *from, glc_audio_i audio, sem_t *finished);
 
 #endif
 

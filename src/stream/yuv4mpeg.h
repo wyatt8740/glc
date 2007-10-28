@@ -18,7 +18,7 @@
  *  \{
  */
 
-int yuv4mpeg_init(glc_t *glc, ps_buffer_t *from);
+__PUBLIC int yuv4mpeg_init(glc_t *glc, ps_buffer_t *from);
 
 /**  \} */
 
