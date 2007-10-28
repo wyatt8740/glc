@@ -93,7 +93,7 @@ int util_init(glc_t *glc)
 	util->glc = glc;
 	gettimeofday(&util->init_time, NULL);
 	pthread_mutex_init(&util->log_mutex, NULL);
-	
+
 	glc->util = util;
 	return 0;
 }
@@ -123,17 +123,17 @@ glc_utime_t util_timestamp(glc_t *glc)
 {
 	struct util_private_s *util = (struct util_private_s *) glc->util;
 	struct timeval tv;
-	
+
 	gettimeofday(&tv, NULL);
-	
+
 	tv.tv_sec -= util->init_time.tv_sec;
 	tv.tv_usec -= util->init_time.tv_usec;
-	
+
 	if (tv.tv_usec < 0) {
 		tv.tv_sec--;
 		tv.tv_usec += 1000000;
 	}
-	
+
 	return (glc_utime_t) (tv.tv_sec * 1000000 + (glc_utime_t) tv.tv_usec - util->timediff);
 }
 
@@ -169,30 +169,30 @@ int util_load_info(glc_t *glc, const char *filename)
 		fprintf(stderr, "can't open %s: %s (%d)\n", filename, strerror(errno), errno);
 		return ENOENT;
 	}
-	
+
 	util_create_info(glc);
 	if (fread(glc->info, 1, GLC_STREAM_INFO_SIZE, file) != GLC_STREAM_INFO_SIZE) {
 		fprintf(stderr, "can't read stream information\n");
 		return ENOSTR;
 	}
-	
+
 	if (glc->info->signature != GLC_SIGNATURE) {
 		fprintf(stderr, "signature does not match\n");
 		fclose(file);
 		return EINVAL;
 	}
-	
+
 	if (glc->info->version != GLC_STREAM_VERSION) {
 		fprintf(stderr, "unsupported stream version 0x%02x\n", glc->info->version);
 		fclose(file);
 		return ENOTSUP;
 	}
-	
+
 	if (glc->info->name_size > 0) {
 		glc->info_name = (char *) malloc(glc->info->name_size);
 		fread(glc->info_name, 1, glc->info->name_size, file);
 	}
-	
+
 	if (glc->info->date_size > 0) {
 		glc->info_date = (char *) malloc(glc->info->date_size);
 		fread(glc->info_date, 1, glc->info->date_size, file);
@@ -260,7 +260,7 @@ int util_app_name(char **path, u_int32_t *path_size)
 {
 	*path = (char *) malloc(1024);
 	ssize_t len;
-	
+
 	if ((len = readlink("/proc/self/exe", *path, 1023)) != -1) {
 		(*path)[len] = '\0';
 		*path_size = len;
@@ -268,9 +268,9 @@ int util_app_name(char **path, u_int32_t *path_size)
 		*path_size = 0;
 		(*path)[0] = '\0';
 	}
-	
+
 	(*path_size)++;
-	
+
 	return 0;
 }
 
@@ -284,14 +284,14 @@ int util_utc_date(char **date, u_int32_t *date_size)
 {
 	time_t t = time(NULL);
 	char *strt = ctime(&t);
-	
+
 	if (strt[strlen(strt)-1] == '\n')
 		strt[strlen(strt)-1] = '\0';
-	
+
 	*date_size = strlen(strt) + 1;
 	*date = (char *) malloc(*date_size);
 	memcpy(*date, strt, *date_size);
-	
+
 	return 0;
 }
 
@@ -316,7 +316,7 @@ int util_write_end_of_stream(glc_t *glc, ps_buffer_t *to)
 	ps_packet_t packet;
 	glc_message_header_t header;
 	header.type = GLC_MESSAGE_CLOSE;
-	
+
 	if ((ret = ps_packet_init(&packet, to)))
 		goto finish;
 	if ((ret = ps_packet_open(&packet, PS_PACKET_WRITE)))
