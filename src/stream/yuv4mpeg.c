@@ -111,6 +111,7 @@ int yuv4mpeg_handle_hdr(struct yuv4mpeg_private_s *yuv4mpeg, glc_ctx_message_t *
 	
 	filename = (char *) malloc(1024);
 	snprintf(filename, 1023, yuv4mpeg->glc->filename_format, ++yuv4mpeg->file_count);
+	util_log(yuv4mpeg->glc, GLC_INFORMATION, "yuv4mpeg", "opening %s for writing", filename);
 	yuv4mpeg->to = fopen(filename, "w");
 	if (!yuv4mpeg->to) {
 		util_log(yuv4mpeg->glc, GLC_ERROR, "yuv4mpeg", "can't open %s", filename);

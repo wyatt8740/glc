@@ -84,7 +84,8 @@ void img_finish_callback(void *ptr, int err)
 
 int img_read_callback(glc_thread_state_t *state)
 {
-	struct img_private_s *img = (struct img_private_s *) state->ptr;
+	struct img_private_s *img = state->ptr;
+	int ret = 0;
 
 	glc_picture_header_t *pic_hdr;
 	glc_ctx_message_t *ctx_msg;
@@ -126,7 +127,7 @@ int img_read_callback(glc_thread_state_t *state)
 				write_pic(img, img->prev_pic, img->w, img->h, img->i++);
 				img->time += img->fps;
 			}
-			write_pic(img, &state->read_data[GLC_PICTURE_HEADER_SIZE],
+			ret = write_pic(img, &state->read_data[GLC_PICTURE_HEADER_SIZE],
 			          img->w, img->h, img->i++);
 			img->time += img->fps;
 		}
@@ -135,7 +136,7 @@ int img_read_callback(glc_thread_state_t *state)
 		       state->read_size - GLC_PICTURE_HEADER_SIZE);
 	}
 
-	return 0;
+	return ret;
 }
 
 int write_pic(struct img_private_s *img, char *pic, unsigned int w, unsigned int h, int num)
@@ -146,8 +147,9 @@ int write_pic(struct img_private_s *img, char *pic, unsigned int w, unsigned int
 	unsigned int i;
 	snprintf(fname, sizeof(fname) - 1, img->glc->filename_format, num);
 
+	util_log(img->glc, GLC_INFORMATION, "img", "opening %s for writing", fname);
 	if (!(fd = fopen(fname, "w")))
-		return 1;
+		return errno;
 
 	fwrite("BM", 1, 2, fd);
 	val = w * h * 3 + 54;
@@ -171,7 +173,6 @@ int write_pic(struct img_private_s *img, char *pic, unsigned int w, unsigned int
 	img->total++;
 	return 0;
 }
-
 
 /**  \} */
 /**  \} */

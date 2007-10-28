@@ -155,6 +155,7 @@ int wav_write_hdr(struct wav_private_s *wav, glc_audio_format_message_t *fmt_msg
 	
 	filename = (char *) malloc(1024);
 	snprintf(filename, 1023, wav->glc->filename_format, ++wav->file_count);
+	util_log(wav->glc, GLC_INFORMATION, "wav", "opening %s for writing", filename);
 	wav->to = fopen(filename, "w");
 	if (!wav->to) {
 		util_log(wav->glc, GLC_ERROR, "wav", "can't open %s", filename);
