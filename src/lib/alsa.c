@@ -52,7 +52,7 @@ int alsa_init(glc_t *glc)
 	alsa.glc = glc;
 	alsa.started = 0;
 
-	util_log(alsa.glc, GLC_INFORMATION, "alsa", "initializing");
+	util_log(alsa.glc, GLC_DEBUG, "alsa", "initializing");
 
 	if (getenv("GLC_AUDIO"))
 		alsa.capture = atoi(getenv("GLC_AUDIO"));
@@ -88,7 +88,7 @@ int alsa_close()
 	if (!alsa.started)
 		return 0;
 
-	util_log(alsa.glc, GLC_INFORMATION, "alsa", "closing");
+	util_log(alsa.glc, GLC_DEBUG, "alsa", "closing");
 
 	if (alsa.capture)
 		audio_capture_close(alsa.audio);
