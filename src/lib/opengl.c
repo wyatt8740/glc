@@ -241,6 +241,11 @@ err:
 
 GLXextFuncPtr glXGetProcAddressARB(const GLubyte *proc_name)
 {
+	return __opengl_glXGetProcAddressARB(proc_name);
+}
+
+GLXextFuncPtr __opengl_glXGetProcAddressARB(const GLubyte *proc_name)
+{
 	INIT_GLC
 
 	GLXextFuncPtr ret = (GLXextFuncPtr) wrapped_func((char *) proc_name);
@@ -251,6 +256,11 @@ GLXextFuncPtr glXGetProcAddressARB(const GLubyte *proc_name)
 }
 
 void glXSwapBuffers(Display *dpy, GLXDrawable drawable)
+{
+	return __opengl_glXSwapBuffers(dpy, drawable);
+}
+
+void __opengl_glXSwapBuffers(Display *dpy, GLXDrawable drawable)
 {
 	INIT_GLC
 
@@ -266,6 +276,11 @@ void glXSwapBuffers(Display *dpy, GLXDrawable drawable)
 }
 
 void glFinish(void)
+{
+	__opengl_glFinish();
+}
+
+void __opengl_glFinish(void)
 {
 	INIT_GLC
 

@@ -85,29 +85,34 @@ __PRIVATE int x11_close();
  * \defgroup hooks Hooked functions
  *  \{
  */
+__PRIVATE void *__main_dlopen(const char *filename, int flag);
+__PRIVATE void *__main_dlsym(void *handle, const char *symbol);
+__PRIVATE void *__main_dlvsym(void *handle, const char *symbol, const char *version);
+__PRIVATE void *__main___libc_dlsym(void *handle, const char *symbol);
+
 typedef void (*GLXextFuncPtr)(void);
-GLXextFuncPtr glXGetProcAddressARB(const GLubyte *proc_name);
-void glXSwapBuffers(Display *dpy, GLXDrawable drawable);
-void glFinish(void);
-void glXSwapBuffers(Display *dpy, GLXDrawable drawable);
+__PRIVATE GLXextFuncPtr __opengl_glXGetProcAddressARB(const GLubyte *proc_name);
+__PRIVATE void __opengl_glXSwapBuffers(Display *dpy, GLXDrawable drawable);
+__PRIVATE void __opengl_glFinish(void);
+__PRIVATE void __opengl_glXSwapBuffers(Display *dpy, GLXDrawable drawable);
 
-int XNextEvent(Display *display, XEvent *event_return);
-int XPeekEvent(Display *display, XEvent *event_return);
-int XWindowEvent(Display *display, Window w, long event_mask, XEvent *event_return);
-Bool XCheckWindowEvent(Display *display, Window w, long event_mask, XEvent *event_return);
-int XMaskEvent(Display *display, long event_mask, XEvent *event_return);
-Bool XCheckMaskEvent(Display *display, long event_mask, XEvent *event_return);
-Bool XCheckTypedEvent(Display *display, int event_type, XEvent *event_return);
-Bool XCheckTypedWindowEvent(Display *display, Window w, int event_type, XEvent *event_return);
-int XIfEvent(Display *display, XEvent *event_return, Bool ( *predicate)(), XPointer arg);
-Bool XCheckIfEvent(Display *display, XEvent *event_return, Bool ( *predicate)(), XPointer arg);
-int XPeekIfEvent(Display *display, XEvent *event_return, Bool ( *predicate)(), XPointer arg);
+__PRIVATE int __x11_XNextEvent(Display *display, XEvent *event_return);
+__PRIVATE int __x11_XPeekEvent(Display *display, XEvent *event_return);
+__PRIVATE int __x11_XWindowEvent(Display *display, Window w, long event_mask, XEvent *event_return);
+__PRIVATE Bool __x11_XCheckWindowEvent(Display *display, Window w, long event_mask, XEvent *event_return);
+__PRIVATE int __x11_XMaskEvent(Display *display, long event_mask, XEvent *event_return);
+__PRIVATE Bool __x11_XCheckMaskEvent(Display *display, long event_mask, XEvent *event_return);
+__PRIVATE Bool __x11_XCheckTypedEvent(Display *display, int event_type, XEvent *event_return);
+__PRIVATE Bool __x11_XCheckTypedWindowEvent(Display *display, Window w, int event_type, XEvent *event_return);
+__PRIVATE int __x11_XIfEvent(Display *display, XEvent *event_return, Bool ( *predicate)(), XPointer arg);
+__PRIVATE Bool __x11_XCheckIfEvent(Display *display, XEvent *event_return, Bool ( *predicate)(), XPointer arg);
+__PRIVATE int __x11_XPeekIfEvent(Display *display, XEvent *event_return, Bool ( *predicate)(), XPointer arg);
 
-int snd_pcm_open(snd_pcm_t **pcmp, const char *name, snd_pcm_stream_t stream, int mode);
-snd_pcm_sframes_t snd_pcm_writei(snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size);
-snd_pcm_sframes_t snd_pcm_writen(snd_pcm_t *pcm, void **bufs, snd_pcm_uframes_t size);
-int snd_pcm_mmap_begin(snd_pcm_t *pcm, const snd_pcm_channel_area_t **areas, snd_pcm_uframes_t *offset, snd_pcm_uframes_t *frames);
-snd_pcm_sframes_t snd_pcm_mmap_commit(snd_pcm_t *pcm, snd_pcm_uframes_t offset, snd_pcm_uframes_t frames);
+__PRIVATE int __alsa_snd_pcm_open(snd_pcm_t **pcmp, const char *name, snd_pcm_stream_t stream, int mode);
+__PRIVATE snd_pcm_sframes_t __alsa_snd_pcm_writei(snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size);
+__PRIVATE snd_pcm_sframes_t __alsa_snd_pcm_writen(snd_pcm_t *pcm, void **bufs, snd_pcm_uframes_t size);
+__PRIVATE int __alsa_snd_pcm_mmap_begin(snd_pcm_t *pcm, const snd_pcm_channel_area_t **areas, snd_pcm_uframes_t *offset, snd_pcm_uframes_t *frames);
+__PRIVATE snd_pcm_sframes_t __alsa_snd_pcm_mmap_commit(snd_pcm_t *pcm, snd_pcm_uframes_t offset, snd_pcm_uframes_t frames);
 /**  \} */
 
 #endif

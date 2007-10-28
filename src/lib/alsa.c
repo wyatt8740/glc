@@ -160,6 +160,11 @@ int alsa_unhook_so(const char *soname)
 
 int snd_pcm_open(snd_pcm_t **pcmp, const char *name, snd_pcm_stream_t stream, int mode)
 {
+	return __alsa_snd_pcm_open(pcmp, name, stream, mode);
+}
+
+int __alsa_snd_pcm_open(snd_pcm_t **pcmp, const char *name, snd_pcm_stream_t stream, int mode)
+{
 	/* it is not necessarily safe to call glc_init() from write funcs
 	   especially async mode (initiated from signal) is troublesome */
 	INIT_GLC
@@ -167,6 +172,11 @@ int snd_pcm_open(snd_pcm_t **pcmp, const char *name, snd_pcm_stream_t stream, in
 }
 
 snd_pcm_sframes_t snd_pcm_writei(snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size)
+{
+	return __alsa_snd_pcm_writei(pcm, buffer, size);
+}
+
+snd_pcm_sframes_t __alsa_snd_pcm_writei(snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size)
 {
 	INIT_GLC
 	snd_pcm_sframes_t ret = alsa.snd_pcm_writei(pcm, buffer, size);
@@ -177,6 +187,11 @@ snd_pcm_sframes_t snd_pcm_writei(snd_pcm_t *pcm, const void *buffer, snd_pcm_ufr
 
 snd_pcm_sframes_t snd_pcm_writen(snd_pcm_t *pcm, void **bufs, snd_pcm_uframes_t size)
 {
+	return __alsa_snd_pcm_writen(pcm, bufs, size);
+}
+
+snd_pcm_sframes_t __alsa_snd_pcm_writen(snd_pcm_t *pcm, void **bufs, snd_pcm_uframes_t size)
+{
 	INIT_GLC
 	snd_pcm_sframes_t ret = alsa.snd_pcm_writen(pcm, bufs, size);
 	if ((alsa.capture) && (ret > 0) && (alsa.glc->flags & GLC_CAPTURE))
@@ -186,6 +201,11 @@ snd_pcm_sframes_t snd_pcm_writen(snd_pcm_t *pcm, void **bufs, snd_pcm_uframes_t 
 
 int snd_pcm_mmap_begin(snd_pcm_t *pcm, const snd_pcm_channel_area_t **areas, snd_pcm_uframes_t *offset, snd_pcm_uframes_t *frames)
 {
+	return __alsa_snd_pcm_mmap_begin(pcm, areas, offset, frames);
+}
+
+int __alsa_snd_pcm_mmap_begin(snd_pcm_t *pcm, const snd_pcm_channel_area_t **areas, snd_pcm_uframes_t *offset, snd_pcm_uframes_t *frames)
+{
 	INIT_GLC
 	int ret = alsa.snd_pcm_mmap_begin(pcm, areas, offset, frames);
 	if ((alsa.capture) && (ret >= 0) && (alsa.glc->flags & GLC_CAPTURE))
@@ -194,6 +214,11 @@ int snd_pcm_mmap_begin(snd_pcm_t *pcm, const snd_pcm_channel_area_t **areas, snd
 }
 
 snd_pcm_sframes_t snd_pcm_mmap_commit(snd_pcm_t *pcm, snd_pcm_uframes_t offset, snd_pcm_uframes_t frames)
+{
+	return __alsa_snd_pcm_mmap_commit(pcm, offset, frames);
+}
+
+snd_pcm_sframes_t __alsa_snd_pcm_mmap_commit(snd_pcm_t *pcm, snd_pcm_uframes_t offset, snd_pcm_uframes_t frames)
 {
 	INIT_GLC
 	if (alsa.capture && (alsa.glc->flags & GLC_CAPTURE))

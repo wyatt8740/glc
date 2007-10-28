@@ -375,50 +375,62 @@ void get_real_libc_dlsym()
 
 void *wrapped_func(const char *symbol)
 {
-	/* prog shouldn't dlsym() dlopen or dlsym :P */
 	if (!strcmp(symbol, "glXGetProcAddressARB"))
-		return &glXGetProcAddressARB;
+		return &__opengl_glXGetProcAddressARB;
 	else if (!strcmp(symbol, "glXSwapBuffers"))
-		return &glXSwapBuffers;
+		return &__opengl_glXSwapBuffers;
 	else if (!strcmp(symbol, "glFinish"))
-		return &glFinish;
+		return &__opengl_glFinish;
 	else if (!strcmp(symbol, "snd_pcm_open"))
-		return &snd_pcm_open;
+		return &__alsa_snd_pcm_open;
 	else if (!strcmp(symbol, "snd_pcm_writei"))
-		return &snd_pcm_writei;
+		return &__alsa_snd_pcm_writei;
 	else if (!strcmp(symbol, "snd_pcm_writen"))
-		return &snd_pcm_writen;
+		return &__alsa_snd_pcm_writen;
 	else if (!strcmp(symbol, "snd_pcm_mmap_begin"))
-		return &snd_pcm_mmap_begin;
+		return &__alsa_snd_pcm_mmap_begin;
 	else if (!strcmp(symbol, "snd_pcm_mmap_commit"))
-		return &snd_pcm_mmap_commit;
+		return &__alsa_snd_pcm_mmap_commit;
 	else if (!strcmp(symbol, "XNextEvent"))
-		return &XNextEvent;
+		return &__x11_XNextEvent;
 	else if (!strcmp(symbol, "XPeekEvent"))
-		return &XPeekEvent;
+		return &__x11_XPeekEvent;
 	else if (!strcmp(symbol, "XWindowEvent"))
-		return &XWindowEvent;
+		return &__x11_XWindowEvent;
 	else if (!strcmp(symbol, "XMaskEvent"))
-		return &XMaskEvent;
+		return &__x11_XMaskEvent;
 	else if (!strcmp(symbol, "XCheckWindowEvent"))
-		return &XCheckWindowEvent;
+		return &__x11_XCheckWindowEvent;
 	else if (!strcmp(symbol, "XCheckMaskEvent"))
-		return &XCheckMaskEvent;
+		return &__x11_XCheckMaskEvent;
 	else if (!strcmp(symbol, "XCheckTypedEvent"))
-		return &XCheckTypedEvent;
+		return &__x11_XCheckTypedEvent;
 	else if (!strcmp(symbol, "XCheckTypedWindowEvent"))
-		return &XCheckTypedWindowEvent;
+		return &__x11_XCheckTypedWindowEvent;
 	else if (!strcmp(symbol, "XIfEvent"))
-		return &XIfEvent;
+		return &__x11_XIfEvent;
 	else if (!strcmp(symbol, "XCheckIfEvent"))
-		return &XCheckIfEvent;
+		return &__x11_XCheckIfEvent;
 	else if (!strcmp(symbol, "XPeekIfEvent"))
-		return &XPeekIfEvent;
+		return &__x11_XPeekIfEvent;
+	else if (!strcmp(symbol, "dlopen"))
+		return &__main_dlopen;
+	else if (!strcmp(symbol, "dlsym"))
+		return &__main_dlsym;
+	else if (!strcmp(symbol, "dlvsym"))
+		return &__main_dlvsym;
+	else if (!strcmp(symbol, "__libc_dlsym"))
+		return &__main___libc_dlsym;
 	else
 		return NULL;
 }
 
 void *dlopen(const char *filename, int flag)
+{
+	return __main_dlopen(filename, flag);
+}
+
+void *__main_dlopen(const char *filename, int flag)
 {
 	if (lib.dlopen == NULL)
 		get_real_dlsym();
@@ -435,6 +447,13 @@ void *dlopen(const char *filename, int flag)
 
 void *dlsym(void *handle, const char *symbol)
 {
+	return __main_dlsym(handle, symbol);
+}
+
+void *__main_dlsym(void *handle, const char *symbol)
+{
+	printf("__dlsym(%p, %s)\n", handle, symbol);
+
 	if (lib.dlsym == NULL)
 		get_real_dlsym();
 
@@ -446,6 +465,11 @@ void *dlsym(void *handle, const char *symbol)
 }
 
 void *dlvsym(void *handle, const char *symbol, const char *version)
+{
+	return __main_dlvsym(handle, symbol, version);
+}
+
+void *__main_dlvsym(void *handle, const char *symbol, const char *version)
 {
 	if (lib.dlvsym == NULL)
 		get_real_dlsym();
@@ -459,10 +483,16 @@ void *dlvsym(void *handle, const char *symbol, const char *version)
 
 void *__libc_dlsym(void *handle, const char *symbol)
 {
+	return __main___libc_dlsym(handle, symbol);
+}
+
+void *__main___libc_dlsym(void *handle, const char *symbol)
+{
+	fprintf(stderr, "(glc:main) __libc_dlsym(%p, %s)\n", handle, symbol);
+
 	if (lib.__libc_dlsym == NULL)
 		get_real_libc_dlsym();
 
-	fprintf(stderr, "(glc:main) __libc_dlsym(%p, %s)\n", handle, symbol);
 	void *ret = wrapped_func(symbol);
 	if (ret)
 		return ret;
