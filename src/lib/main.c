@@ -333,7 +333,7 @@ void get_real_dlsym()
 {
 	eh_obj_t libdl;
 
-	if (eh_init_obj(&libdl, "*libdl.so*")) {
+	if (eh_find_obj(&libdl, "*libdl.so*")) {
 		fprintf(stderr, "(glc) libdl.so is not present in memory\n");
 		exit(1);
 	}
@@ -360,7 +360,7 @@ void get_real_libc_dlsym()
 {
 	eh_obj_t libc;
 
-	if (eh_init_obj(&libc, "*libc.so*")) {
+	if (eh_find_obj(&libc, "*libc.so*")) {
 		fprintf(stderr, "(glc) libc.so is not present in memory\n");
 		exit(1);
 	}
