@@ -1,3 +1,8 @@
+0.3.10 (2007/10/29)
+   Support for -fvisibility=hidden
+   Fix crash/hooking when multiple hooks (eg. mumble overlay) is present.
+   Wrap __libc_dlsym()
+
 0.3.9 (2007/10/28)
    Logging framework: should help in debugging and testing.
    Support for locking fps when capturing.
