@@ -227,6 +227,14 @@ void lib_close()
 {
 	int ret;
 	mpriv.glc->flags &= ~GLC_CAPTURE; /* disable capturing */
+	/*
+	 There is a small possibility that a capture operation in another
+	 thread is still active. This should be called only in exit() or
+	 at return from main loop so we choose performance and not safety.
+
+	 Adding a rwlock for all capture operations might inflict a noticeable
+	 cost, at least in complexity.
+	*/
 
 	util_log(mpriv.glc, GLC_INFORMATION, "main", "closing glc");
 
@@ -356,7 +364,7 @@ void get_real_dlsym()
 	eh_destroy_obj(&libdl);
 }
 
-void get_real_libc_dlsym()
+void get_real___libc_dlsym()
 {
 	eh_obj_t libc;
 
@@ -487,7 +495,7 @@ __PUBLIC void *__libc_dlsym(void *handle, const char *symbol)
 void *__main___libc_dlsym(void *handle, const char *symbol)
 {
 	if (lib.__libc_dlsym == NULL)
-		get_real_libc_dlsym();
+		get_real___libc_dlsym();
 
 	void *ret = wrapped_func(symbol);
 	if (ret)
