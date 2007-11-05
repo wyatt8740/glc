@@ -105,14 +105,27 @@ void file_finish_callback(void *ptr, int err)
 int file_read_callback(glc_thread_state_t *state)
 {
 	struct file_private_s *file = (struct file_private_s *) state->ptr;
-	glc_size_t glc_size = (glc_size_t) state->read_size;
+	glc_container_message_t *container;
 
-	if (fwrite(&state->header, 1, GLC_MESSAGE_HEADER_SIZE, file->to) != GLC_MESSAGE_HEADER_SIZE)
-		return ENOSTR;
-	if (fwrite(&glc_size, 1, GLC_SIZE_SIZE, file->to) != GLC_SIZE_SIZE)
-		return ENOSTR;
-	if (fwrite(state->read_data, 1, state->read_size, file->to) != state->read_size)
-		return ENOSTR;
+	if (state->header.type == GLC_MESSAGE_CONTAINER) {
+		container = (glc_container_message_t *) state->read_data;
+
+		if (fwrite(&container->header, 1, GLC_MESSAGE_HEADER_SIZE, file->to)
+		    != GLC_MESSAGE_HEADER_SIZE)
+			return ENOSTR;
+		if (fwrite(&container->size, 1, GLC_SIZE_SIZE, file->to) != GLC_SIZE_SIZE)
+			return ENOSTR;
+		if (fwrite(&state->read_data[GLC_CONTAINER_MESSAGE_SIZE], 1, container->size, file->to)
+		    != container->size)
+			return ENOSTR;
+	} else {
+		if (fwrite(&state->header, 1, GLC_MESSAGE_HEADER_SIZE, file->to) != GLC_MESSAGE_HEADER_SIZE)
+			return ENOSTR;
+		if (fwrite(&state->read_size, 1, GLC_SIZE_SIZE, file->to) != GLC_SIZE_SIZE)
+			return ENOSTR;
+		if (fwrite(state->read_data, 1, state->read_size, file->to) != state->read_size)
+			return ENOSTR;
+	}
 
 	return 0;
 }

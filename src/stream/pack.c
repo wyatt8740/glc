@@ -84,7 +84,7 @@ int pack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 	pack->thread.thread_finish_callback = &pack_thread_finish_callback;
 	pack->thread.read_callback = &pack_read_callback;
 	pack->thread.finish_callback = &pack_finish_callback;
-	pack->thread.threads = 1; /* compression can't currently take advantage of threading */
+	pack->thread.threads = util_cpus();
 
 	if (pack->glc->flags & GLC_COMPRESS_QUICKLZ) {
 #ifdef __QUICKLZ
@@ -155,14 +155,16 @@ int pack_read_callback(glc_thread_state_t *state)
 	     (state->header.type == GLC_MESSAGE_AUDIO))) {
 		if (pack->glc->flags & GLC_COMPRESS_QUICKLZ) {
 #ifdef __QUICKLZ
-			state->write_size = GLC_QUICKLZ_HEADER_SIZE
+			state->write_size = GLC_CONTAINER_MESSAGE_SIZE
+					    + GLC_QUICKLZ_HEADER_SIZE
 					    + __quicklz_worstcase(state->read_size);
 #else
 			goto copy;
 #endif
 		} else if (pack->glc->flags & GLC_COMPRESS_LZO) {
 #ifdef __LZO
-			state->write_size = GLC_LZO_HEADER_SIZE
+			state->write_size = GLC_CONTAINER_MESSAGE_SIZE
+					    + GLC_LZO_HEADER_SIZE
 			                    + __lzo_worstcase(state->read_size);
 #else
 			goto copy;
@@ -170,7 +172,6 @@ int pack_read_callback(glc_thread_state_t *state)
 		} else
 			goto copy;
 
-		state->flags |= GLC_THREAD_STATE_UNKNOWN_FINAL_SIZE;
 		return 0;
 	}
 copy:
@@ -181,18 +182,23 @@ copy:
 int pack_lzo_write_callback(glc_thread_state_t *state)
 {
 #ifdef __LZO
-	glc_lzo_header_t *lzo_header = (glc_lzo_header_t *) state->write_data;
+	glc_container_message_t *container = (glc_container_message_t *) state->write_data;
+	glc_lzo_header_t *lzo_header =
+		(glc_lzo_header_t *) &state->write_data[GLC_CONTAINER_MESSAGE_SIZE];
 
 	__lzo_compress((unsigned char *) state->read_data, state->read_size,
-		       (unsigned char *) &state->write_data[GLC_LZO_HEADER_SIZE],
-		       (lzo_uintp) &state->write_size,
+		       (unsigned char *) &state->write_data[GLC_LZO_HEADER_SIZE +
+		       					    GLC_CONTAINER_MESSAGE_SIZE],
+		       (lzo_uintp) &container->size,
 		       state->threadptr);
 
 	lzo_header->size = (glc_size_t) state->read_size;
 	memcpy(&lzo_header->header, &state->header, GLC_MESSAGE_HEADER_SIZE);
-	state->header.type = GLC_MESSAGE_LZO;
 
-	state->write_size += GLC_LZO_HEADER_SIZE;
+	container->size += GLC_LZO_HEADER_SIZE;
+	container->header.type = GLC_MESSAGE_LZO;
+
+	state->header.type = GLC_MESSAGE_CONTAINER;
 
 	return 0;
 #else
@@ -203,18 +209,23 @@ int pack_lzo_write_callback(glc_thread_state_t *state)
 int pack_quicklz_write_callback(glc_thread_state_t *state)
 {
 #ifdef __QUICKLZ
-	glc_quicklz_header_t *quicklz_header = (glc_quicklz_header_t *) state->write_data;
+	glc_container_message_t *container = (glc_container_message_t *) state->write_data;
+	glc_quicklz_header_t *quicklz_header =
+		(glc_quicklz_header_t *) &state->write_data[GLC_CONTAINER_MESSAGE_SIZE];
 
 	quicklz_compress((const unsigned char *) state->read_data,
-			 (unsigned char *) &state->write_data[GLC_QUICKLZ_HEADER_SIZE],
-			 state->read_size, &state->write_size,
+			 (unsigned char *) &state->write_data[GLC_QUICKLZ_HEADER_SIZE +
+			 				      GLC_CONTAINER_MESSAGE_SIZE],
+			 state->read_size, &container->size,
 			 state->threadptr);
 
 	quicklz_header->size = (glc_size_t) state->read_size;
 	memcpy(&quicklz_header->header, &state->header, GLC_MESSAGE_HEADER_SIZE);
-	state->header.type = GLC_MESSAGE_QUICKLZ;
 
-	state->write_size += GLC_QUICKLZ_HEADER_SIZE;
+	container->size += GLC_QUICKLZ_HEADER_SIZE;
+	container->header.type = GLC_MESSAGE_QUICKLZ;
+
+	state->header.type = GLC_MESSAGE_CONTAINER;
 
 	return 0;
 #else

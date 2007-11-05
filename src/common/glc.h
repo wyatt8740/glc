@@ -255,6 +255,8 @@ typedef char glc_message_type_t;
 #define GLC_MESSAGE_QUICKLZ            0x07
 /** gamma correction information */
 #define GLC_MESSAGE_GAMMA              0x08
+/** plain container */
+#define GLC_MESSAGE_CONTAINER          0x09
 
 /**
  * \brief stream message header
@@ -385,7 +387,20 @@ typedef struct {
 	/** blue gamma */
 	float blue;
 } glc_gamma_message_t;
+/** sizeof(glc_gamma_message_t) */
 #define GLC_GAMMA_MESSAGE_SIZE           16
+
+/**
+ * \brief container message
+ */
+typedef struct {
+	/** size */
+	glc_size_t size;
+	/** header */
+	glc_message_header_t header;
+} glc_container_message_t;
+/** sizeof(glc_container_message_t) */
+#define GLC_CONTAINER_MESSAGE_SIZE        9
 
 /**  \} */
 
