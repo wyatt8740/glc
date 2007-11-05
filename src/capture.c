@@ -176,6 +176,7 @@ int main(int argc, char *argv[])
 	
 	if ((ret = execvp(program, program_args))) {
 		fprintf(stderr, "can't execute \"%s", program);
+		optind++;
 		while (optind < argc)
 			fprintf(stderr, " %s", argv[optind++]);
 		fprintf(stderr, "\"\n");
