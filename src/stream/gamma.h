@@ -21,6 +21,8 @@
  *  \{
  */
 
+__PUBLIC int gamma_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
+
 /**  \} */
 
 #endif

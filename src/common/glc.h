@@ -84,8 +84,10 @@
 #define GLC_SIGNAL_RGB_FINISHED          11
 /** gl playback has finished */
 #define GLC_SIGNAL_GL_PLAY_FINISHED      12
+/** gamma correction filter has finished */
+#define GLC_SIGNAL_GAMMA_FINISHED        13
 /** number of signals */
-#define GLC_SIGNALS                      13
+#define GLC_SIGNALS                      14
 
 /** unsigned time in microseconds */
 typedef u_int64_t glc_utime_t;
