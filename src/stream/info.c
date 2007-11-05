@@ -67,6 +67,7 @@ void pic_info(struct info_private_s *info, glc_picture_header_t *pic_header);
 void audio_fmt_info(struct info_private_s *info, glc_audio_format_message_t *fmt_message);
 void audio_info(struct info_private_s *info, glc_audio_header_t *audio_header);
 void stream_info(struct info_private_s *info);
+void gamma_info(struct info_private_s *info, glc_gamma_message_t *gamma_msg);
 
 void print_time(FILE *stream, glc_utime_t time);
 
@@ -122,6 +123,8 @@ int info_read_callback(glc_thread_state_t *state)
 		audio_fmt_info(info, (glc_audio_format_message_t *) state->read_data);
 	else if (state->header.type == GLC_MESSAGE_AUDIO)
 		audio_info(info, (glc_audio_header_t *) state->read_data);
+	else if (state->header.type == GLC_MESSAGE_GAMMA)
+		gamma_info(info, (glc_gamma_message_t *) state->read_data);
 	else if (state->header.type == GLC_MESSAGE_CLOSE) {
 		print_time(stdout, info->time);
 		printf("end of stream\n");
@@ -287,6 +290,19 @@ void audio_info(struct info_private_s *info, glc_audio_header_t *audio_header)
 	}
 }
 
+void gamma_info(struct info_private_s *info, glc_gamma_message_t *gamma_msg)
+{
+	print_time(stdout, info->time);
+	if (info->glc->info_level >= INFO_DETAILED_CTX) {
+		printf("gamma message\n");
+		printf("  ctx         = %d\n", gamma_msg->ctx);
+		printf("  red         = %f\n", gamma_msg->red);
+		printf("  green       = %f\n", gamma_msg->green);
+		printf("  blue        = %f\n", gamma_msg->blue);
+	} else
+		printf("gamma %d\n", gamma_msg->ctx);
+}
+
 void stream_info(struct info_private_s *info)
 {
 	if (info->stream_info)
@@ -312,7 +328,6 @@ void print_time(FILE *stream, glc_utime_t time)
 {
 	fprintf(stream, "[%7.2fs] ", (double) time / 1000000.0);
 }
-
 
 /**  \} */
 /**  \} */
