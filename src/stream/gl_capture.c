@@ -490,7 +490,7 @@ int gl_capture_update_ctx(struct gl_capture_private_s *gl_capture,
 		else
 			ctx->flags |= GLC_CTX_BGR;
 
-		if (gl_capture->glc->flags & GLC_CTX_DWORD_ALIGNED)
+		if (gl_capture->glc->flags & GLC_CAPTURE_DWORD_ALIGNED)
 			ctx->flags = GLC_CTX_DWORD_ALIGNED;
 	} else if (ctx->flags & GLC_CTX_CREATE) {
 		ctx->flags &= ~GLC_CTX_CREATE;
