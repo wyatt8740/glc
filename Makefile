@@ -31,7 +31,7 @@ QUICKLZ = support/quicklz/
 QUICKLZ_OBJ = $(BUILD)/quicklz.o
 USE_QUICKLZ = -D__QUICKLZ -I$(QUICKLZ)
 
-LIBS = -lpthread -lpacketstream -lGL -ldl -lelfhacks -lasound
+LIBS = -lpthread -lpacketstream -lGL -ldl -lasound
 
 HEADERS = $(COMMON)/glc.h \
 	  $(COMMON)/util.h \
@@ -49,7 +49,8 @@ HEADERS = $(COMMON)/glc.h \
 	  $(STREAM)/demux.h \
 	  $(STREAM)/ycbcr.h \
 	  $(STREAM)/yuv4mpeg.h \
-	  $(STREAM)/rgb.h
+	  $(STREAM)/rgb.h \
+	  $(STREAM)/gamma.h
 
 LIB_OBJS = $(BUILD)/gl_capture.o \
            $(BUILD)/gl_play.o \
@@ -67,6 +68,7 @@ LIB_OBJS = $(BUILD)/gl_capture.o \
            $(BUILD)/ycbcr.o \
            $(BUILD)/yuv4mpeg.o \
            $(BUILD)/rgb.o \
+           $(BUILD)/gamma.o \
            $(LZO_OBJ) \
            $(QUICKLZ_OBJ)
 
@@ -82,8 +84,8 @@ $(BUILD):
 
 # capture library
 $(BUILD)/libglc-capture.so.$(RELEASE): $(BUILD)/libglc.so.$(RELEASE) $(CAPT_OBJS)
-	$(LD) $(LDFLAGS) -Wl,-soname,libglc-capture-so.$(VERSION) -L$(BUILD) -lglc -shared \
-		-o $(BUILD)/libglc-capture.so.$(RELEASE) $(CAPT_OBJS)
+	$(LD) $(LDFLAGS) -Wl,-soname,libglc-capture-so.$(VERSION) -L$(BUILD) -lglc -lelfhacks \
+		-shared -o $(BUILD)/libglc-capture.so.$(RELEASE) $(CAPT_OBJS)
 	ln -sf libglc-capture.so.$(RELEASE) $(BUILD)/libglc-capture.so.$(VERSION)
 	ln -sf libglc-capture.so.$(RELEASE) $(BUILD)/libglc-capture.so
 
@@ -173,6 +175,9 @@ $(BUILD)/yuv4mpeg.o: $(STREAM)/yuv4mpeg.c $(HEADERS)
 
 $(BUILD)/rgb.o: $(STREAM)/rgb.c $(HEADERS)
 	$(CC) $(SO_CFLAGS) -o $(BUILD)/rgb.o -c $(STREAM)/rgb.c
+
+$(BUILD)/gamma.o: $(STREAM)/gamma.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/gamma.o -c $(STREAM)/gamma.c
 
 
 $(LZO_OBJ): $(MINILZO)minilzo.c $(MINILZO)lzoconf.h $(MINILZO)lzodefs.h $(MINILZO)minilzo.h
