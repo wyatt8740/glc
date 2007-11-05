@@ -537,6 +537,9 @@ int gl_capture_update_ctx(struct gl_capture_private_s *gl_capture,
 			 "ctx %d: %ux%u (%ux%u), 0x%02x flags", ctx->ctx_i,
 			 ctx->cw, ctx->ch, ctx->w, ctx->h, ctx->flags);
 
+		/* how about gamma? */
+		gl_capture_update_gamma(gl_capture, ctx);
+
 		if (gl_capture->use_pbo) {
 			if (ctx->pbo)
 				gl_capture_destroy_pbo(gl_capture, ctx);
