@@ -251,6 +251,8 @@ typedef char glc_message_type_t;
 #define GLC_MESSAGE_AUDIO              0x06
 /** quicklz-compressed packet */
 #define GLC_MESSAGE_QUICKLZ            0x07
+/** gamma correction information */
+#define GLC_MESSAGE_GAMMA              0x08
 
 /**
  * \brief stream message header
@@ -367,6 +369,21 @@ typedef struct {
 } glc_audio_header_t;
 /** sizeof(glc_audio_header_t) */
 #define GLC_AUDIO_HEADER_SIZE            20
+
+/**
+ * \brief gamma correction information message
+ */
+typedef struct {
+	/** context */
+	glc_ctx_i ctx;
+	/** red gamma */
+	float red;
+	/** green gamma */
+	float green;
+	/** blue gamma */
+	float blue;
+} glc_gamma_message_t;
+#define GLC_GAMMA_MESSAGE_SIZE           16
 
 /**  \} */
 

@@ -375,6 +375,5 @@ int __x11_XPeekIfEvent(Display *display, XEvent *event_return, Bool (*predicate)
 	return ret;
 }
 
-
 /**  \} */
 /**  \} */

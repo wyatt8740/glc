@@ -33,39 +33,5 @@
  *  \{
  */
 
-int gamma_capture(glc_t *glc, ps_buffer_t *to, float red, float green, float blue)
-{
-	ps_packet_t packet;
-	int ret = 0;
-	glc_message_header_t msg_hdr;
-	glc_gamma_message_t msg;
-
-	msg_hdr.type = GLC_MESSAGE_GAMMA;
-	msg.red = red;
-	msg.green = green;
-	msg.blue = blue;
-
-	if ((ret = ps_packet_init(&packet, to)))
-		goto err;
-	if ((ret = ps_packet_open(&packet, PS_PACKET_WRITE)))
-		goto err;
-	if ((ret = ps_packet_write(&packet, &msg_hdr, GLC_MESSAGE_HEADER_SIZE)))
-		goto err;
-	if ((ret = ps_packet_write(&packet, &msg, GLC_GAMMA_MESSAGE_SIZE)))
-		goto err;
-	if ((ret = ps_packet_close(&packet)))
-		goto err;
-	if ((ret = ps_packet_destroy(&packet)))
-		goto err;
-
-	return 0;
-err:
-	ps_packet_cancel(&packet);
-
-	util_log(glc, GLC_ERROR, "gamma",  "can't write gamma correction information to buffer: %s (%d)\n",
-		 strerror(ret), ret);
-	return ret;
-}
-
 /**  \} */
 /**  \} */

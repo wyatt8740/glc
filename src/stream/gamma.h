@@ -21,9 +21,6 @@
  *  \{
  */
 
-/** \TODO support GammaRamp */
-int gamma_capture(glc_t *glc, ps_buffer_t *to, float red, float green, float blue);
-
 /**  \} */
 
 #endif

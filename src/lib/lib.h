@@ -16,6 +16,7 @@
 #include "../common/glc.h"
 #include <X11/X.h>
 #include <X11/Xlib.h>
+#include <X11/extensions/xf86vmode.h>
 #include <GL/gl.h>
 #include <GL/glx.h>
 #include <alsa/asoundlib.h>
@@ -105,6 +106,8 @@ __PRIVATE Bool __x11_XCheckTypedWindowEvent(Display *display, Window w, int even
 __PRIVATE int __x11_XIfEvent(Display *display, XEvent *event_return, Bool ( *predicate)(), XPointer arg);
 __PRIVATE Bool __x11_XCheckIfEvent(Display *display, XEvent *event_return, Bool ( *predicate)(), XPointer arg);
 __PRIVATE int __x11_XPeekIfEvent(Display *display, XEvent *event_return, Bool ( *predicate)(), XPointer arg);
+
+__PRIVATE int __x11_XF86VidModeSetGamma(Display *display, int screen, XF86VidModeGamma *Gamma);
 
 __PRIVATE int __alsa_snd_pcm_open(snd_pcm_t **pcmp, const char *name, snd_pcm_stream_t stream, int mode);
 __PRIVATE snd_pcm_sframes_t __alsa_snd_pcm_writei(snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size);

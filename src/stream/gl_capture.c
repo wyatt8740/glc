@@ -15,6 +15,7 @@
 #include <string.h>
 #include <X11/X.h>
 #include <X11/Xlib.h>
+#include <X11/extensions/xf86vmode.h>
 #include <GL/gl.h>
 #include <GL/glx.h>
 #include <GL/glext.h>
@@ -57,6 +58,7 @@ typedef GLboolean (*glUnmapBufferProc)(GLenum target);
 struct gl_capture_ctx_s {
 	glc_flags_t flags;
 	Display *dpy;
+	int screen;
 	GLXDrawable drawable;
 	ps_packet_t packet;
 	glc_ctx_i ctx_i;
@@ -64,6 +66,8 @@ struct gl_capture_ctx_s {
 
 	unsigned int w, h;
 	unsigned int cw, ch, row, cx, cy;
+
+	float gamma_red, gamma_green, gamma_blue;
 
 	int indicator_list;
 
@@ -111,6 +115,8 @@ int gl_capture_get_geometry(struct gl_capture_private_s *gl_capture,
 			    Display *dpy, GLXDrawable drawable, unsigned int *w, unsigned int *h);
 int gl_capture_calc_geometry(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx,
 			     unsigned int w, unsigned int h);
+int gl_capture_update_screen(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
+int gl_capture_update_gamma(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
 
 int gl_capture_get_pixels(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx, char *to);
 int gl_capture_gen_indicator_list(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
@@ -204,6 +210,13 @@ int gl_capture_get_geometry(struct gl_capture_private_s *gl_capture, Display *dp
 	XGetGeometry(dpy, drawable, &rootWindow, &unused, &unused, w, h,
 	             (unsigned int *) &unused, (unsigned int *) &unused);
 	
+	return 0;
+}
+
+int gl_capture_update_screen(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
+{
+	/* TODO fix this! */
+	ctx->screen = DefaultScreen(ctx->dpy);
 	return 0;
 }
 
@@ -483,6 +496,12 @@ int gl_capture_update_ctx(struct gl_capture_private_s *gl_capture,
 	gl_capture_get_geometry(gl_capture, ctx->dpy, ctx->drawable, &w, &h);
 
 	if (ctx->flags == 0) {
+		/* initialize screen information */
+		gl_capture_update_screen(gl_capture, ctx);
+
+		/* reset gamma values */
+		ctx->gamma_red = ctx->gamma_green = ctx->gamma_blue = 1.0;
+
 		ctx->flags |= GLC_CTX_CREATE;
 
 		if (gl_capture->glc->flags & GLC_CAPTURE_BGRA)
@@ -634,6 +653,50 @@ cancel:
 	}
 	ps_packet_cancel(&ctx->packet);
 	goto finish;
+}
+
+/** \TODO support GammaRamp */
+int gl_capture_update_gamma(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
+{
+	glc_message_header_t msg_hdr;
+	glc_gamma_message_t msg;
+	XF86VidModeGamma gamma;
+	int ret = 0;
+
+	XF86VidModeGetGamma(ctx->dpy, ctx->screen, &gamma);
+
+	if ((gamma.red == ctx->gamma_red) &&
+	    (gamma.green == ctx->gamma_green) &&
+	    (gamma.blue == ctx->gamma_blue))
+		return 0; /* nothing to update */
+
+	msg_hdr.type = GLC_MESSAGE_GAMMA;
+	msg.ctx = ctx->ctx_i;
+	msg.red = gamma.red;
+	msg.green = gamma.green;
+	msg.blue = gamma.blue;
+
+	util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture", "gamma: %f, %f, %f",
+		 msg.red, msg.green, msg.blue);
+
+	if ((ret = ps_packet_open(&ctx->packet, PS_PACKET_WRITE)))
+		goto err;
+	if ((ret = ps_packet_write(&ctx->packet, &msg_hdr, GLC_MESSAGE_HEADER_SIZE)))
+		goto err;
+	if ((ret = ps_packet_write(&ctx->packet, &msg, GLC_GAMMA_MESSAGE_SIZE)))
+		goto err;
+	if ((ret = ps_packet_close(&ctx->packet)))
+		goto err;
+
+	return 0;
+
+err:
+	ps_packet_cancel(&ctx->packet);
+
+	util_log(gl_capture->glc, GLC_ERROR, "gl_capture",
+		 "can't write gamma correction information to buffer: %s (%d)",
+		 strerror(ret), ret);
+	return ret;
 }
 
 /**  \} */
