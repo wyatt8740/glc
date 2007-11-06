@@ -34,7 +34,7 @@
  *  \{
  */
 
-#define LOOKUP_BITS 7
+#define LOOKUP_BITS 6
 #define YCBCR_LOOKUP_POS(Y, Cb, Cr) \
 	(((((Y)  >> (8 - LOOKUP_BITS)) << (LOOKUP_BITS * 2)) + \
 	  (((Cb) >> (8 - LOOKUP_BITS)) << LOOKUP_BITS) + \
@@ -115,9 +115,6 @@ int color_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 	color->thread.finish_callback = &color_finish_callback;
 	color->thread.ptr = color;
 	color->thread.threads = util_cpus();
-
-	util_log(color->glc, GLC_INFORMATION, "color", "using %d bit accuracy for YCbCr lookup table",
-		 LOOKUP_BITS);
 
 	return glc_thread_create(glc, &color->thread, from, to);
 }
@@ -219,6 +216,7 @@ int color_ctx_msg(struct color_private_s *color, glc_ctx_message_t *msg)
 {
 	struct color_ctx_s *ctx;
 	color_get_ctx(color, msg->ctx, &ctx);
+	pthread_rwlock_wrlock(&ctx->update);
 
 	ctx->flags = msg->flags;
 	ctx->w = msg->w;
@@ -251,8 +249,8 @@ int color_ctx_msg(struct color_private_s *color, glc_ctx_message_t *msg)
 			 ctx->red_gamma, ctx->green_gamma, ctx->blue_gamma);
 
 		if (ctx->flags & GLC_CTX_YCBCR_420JPEG) {
-			/*color_generate_ycbcr_lookup_table(color, ctx);
-			ctx->proc = &color_ycbcr;*/
+			color_generate_ycbcr_lookup_table(color, ctx);
+			ctx->proc = &color_ycbcr;
 		} else if ((ctx->flags & GLC_CTX_BGR) | (ctx->flags & GLC_CTX_BGRA)) {
 			color_generate_rgb_lookup_table(color, ctx);
 			ctx->proc = &color_bgr;
@@ -260,6 +258,7 @@ int color_ctx_msg(struct color_private_s *color, glc_ctx_message_t *msg)
 			util_log(color->glc, GLC_WARNING, "color", "unsupported ctx %d", msg->ctx);
 	}
 
+	pthread_rwlock_unlock(&ctx->update);
 	return 0;
 }
 
@@ -271,6 +270,7 @@ int color_color_msg(struct color_private_s *color, glc_color_message_t *msg)
 		return 0; /* ignore */
 
 	color_get_ctx(color, msg->ctx, &ctx);
+	pthread_rwlock_wrlock(&ctx->update);
 
 	ctx->brightness = msg->brightness;
 	ctx->contrast = msg->contrast;
@@ -284,13 +284,14 @@ int color_color_msg(struct color_private_s *color, glc_color_message_t *msg)
 		 ctx->red_gamma, ctx->green_gamma, ctx->blue_gamma);
 
 	if (ctx->flags & GLC_CTX_YCBCR_420JPEG) {
-		/*color_generate_ycbcr_lookup_table(color, ctx);
-		ctx->proc = &color_ycbcr;*/
+		color_generate_ycbcr_lookup_table(color, ctx);
+		ctx->proc = &color_ycbcr;
 	} else if ((ctx->flags & GLC_CTX_BGR) | (ctx->flags & GLC_CTX_BGRA)) {
 		color_generate_rgb_lookup_table(color, ctx);
 		ctx->proc = &color_bgr;
 	}
 
+	pthread_rwlock_unlock(&ctx->update);
 	return 0;
 }
 
@@ -298,7 +299,43 @@ void color_ycbcr(struct color_private_s *color,
 		 struct color_ctx_s *ctx,
 		 unsigned char *from, unsigned char *to)
 {
+	unsigned int x, y, Cpix, Y;
+	unsigned int pos;
+	unsigned char *Y_from, *Cb_from, *Cr_from;
+	unsigned char *Y_to, *Cb_to, *Cr_to;
 
+	Y_from = from;
+	Cb_from = &from[ctx->h * ctx->w];
+	Cr_from = &from[ctx->h * ctx->w + (ctx->h / 2) * (ctx->w / 2)];
+
+	Y_to = to;
+	Cb_to = &to[ctx->h * ctx->w];
+	Cr_to = &to[ctx->h * ctx->w + (ctx->h / 2) * (ctx->w / 2)];
+
+	Cpix = 0;
+
+#define CONVERT_Y(xadd, yadd) 								\
+	pos = YCBCR_LOOKUP_POS(Y_from[(x + (xadd)) + (y + (yadd)) * ctx->w],		\
+			       Cb_from[Cpix], Cr_from[Cpix]);				\
+	Y_to[(x + (xadd)) + (y + (yadd)) * ctx->w] = ctx->lookup_table[pos + 0];	\
+	Y += ctx->lookup_table[pos + 0];
+
+	for (y = 0; y < ctx->h; y += 2) {
+		for (x = 0; x < ctx->w; x += 2) {
+			Y = 0;
+
+			CONVERT_Y(0, 0)
+			CONVERT_Y(0, 1)
+			CONVERT_Y(1, 0)
+			CONVERT_Y(1, 1)
+
+			pos = YCBCR_LOOKUP_POS(Y >> 2, Cb_from[Cpix], Cr_from[Cpix]);
+			Cb_to[Cpix] = ctx->lookup_table[pos + 1];
+			Cr_to[Cpix] = ctx->lookup_table[pos + 2];
+
+			Cpix++;
+		}
+	}
 }
 
 void color_bgr(struct color_private_s *color,
@@ -318,9 +355,57 @@ void color_bgr(struct color_private_s *color,
 	}
 }
 
+/* TODO something more sane... */
+#define YCbCrJPEG_TO_RGB_Rd(Y, Cb, Cr) \
+	((Y) + 1.402 * ((Cr) - 128))
+#define YCbCrJPEG_TO_RGB_Gd(Y, Cb, Cr) \
+	((Y) - 0.344136 * ((Cb) - 128) - 0.714136 * ((Cr) - 128))
+#define YCbCrJPEG_TO_RGB_Bd(Y, Cb, Cr) \
+	((Y) + 1.772 * ((Cb) - 128))
+
+#define RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd) \
+	(    + 0.299    * (Rd) +    0.587 * (Gd) + 0.114 *    (Bd))
+#define RGB_TO_YCbCrJPEG_Cb(Rd, Gd, Bd) \
+	(128 - 0.168736 * (Rd) - 0.331264 * (Gd) + 0.5      * (Bd))
+#define RGB_TO_YCbCrJPEG_Cr(Rd, Gd, Bd) \
+	(128 + 0.5      * (Rd) - 0.418688 * (Gd) - 0.081312 * (Bd))
+
 int color_generate_ycbcr_lookup_table(struct color_private_s *color,
 				      struct color_ctx_s *ctx)
 {
+	unsigned int Y, Cb, Cr, pos;
+	double R, G, B;
+	size_t lookup_size = (1 << LOOKUP_BITS) * (1 << LOOKUP_BITS) * (1 << LOOKUP_BITS) * 3;
+
+	util_log(color->glc, GLC_INFORMATION, "color",
+		 "using %d bit lookup table (%zd bytes)", LOOKUP_BITS, lookup_size);
+	ctx->lookup_table = malloc(lookup_size);
+
+#define CALC(value, brightness, contrast, gamma) \
+	((pow((double) value / 255.0, 1.0 / gamma) - 0.5) * (1.0 + contrast) \
+	 + brightness + 0.5) * 255.0
+
+	pos = 0;
+	for (Y = 0; Y < 256; Y += (1 << (8 - LOOKUP_BITS))) {
+		for (Cb = 0; Cb < 256; Cb += (1 << (8 - LOOKUP_BITS))) {
+			for (Cr = 0; Cr < 256; Cr += (1 << (8 - LOOKUP_BITS))) {
+				R = color_clamp(CALC(color_clamp(YCbCrJPEG_TO_RGB_Rd(Y, Cb, Cr)),
+						ctx->brightness, ctx->contrast, ctx->red_gamma));
+				G = color_clamp(CALC(color_clamp(YCbCrJPEG_TO_RGB_Gd(Y, Cb, Cr)),
+						ctx->brightness, ctx->contrast, ctx->green_gamma));
+				B = color_clamp(CALC(color_clamp(YCbCrJPEG_TO_RGB_Bd(Y, Cb, Cr)),
+						ctx->brightness, ctx->contrast, ctx->blue_gamma));
+
+				ctx->lookup_table[pos + 0] = RGB_TO_YCbCrJPEG_Y(R, G, B);
+				ctx->lookup_table[pos + 1] = RGB_TO_YCbCrJPEG_Cb(R, G, B);
+				ctx->lookup_table[pos + 2] = RGB_TO_YCbCrJPEG_Cr(R, G, B);
+				pos += 3;
+			}
+		}
+	}
+
+#undef CALC
+
 	return 0;
 }
 
