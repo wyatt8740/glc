@@ -1,27 +1,27 @@
 /**
- * \file src/stream/gamma.h
- * \brief gamma correction
+ * \file src/stream/color.h
+ * \brief color correction
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
  */
 
-/* gamma.h -- gamma correction
+/* color.h -- color correction
  * Copyright (C) 2007 Pyry Haulos
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-#ifndef _GAMMA_H
-#define _GAMMA_H
+#ifndef _COLOR_H
+#define _COLOR_H
 
 #include <packetstream.h>
 #include "../common/glc.h"
 
 /**
- * \addtogroup gamma
+ * \addtogroup color
  *  \{
  */
 
-__PUBLIC int gamma_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
+__PUBLIC int color_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
 
 /**  \} */
 

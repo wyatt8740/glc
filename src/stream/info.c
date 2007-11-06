@@ -67,7 +67,7 @@ void pic_info(struct info_private_s *info, glc_picture_header_t *pic_header);
 void audio_fmt_info(struct info_private_s *info, glc_audio_format_message_t *fmt_message);
 void audio_info(struct info_private_s *info, glc_audio_header_t *audio_header);
 void stream_info(struct info_private_s *info);
-void gamma_info(struct info_private_s *info, glc_gamma_message_t *gamma_msg);
+void color_info(struct info_private_s *info, glc_color_message_t *color_msg);
 
 void print_time(FILE *stream, glc_utime_t time);
 
@@ -123,8 +123,8 @@ int info_read_callback(glc_thread_state_t *state)
 		audio_fmt_info(info, (glc_audio_format_message_t *) state->read_data);
 	else if (state->header.type == GLC_MESSAGE_AUDIO)
 		audio_info(info, (glc_audio_header_t *) state->read_data);
-	else if (state->header.type == GLC_MESSAGE_GAMMA)
-		gamma_info(info, (glc_gamma_message_t *) state->read_data);
+	else if (state->header.type == GLC_MESSAGE_COLOR)
+		color_info(info, (glc_color_message_t *) state->read_data);
 	else if (state->header.type == GLC_MESSAGE_CLOSE) {
 		print_time(stdout, info->time);
 		printf("end of stream\n");
@@ -290,17 +290,19 @@ void audio_info(struct info_private_s *info, glc_audio_header_t *audio_header)
 	}
 }
 
-void gamma_info(struct info_private_s *info, glc_gamma_message_t *gamma_msg)
+void color_info(struct info_private_s *info, glc_color_message_t *color_msg)
 {
 	print_time(stdout, info->time);
 	if (info->glc->info_level >= INFO_DETAILED_CTX) {
-		printf("gamma message\n");
-		printf("  ctx         = %d\n", gamma_msg->ctx);
-		printf("  red         = %f\n", gamma_msg->red);
-		printf("  green       = %f\n", gamma_msg->green);
-		printf("  blue        = %f\n", gamma_msg->blue);
+		printf("color correction message\n");
+		printf("  ctx         = %d\n", color_msg->ctx);
+		printf("  brightness  = %f\n", color_msg->brightness);
+		printf("  contrast    = %f\n", color_msg->contrast);
+		printf("  red gamma   = %f\n", color_msg->red);
+		printf("  green gamma = %f\n", color_msg->green);
+		printf("  blue gamma  = %f\n", color_msg->blue);
 	} else
-		printf("gamma %d\n", gamma_msg->ctx);
+		printf("color correction information for ctx %d\n", color_msg->ctx);
 }
 
 void stream_info(struct info_private_s *info)

@@ -50,7 +50,7 @@ HEADERS = $(COMMON)/glc.h \
 	  $(STREAM)/ycbcr.h \
 	  $(STREAM)/yuv4mpeg.h \
 	  $(STREAM)/rgb.h \
-	  $(STREAM)/gamma.h
+	  $(STREAM)/color.h
 
 LIB_OBJS = $(BUILD)/gl_capture.o \
            $(BUILD)/gl_play.o \
@@ -68,7 +68,7 @@ LIB_OBJS = $(BUILD)/gl_capture.o \
            $(BUILD)/ycbcr.o \
            $(BUILD)/yuv4mpeg.o \
            $(BUILD)/rgb.o \
-           $(BUILD)/gamma.o \
+           $(BUILD)/color.o \
            $(LZO_OBJ) \
            $(QUICKLZ_OBJ)
 
@@ -176,8 +176,8 @@ $(BUILD)/yuv4mpeg.o: $(STREAM)/yuv4mpeg.c $(HEADERS)
 $(BUILD)/rgb.o: $(STREAM)/rgb.c $(HEADERS)
 	$(CC) $(SO_CFLAGS) -o $(BUILD)/rgb.o -c $(STREAM)/rgb.c
 
-$(BUILD)/gamma.o: $(STREAM)/gamma.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/gamma.o -c $(STREAM)/gamma.c
+$(BUILD)/color.o: $(STREAM)/color.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/color.o -c $(STREAM)/color.c
 
 
 $(LZO_OBJ): $(MINILZO)minilzo.c $(MINILZO)lzoconf.h $(MINILZO)lzodefs.h $(MINILZO)minilzo.h

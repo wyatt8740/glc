@@ -84,8 +84,8 @@
 #define GLC_SIGNAL_RGB_FINISHED          11
 /** gl playback has finished */
 #define GLC_SIGNAL_GL_PLAY_FINISHED      12
-/** gamma correction filter has finished */
-#define GLC_SIGNAL_GAMMA_FINISHED        13
+/** color correction filter has finished */
+#define GLC_SIGNAL_COLOR_FINISHED        13
 /** number of signals */
 #define GLC_SIGNALS                      14
 
@@ -253,8 +253,8 @@ typedef char glc_message_type_t;
 #define GLC_MESSAGE_AUDIO              0x06
 /** quicklz-compressed packet */
 #define GLC_MESSAGE_QUICKLZ            0x07
-/** gamma correction information */
-#define GLC_MESSAGE_GAMMA              0x08
+/** color correction information */
+#define GLC_MESSAGE_COLOR              0x08
 /** plain container */
 #define GLC_MESSAGE_CONTAINER          0x09
 
@@ -375,20 +375,24 @@ typedef struct {
 #define GLC_AUDIO_HEADER_SIZE            20
 
 /**
- * \brief gamma correction information message
+ * \brief color correction information message
  */
 typedef struct {
 	/** context */
 	glc_ctx_i ctx;
+	/** brightness */
+	float brightness;
+	/** contrast */
+	float contrast;
 	/** red gamma */
 	float red;
 	/** green gamma */
 	float green;
 	/** blue gamma */
 	float blue;
-} glc_gamma_message_t;
-/** sizeof(glc_gamma_message_t) */
-#define GLC_GAMMA_MESSAGE_SIZE           16
+} glc_color_message_t;
+/** sizeof(glc_color_message_t) */
+#define GLC_COLOR_MESSAGE_SIZE           24
 
 /**
  * \brief container message

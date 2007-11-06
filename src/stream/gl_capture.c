@@ -67,6 +67,7 @@ struct gl_capture_ctx_s {
 	unsigned int w, h;
 	unsigned int cw, ch, row, cx, cy;
 
+	float brightness, contrast;
 	float gamma_red, gamma_green, gamma_blue;
 
 	int indicator_list;
@@ -116,7 +117,7 @@ int gl_capture_get_geometry(struct gl_capture_private_s *gl_capture,
 int gl_capture_calc_geometry(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx,
 			     unsigned int w, unsigned int h);
 int gl_capture_update_screen(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
-int gl_capture_update_gamma(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
+int gl_capture_update_color(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
 
 int gl_capture_get_pixels(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx, char *to);
 int gl_capture_gen_indicator_list(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
@@ -537,8 +538,8 @@ int gl_capture_update_ctx(struct gl_capture_private_s *gl_capture,
 			 "ctx %d: %ux%u (%ux%u), 0x%02x flags", ctx->ctx_i,
 			 ctx->cw, ctx->ch, ctx->w, ctx->h, ctx->flags);
 
-		/* how about gamma? */
-		gl_capture_update_gamma(gl_capture, ctx);
+		/* how about color correction? */
+		gl_capture_update_color(gl_capture, ctx);
 
 		if (gl_capture->use_pbo) {
 			if (ctx->pbo)
@@ -659,10 +660,10 @@ cancel:
 }
 
 /** \TODO support GammaRamp */
-int gl_capture_update_gamma(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
+int gl_capture_update_color(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
 {
 	glc_message_header_t msg_hdr;
-	glc_gamma_message_t msg;
+	glc_color_message_t msg;
 	XF86VidModeGamma gamma;
 	int ret = 0;
 
@@ -673,20 +674,21 @@ int gl_capture_update_gamma(struct gl_capture_private_s *gl_capture, struct gl_c
 	    (gamma.blue == ctx->gamma_blue))
 		return 0; /* nothing to update */
 
-	msg_hdr.type = GLC_MESSAGE_GAMMA;
+	msg_hdr.type = GLC_MESSAGE_COLOR;
 	msg.ctx = ctx->ctx_i;
 	msg.red = gamma.red;
 	msg.green = gamma.green;
 	msg.blue = gamma.blue;
 
-	util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture", "gamma: %f, %f, %f",
-		 msg.red, msg.green, msg.blue);
+	util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+		 "color correction: brightness=%f, contrast=%f, red=%f, green=%f, blue%f",
+		 msg.brightness, msg.contrast, msg.red, msg.green, msg.blue);
 
 	if ((ret = ps_packet_open(&ctx->packet, PS_PACKET_WRITE)))
 		goto err;
 	if ((ret = ps_packet_write(&ctx->packet, &msg_hdr, GLC_MESSAGE_HEADER_SIZE)))
 		goto err;
-	if ((ret = ps_packet_write(&ctx->packet, &msg, GLC_GAMMA_MESSAGE_SIZE)))
+	if ((ret = ps_packet_write(&ctx->packet, &msg, GLC_COLOR_MESSAGE_SIZE)))
 		goto err;
 	if ((ret = ps_packet_close(&ctx->packet)))
 		goto err;
