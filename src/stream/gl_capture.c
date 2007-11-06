@@ -680,6 +680,9 @@ int gl_capture_update_color(struct gl_capture_private_s *gl_capture, struct gl_c
 	msg.green = gamma.green;
 	msg.blue = gamma.blue;
 
+	/** \TODO figure out brightness and contrast */
+	msg.brightness = msg.contrast = 0;
+
 	util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 		 "color correction: brightness=%f, contrast=%f, red=%f, green=%f, blue%f",
 		 msg.brightness, msg.contrast, msg.red, msg.green, msg.blue);
