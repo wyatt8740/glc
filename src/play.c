@@ -212,7 +212,7 @@ int main(int argc, char *argv[])
 
 	ps_bufferattr_destroy(&attr);
 
-	if ((img) | (yuv4mpeg) | (play))
+	if ((img) | (yuv4mpeg))
 		color_init(glc, uncompressed, color);
 
 	if (img) {
@@ -226,8 +226,9 @@ int main(int argc, char *argv[])
 		ycbcr_init(glc, color, ycbcr);
 		yuv4mpeg_init(glc, ycbcr);
 	} else { /* play */
-		rgb_init(glc, color, rgb);
-		demux_init(glc, rgb);
+		rgb_init(glc, uncompressed, rgb);
+		color_init(glc, rgb, color);
+		demux_init(glc, color);
 	}
 
 	unpack_init(glc, compressed, uncompressed);
