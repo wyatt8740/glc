@@ -34,7 +34,7 @@
  *  \{
  */
 
-#define LOOKUP_BITS 6
+#define LOOKUP_BITS 8
 #define YCBCR_LOOKUP_POS(Y, Cb, Cr) \
 	(((((Y)  >> (8 - LOOKUP_BITS)) << (LOOKUP_BITS * 2)) + \
 	  (((Cb) >> (8 - LOOKUP_BITS)) << LOOKUP_BITS) + \
@@ -356,12 +356,26 @@ void color_bgr(struct color_private_s *color,
 }
 
 /* TODO something more sane... */
-#define YCbCrJPEG_TO_RGB_Rd(Y, Cb, Cr) \
-	((Y) + 1.402 * ((Cr) - 128))
-#define YCbCrJPEG_TO_RGB_Gd(Y, Cb, Cr) \
-	((Y) - 0.344136 * ((Cb) - 128) - 0.714136 * ((Cr) - 128))
-#define YCbCrJPEG_TO_RGB_Bd(Y, Cb, Cr) \
-	((Y) + 1.772 * ((Cb) - 128))
+#define CLAMP_256(val) \
+	(val) < 0 ? 0 : ((val) > 255 ? 255 : (val))
+
+unsigned char YCbCr_TO_RGB_Rd(unsigned char Y, unsigned char Cb, unsigned char Cr)
+{
+	int R = Y + 1.402 * (Cr - 128);
+	return CLAMP_256(R);
+}
+
+unsigned char YCbCr_TO_RGB_Gd(unsigned char Y, unsigned char Cb, unsigned char Cr)
+{
+	int G = Y - 0.344136 * (Cb - 128) - 0.714136 * (Cr - 128);
+	return CLAMP_256(G);
+}
+
+unsigned char YCbCr_TO_RGB_Bd(unsigned char Y, unsigned char Cb, unsigned char Cr)
+{
+	int B = Y + 1.772 * (Cb - 128);
+	return CLAMP_256(B);
+}
 
 #define RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd) \
 	(    + 0.299    * (Rd) +    0.587 * (Gd) + 0.114 *    (Bd))
@@ -374,7 +388,7 @@ int color_generate_ycbcr_lookup_table(struct color_private_s *color,
 				      struct color_ctx_s *ctx)
 {
 	unsigned int Y, Cb, Cr, pos;
-	double R, G, B;
+	unsigned char R, G, B;
 	size_t lookup_size = (1 << LOOKUP_BITS) * (1 << LOOKUP_BITS) * (1 << LOOKUP_BITS) * 3;
 
 	util_log(color->glc, GLC_INFORMATION, "color",
@@ -389,11 +403,11 @@ int color_generate_ycbcr_lookup_table(struct color_private_s *color,
 	for (Y = 0; Y < 256; Y += (1 << (8 - LOOKUP_BITS))) {
 		for (Cb = 0; Cb < 256; Cb += (1 << (8 - LOOKUP_BITS))) {
 			for (Cr = 0; Cr < 256; Cr += (1 << (8 - LOOKUP_BITS))) {
-				R = color_clamp(CALC(color_clamp(YCbCrJPEG_TO_RGB_Rd(Y, Cb, Cr)),
+				R = color_clamp(CALC(YCbCr_TO_RGB_Rd(Y, Cb, Cr),
 						ctx->brightness, ctx->contrast, ctx->red_gamma));
-				G = color_clamp(CALC(color_clamp(YCbCrJPEG_TO_RGB_Gd(Y, Cb, Cr)),
+				G = color_clamp(CALC(YCbCr_TO_RGB_Gd(Y, Cb, Cr),
 						ctx->brightness, ctx->contrast, ctx->green_gamma));
-				B = color_clamp(CALC(color_clamp(YCbCrJPEG_TO_RGB_Bd(Y, Cb, Cr)),
+				B = color_clamp(CALC(YCbCr_TO_RGB_Bd(Y, Cb, Cr),
 						ctx->brightness, ctx->contrast, ctx->blue_gamma));
 
 				ctx->lookup_table[pos + 0] = RGB_TO_YCbCrJPEG_Y(R, G, B);
