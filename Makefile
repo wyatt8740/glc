@@ -31,7 +31,7 @@ QUICKLZ = support/quicklz/
 QUICKLZ_OBJ = $(BUILD)/quicklz.o
 USE_QUICKLZ = -D__QUICKLZ -I$(QUICKLZ)
 
-LIBS = -lpthread -lpacketstream -lGL -ldl -lasound -lXxf86vm
+LIBS = -lpthread -lpacketstream -lGL -ldl -lasound -lXxf86vm -lm
 
 HEADERS = $(COMMON)/glc.h \
 	  $(COMMON)/util.h \

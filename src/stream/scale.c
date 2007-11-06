@@ -169,7 +169,7 @@ int scale_get_ctx(struct scale_private_s *scale, glc_ctx_i ctx_i, struct scale_c
 int scale_pic_msg(struct scale_private_s *scale, struct scale_ctx_s *ctx, unsigned char *from, unsigned char *to)
 {
 	unsigned int x, y, ox, oy, tp, sp, op1, op2, op3, op4;
-	unsigned int swi = ctx->sw * 3;
+	unsigned int swi = ctx->sw * 3; /* target BPP is always 3 */
 	unsigned int shi = ctx->sh * 3;
 	ox = oy = 0;
 

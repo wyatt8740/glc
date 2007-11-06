@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <packetstream.h>
 #include <errno.h>
+#include <math.h>
 
 #include "../common/glc.h"
 #include "../common/thread.h"
@@ -34,10 +35,10 @@
  */
 
 #define LOOKUP_BITS 7
-#define LOOKUP_POS(A, B, C) \
-	(((((A) >> (8 - LOOKUP_BITS)) << (LOOKUP_BITS * 2)) + \
-	  (((B) >> (8 - LOOKUP_BITS)) << LOOKUP_BITS) + \
-	  ( (C) >> (8 - LOOKUP_BITS))) * 3)
+#define YCBCR_LOOKUP_POS(Y, Cb, Cr) \
+	(((((Y)  >> (8 - LOOKUP_BITS)) << (LOOKUP_BITS * 2)) + \
+	  (((Cb) >> (8 - LOOKUP_BITS)) << LOOKUP_BITS) + \
+	  ( (Cr) >> (8 - LOOKUP_BITS))) * 3)
 
 struct color_private_s;
 struct color_ctx_s;
@@ -48,7 +49,13 @@ typedef void (*color_proc)(struct color_private_s *color,
 
 struct color_ctx_s {
 	glc_ctx_i ctx_i;
+	glc_flags_t flags;
 	unsigned int w, h;
+
+	unsigned int bpp, row;
+
+	float brightness, contrast;
+	float red_gamma, green_gamma, blue_gamma;
 
 	unsigned char *lookup_table;
 	color_proc proc;
@@ -70,14 +77,30 @@ void color_finish_callback(void *ptr, int err);
 void color_get_ctx(struct color_private_s *color, glc_ctx_i ctx_i,
 		   struct color_ctx_s **ctx);
 
+int color_ctx_msg(struct color_private_s *color, glc_ctx_message_t *msg);
 int color_color_msg(struct color_private_s *color, glc_color_message_t *msg);
+
+int color_generate_ycbcr_lookup_table(struct color_private_s *color,
+				      struct color_ctx_s *ctx);
+int color_generate_rgb_lookup_table(struct color_private_s *color,
+				    struct color_ctx_s *ctx);
 
 void color_ycbcr(struct color_private_s *color,
 		 struct color_ctx_s *ctx,
 		 unsigned char *from, unsigned char *to);
-void color_rgb(struct color_private_s *color,
+void color_bgr(struct color_private_s *color,
 	       struct color_ctx_s *ctx,
 	       unsigned char *from, unsigned char *to);
+
+/* unfortunately over- and underflows will occur */
+__inline__ unsigned char color_clamp(int val)
+{
+	if (val > 255)
+		return 255;
+	else if (val < 0)
+		return 0;
+	return val;
+}
 
 int color_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 {
@@ -89,8 +112,12 @@ int color_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 	color->thread.flags = GLC_THREAD_READ | GLC_THREAD_WRITE;
 	color->thread.read_callback = &color_read_callback;
 	color->thread.write_callback = &color_write_callback;
+	color->thread.finish_callback = &color_finish_callback;
 	color->thread.ptr = color;
 	color->thread.threads = util_cpus();
+
+	util_log(color->glc, GLC_INFORMATION, "color", "using %d bit accuracy for YCbCr lookup table",
+		 LOOKUP_BITS);
 
 	return glc_thread_create(glc, &color->thread, from, to);
 }
@@ -130,6 +157,9 @@ int color_read_callback(glc_thread_state_t *state)
 		state->flags |= GLC_THREAD_STATE_SKIP_WRITE;
 		return 0;
 	}
+
+	if (state->header.type == GLC_MESSAGE_CTX)
+		color_ctx_msg(color, (glc_ctx_message_t *) state->read_data);
 
 	if (state->header.type == GLC_MESSAGE_PICTURE) {
 		pic_hdr = (glc_picture_header_t *) state->read_data;
@@ -185,8 +215,82 @@ void color_get_ctx(struct color_private_s *color, glc_ctx_i ctx_i,
 	}
 }
 
+int color_ctx_msg(struct color_private_s *color, glc_ctx_message_t *msg)
+{
+	struct color_ctx_s *ctx;
+	color_get_ctx(color, msg->ctx, &ctx);
+
+	ctx->flags = msg->flags;
+	ctx->w = msg->w;
+	ctx->h = msg->h;
+
+	if ((ctx->flags & GLC_CTX_BGR) | (ctx->flags & GLC_CTX_BGRA)) {
+		if (ctx->flags & GLC_CTX_BGRA)
+			ctx->bpp = 4;
+		else
+			ctx->bpp = 3;
+
+		ctx->row = ctx->bpp * ctx->w;
+
+		if ((ctx->flags & GLC_CTX_DWORD_ALIGNED) && (ctx->row % 8 != 0))
+			ctx->row += 8 - ctx->row % 8;
+	}
+
+	if (color->glc->flags & GLC_OVERRIDE_COLOR_CORRECTION) {
+		ctx->brightness = color->glc->brightness;
+		ctx->contrast = color->glc->contrast;
+		ctx->red_gamma = color->glc->red_gamma;
+		ctx->green_gamma = color->glc->green_gamma;
+		ctx->blue_gamma = color->glc->blue_gamma;
+
+		util_log(color->glc, GLC_INFORMATION, "color",
+			 "using global color correction for ctx %d", msg->ctx);
+		util_log(color->glc, GLC_INFORMATION, "color",
+			 "ctx %d: brightness=%f, contrast=%f, red=%f, green=%f, blue=%f",
+			 msg->ctx, ctx->brightness, ctx->contrast,
+			 ctx->red_gamma, ctx->green_gamma, ctx->blue_gamma);
+
+		if (ctx->flags & GLC_CTX_YCBCR_420JPEG) {
+			/*color_generate_ycbcr_lookup_table(color, ctx);
+			ctx->proc = &color_ycbcr;*/
+		} else if ((ctx->flags & GLC_CTX_BGR) | (ctx->flags & GLC_CTX_BGRA)) {
+			color_generate_rgb_lookup_table(color, ctx);
+			ctx->proc = &color_bgr;
+		} else /* just don't set proc -> no conversion done */
+			util_log(color->glc, GLC_WARNING, "color", "unsupported ctx %d", msg->ctx);
+	}
+
+	return 0;
+}
+
 int color_color_msg(struct color_private_s *color, glc_color_message_t *msg)
 {
+	struct color_ctx_s *ctx;
+
+	if (color->glc->flags & GLC_OVERRIDE_COLOR_CORRECTION)
+		return 0; /* ignore */
+
+	color_get_ctx(color, msg->ctx, &ctx);
+
+	ctx->brightness = msg->brightness;
+	ctx->contrast = msg->contrast;
+	ctx->red_gamma = msg->red;
+	ctx->green_gamma = msg->green;
+	ctx->blue_gamma = msg->blue;
+
+	util_log(color->glc, GLC_INFORMATION, "color",
+		 "ctx %d: brightness=%f, contrast=%f, red=%f, green=%f, blue=%f",
+		 msg->ctx, ctx->brightness, ctx->contrast,
+		 ctx->red_gamma, ctx->green_gamma, ctx->blue_gamma);
+
+	if (ctx->flags & GLC_CTX_YCBCR_420JPEG) {
+		/*color_generate_ycbcr_lookup_table(color, ctx);
+		ctx->proc = &color_ycbcr;*/
+	} else if ((ctx->flags & GLC_CTX_BGR) | (ctx->flags & GLC_CTX_BGRA)) {
+		color_generate_rgb_lookup_table(color, ctx);
+		ctx->proc = &color_bgr;
+	}
+
 	return 0;
 }
 
@@ -197,11 +301,54 @@ void color_ycbcr(struct color_private_s *color,
 
 }
 
-void color_rgb(struct color_private_s *color,
+void color_bgr(struct color_private_s *color,
 	       struct color_ctx_s *ctx,
 	       unsigned char *from, unsigned char *to)
 {
+	unsigned int x, y, p;
 
+	for (y = 0; y < ctx->h; y++) {
+		for (x = 0; x < ctx->w; x++) {
+			p = ctx->row * y + x * ctx->bpp;
+
+			to[p + 0] = ctx->lookup_table[256 + 256 + from[p + 0]];
+			to[p + 1] = ctx->lookup_table[256       + from[p + 1]];
+			to[p + 2] = ctx->lookup_table[            from[p + 2]];
+		}
+	}
+}
+
+int color_generate_ycbcr_lookup_table(struct color_private_s *color,
+				      struct color_ctx_s *ctx)
+{
+	return 0;
+}
+
+int color_generate_rgb_lookup_table(struct color_private_s *color,
+				    struct color_ctx_s *ctx)
+{
+	unsigned int c;
+
+	ctx->lookup_table = malloc(256 + 256 + 256);
+
+#define CALC(value, brightness, contrast, gamma) \
+	color_clamp( \
+		(((pow((double) value / 255.0, 1.0 / gamma) - 0.5) * (1.0 + contrast) + 0.5) \
+		 + brightness) * 255.0 \
+		)
+
+	for (c = 0; c < 256; c++)
+		ctx->lookup_table[c + 0] = CALC(c, ctx->brightness, ctx->contrast, ctx->red_gamma);
+
+	for (c = 0; c < 256; c++)
+		ctx->lookup_table[c + 256] = CALC(c, ctx->brightness, ctx->contrast, ctx->green_gamma);
+
+	for (c = 0; c < 256; c++)
+		ctx->lookup_table[c + 256 + 256] = CALC(c, ctx->brightness, ctx->contrast, ctx->blue_gamma);
+
+#undef CALC
+
+	return 0;
 }
 
 /**  \} */
