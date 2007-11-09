@@ -47,6 +47,7 @@ struct x11_private_s {
 	Bool (*XCheckIfEvent)(Display *, XEvent *, Bool (*)(), XPointer);
 	int (*XPeekIfEvent)(Display *, XEvent *, Bool (*)(), XPointer);
 
+	void *libXxf86vm_handle;
 	Bool (*XF86VidModeSetGamma)(Display *, int, XF86VidModeGamma *);
 
 	unsigned int key_mask;
@@ -228,11 +229,14 @@ void get_real_x11()
 	    lib.dlsym(x11.libX11_handle, "XPeekIfEvent");
 	if (!x11.XPeekIfEvent)
 		goto err;
-	x11.XF86VidModeSetGamma =
-	  (Bool (*)(Display *, int, XF86VidModeGamma *))
-	    lib.dlsym(x11.libX11_handle, "XF86VidModeGamma");
-	if (!x11.XF86VidModeSetGamma)
-		goto err;
+
+	x11.XF86VidModeSetGamma = NULL;
+	x11.libXxf86vm_handle = lib.dlopen("libXxf86vm.so", RTLD_LAZY);
+	if (x11.libXxf86vm_handle) {
+		x11.XF86VidModeSetGamma =
+		  (Bool (*)(Display *, int, XF86VidModeGamma *))
+		    lib.dlsym(x11.libX11_handle, "XF86VidModeGamma");
+	}
 
 	return;
 err:
@@ -391,6 +395,9 @@ __PUBLIC Bool XF86VidModeSetGamma(Display *display, int screen, XF86VidModeGamma
 Bool __x11_XF86VidModeSetGamma(Display *display, int screen, XF86VidModeGamma *Gamma)
 {
 	INIT_GLC
+
+	if (x11.XF86VidModeSetGamma == NULL)
+		return False; /* might not be present */
 
 	Bool ret = x11.XF86VidModeSetGamma(display, screen, Gamma);
 	gl_capture_refresh_color(lib.gl);
