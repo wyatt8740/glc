@@ -241,7 +241,7 @@ int audio_play_play(struct audio_play_private_s *audio_play, glc_audio_header_t 
 
 int audio_play_xrun(struct audio_play_private_s *audio_play, int err)
 {
-	util_log(audio_play->glc, GLC_WARNING, "audio", "xrun");
+	util_log(audio_play->glc, GLC_DEBUG, "audio", "xrun");
 	if (err == -EPIPE) {
 		if ((err = snd_pcm_prepare(audio_play->pcm)) < 0)
 			return -err;

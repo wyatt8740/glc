@@ -390,7 +390,7 @@ int gl_play_read_callback(glc_thread_state_t *state)
 		if (pic_hdr->timestamp > time)
 			usleep(pic_hdr->timestamp - time);
 		else if (time > pic_hdr->timestamp + gl_play->fps) {
-			util_log(gl_play->glc, GLC_WARNING, "gl_play", "dropped frame");
+			util_log(gl_play->glc, GLC_DEBUG, "gl_play", "dropped frame");
 			return 0;
 		}
 
