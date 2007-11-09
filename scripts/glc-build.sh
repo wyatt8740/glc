@@ -35,9 +35,12 @@ unpack () {
 
 info "Welcome to glc install script!"
 
+BUILD64=0
+uname -a | grep x86_64 > /dev/null && BUILD64=1
+
 echo "#include <stdio.h>
 	int main(int argc, char argv[]){printf(\"test\");return 0;}" | \
-	gcc -x c -c - -o /dev/null 2> /dev/null \
+	gcc -x c - -o /dev/null 2> /dev/null \
 	|| die "Can't compile (Ubuntu users: apt-get install build-essential)"
 [ -e "/usr/include/X11/X.h" -a -e "/usr/include/X11/Xlib.h" ] \
 	|| die "Missing X11 headers (Ubuntu users: apt-get install libx11-dev)"
@@ -46,8 +49,13 @@ echo "#include <stdio.h>
 [ -e "/usr/include/alsa/asoundlib.h" ] \
 	|| die "Missing ALSA headers (Ubuntu users: apt-get install libasound2-dev)"
 
-BUILD64=0
-uname -a | grep x86_64 > /dev/null && BUILD64=1
+if [ $BUILD64 == 1 ]; then
+	echo "#include <stdio.h>
+		int main(int argc, char argv[]){printf(\"test\");return 0;}" | \
+		gcc -m32 -x c - -o /dev/null 2> /dev/null \
+		|| die "Can't compile 32-bit code (Ubuntu users: apt-get install gcc-multilib)"
+fi
+
 DEFAULT_CFLAGS="-O2 -msse -mmmx -fomit-frame-pointer"
 [ $BUILD64 == 0 ] && DEFAULT_CFLAGS="${DEFAULT_CFLAGS} -mtune=pentium3"
 

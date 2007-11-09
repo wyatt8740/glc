@@ -71,4 +71,10 @@ export GLC_CAPTURE_DWORD_ALIGNED=1
 # set SDL audiodriver to alsa
 export SDL_AUDIODRIVER=alsa
 
+# log verbosity
+export GLC_LOG=1
+
+# log file
+export GLC_LOG_FILE="/dev/stderr"
+
 LD_PRELOAD=libglc-capture.so "${@}"
