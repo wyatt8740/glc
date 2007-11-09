@@ -28,6 +28,7 @@ __PUBLIC void gl_capture_close(void *glpriv);
 
 __PUBLIC int gl_capture_frame(void *glpriv, Display *dpy, GLXDrawable drawable);
 __PUBLIC int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable);
+__PUBLIC int gl_capture_refresh_color(void *glpriv);
 
 /**  \} */
 

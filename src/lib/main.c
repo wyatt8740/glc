@@ -39,8 +39,6 @@
 struct main_private_s {
 	glc_t *glc;
 
-	void *gl;
-
 	ps_buffer_t *uncompressed;
 	ps_buffer_t *compressed;
 	size_t uncompressed_size, compressed_size;
@@ -59,6 +57,7 @@ __PRIVATE glc_lib_t lib = {NULL, /* dlopen */
 			   0, /* initialized */
 			   0, /* running */
 			   PTHREAD_MUTEX_INITIALIZER, /* init_lock */
+			   NULL, /* gl */
 			   };
 __PRIVATE struct main_private_s mpriv;
 
@@ -421,6 +420,8 @@ void *wrapped_func(const char *symbol)
 		return &__x11_XCheckIfEvent;
 	else if (!strcmp(symbol, "XPeekIfEvent"))
 		return &__x11_XPeekIfEvent;
+	else if (!strcmp(symbol, "XF86VidModeSetGamma"))
+		return &__x11_XF86VidModeSetGamma;
 	else if (!strcmp(symbol, "dlopen"))
 		return &__main_dlopen;
 	else if (!strcmp(symbol, "dlsym"))

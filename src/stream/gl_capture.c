@@ -659,6 +659,26 @@ cancel:
 	goto finish;
 }
 
+int gl_capture_refresh_color(void *glpriv)
+{
+	struct gl_capture_private_s *gl_capture = glpriv;
+	struct gl_capture_ctx_s *ctx;
+
+	util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+		 "refreshing color correction");
+
+	pthread_rwlock_rdlock(&gl_capture->ctxlist_lock);
+	ctx = gl_capture->ctx;
+	while (ctx != NULL) {
+		gl_capture_update_color(gl_capture, ctx);
+		
+		ctx = ctx->next;
+	}
+	pthread_rwlock_unlock(&gl_capture->ctxlist_lock);
+
+	return 0;
+}
+
 /** \TODO support GammaRamp */
 int gl_capture_update_color(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
 {

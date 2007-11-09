@@ -18,6 +18,7 @@
 #include "../common/glc.h"
 #include "../common/util.h"
 #include "lib.h"
+#include "../stream/gl_capture.h"
 
 /**
  * \addtogroup lib
@@ -45,6 +46,8 @@ struct x11_private_s {
 	int (*XIfEvent)(Display *, XEvent *, Bool (*)(), XPointer);
 	Bool (*XCheckIfEvent)(Display *, XEvent *, Bool (*)(), XPointer);
 	int (*XPeekIfEvent)(Display *, XEvent *, Bool (*)(), XPointer);
+
+	Bool (*XF86VidModeSetGamma)(Display *, int, XF86VidModeGamma *);
 
 	unsigned int key_mask;
 	KeySym capture;
@@ -225,6 +228,11 @@ void get_real_x11()
 	    lib.dlsym(x11.libX11_handle, "XPeekIfEvent");
 	if (!x11.XPeekIfEvent)
 		goto err;
+	x11.XF86VidModeSetGamma =
+	  (Bool (*)(Display *, int, XF86VidModeGamma *))
+	    lib.dlsym(x11.libX11_handle, "XF86VidModeGamma");
+	if (!x11.XF86VidModeSetGamma)
+		goto err;
 
 	return;
 err:
@@ -372,6 +380,21 @@ int __x11_XPeekIfEvent(Display *display, XEvent *event_return, Bool (*predicate)
 	INIT_GLC
 	int ret = x11.XPeekIfEvent(display, event_return, predicate, arg);
 	x11_event(display, event_return);
+	return ret;
+}
+
+__PUBLIC Bool XF86VidModeSetGamma(Display *display, int screen, XF86VidModeGamma *Gamma)
+{
+	return __x11_XF86VidModeSetGamma(display, screen, Gamma);
+}
+
+Bool __x11_XF86VidModeSetGamma(Display *display, int screen, XF86VidModeGamma *Gamma)
+{
+	INIT_GLC
+
+	Bool ret = x11.XF86VidModeSetGamma(display, screen, Gamma);
+	gl_capture_refresh_color(lib.gl);
+
 	return ret;
 }
 

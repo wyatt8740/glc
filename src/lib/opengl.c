@@ -43,7 +43,6 @@ struct opengl_private_s {
 
 	int capture_glfinish;
 	int convert_ycbcr_420jpeg;
-	void *gl;
 
 	int started;
 };
@@ -165,11 +164,11 @@ int opengl_start(ps_buffer_t *buffer)
 			ycbcr_init(opengl.glc, opengl.unscaled, buffer);
 		else
 			scale_init(opengl.glc, opengl.unscaled, buffer);
-		opengl.gl = gl_capture_init(opengl.glc, opengl.unscaled);
+		lib.gl = gl_capture_init(opengl.glc, opengl.unscaled);
 	} else
-		opengl.gl = gl_capture_init(opengl.glc, buffer);
+		lib.gl = gl_capture_init(opengl.glc, buffer);
 
-	if (!opengl.gl)
+	if (!lib.gl)
 		return EAGAIN;
 
 	opengl.started = 1;
@@ -184,7 +183,7 @@ int opengl_close()
 
 	util_log(opengl.glc, GLC_DEBUG, "opengl", "closing");
 
-	gl_capture_close(opengl.gl);
+	gl_capture_close(lib.gl);
 
 	if (opengl.glc->flags & GLC_SCALE) {
 		if (lib.running) {
@@ -269,7 +268,7 @@ void __opengl_glXSwapBuffers(Display *dpy, GLXDrawable drawable)
 		opengl.glXSwapBuffers(dpy, drawable);
 
 	if (opengl.glc->flags & GLC_CAPTURE)
-		gl_capture(opengl.gl, dpy, drawable);
+		gl_capture(lib.gl, dpy, drawable);
 
 	if (opengl.glc->flags & GLC_CAPTURE_BACK)
 		opengl.glXSwapBuffers(dpy, drawable);
@@ -297,7 +296,7 @@ void opengl_capture_current()
 	GLXDrawable drawable = glXGetCurrentDrawable();
 
 	if ((opengl.glc->flags & GLC_CAPTURE) && (dpy != NULL) && (drawable != None))
-		gl_capture(opengl.gl, dpy, drawable);
+		gl_capture(lib.gl, dpy, drawable);
 }
 
 
