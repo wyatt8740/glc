@@ -106,6 +106,7 @@ int file_read_callback(glc_thread_state_t *state)
 {
 	struct file_private_s *file = (struct file_private_s *) state->ptr;
 	glc_container_message_t *container;
+	glc_size_t glc_size;
 
 	if (state->header.type == GLC_MESSAGE_CONTAINER) {
 		container = (glc_container_message_t *) state->read_data;
@@ -121,7 +122,8 @@ int file_read_callback(glc_thread_state_t *state)
 	} else {
 		if (fwrite(&state->header, 1, GLC_MESSAGE_HEADER_SIZE, file->to) != GLC_MESSAGE_HEADER_SIZE)
 			return ENOSTR;
-		if (fwrite(&state->read_size, 1, GLC_SIZE_SIZE, file->to) != GLC_SIZE_SIZE)
+		glc_size = state->read_size;
+		if (fwrite(&glc_size, 1, GLC_SIZE_SIZE, file->to) != GLC_SIZE_SIZE)
 			return ENOSTR;
 		if (fwrite(state->read_data, 1, state->read_size, file->to) != state->read_size)
 			return ENOSTR;
