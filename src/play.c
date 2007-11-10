@@ -212,17 +212,16 @@ int main(int argc, char *argv[])
 
 	ps_bufferattr_destroy(&attr);
 
-	if ((img) | (yuv4mpeg))
-		color_init(glc, uncompressed, color);
-
 	if (img) {
-		rgb_init(glc, color, rgb);
-		img_init(glc, rgb);
+		rgb_init(glc, uncompressed, rgb);
+		color_init(glc, rgb, color);
+		img_init(glc, color);
 	} else if (info)
 		info_init(glc, uncompressed);
 	else if (wav)
 		wav_init(glc, uncompressed);
 	else if (yuv4mpeg) {
+		color_init(glc, uncompressed, color);
 		ycbcr_init(glc, color, ycbcr);
 		yuv4mpeg_init(glc, ycbcr);
 	} else { /* play */
