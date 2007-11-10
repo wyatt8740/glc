@@ -1,3 +1,10 @@
+0.3.11 (2007/11/10)
+   Color correction support; either use gamma values stored to stream
+    at capture time (XF86VidModeSetGamma) or set custom gamma, brightness
+    and contrast values at playback/export.
+   Parallel compression support.
+   Some bugfixes (double word -aligned image data).
+
 0.3.10 (2007/10/29)
    Support for -fvisibility=hidden
    Fix crash/hooking when multiple hooks (eg. mumble overlay) is present.
