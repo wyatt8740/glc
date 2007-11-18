@@ -248,7 +248,13 @@ int color_ctx_msg(struct color_private_s *color, glc_ctx_message_t *msg)
 			 msg->ctx, ctx->brightness, ctx->contrast,
 			 ctx->red_gamma, ctx->green_gamma, ctx->blue_gamma);
 
-		if (ctx->flags & GLC_CTX_YCBCR_420JPEG) {
+		if ((ctx->brightness == 0) &&
+		    (ctx->contrast == 0) &&
+		    (ctx->red_gamma == 1) &&
+		    (ctx->green_gamma == 1) &&
+		    (ctx->blue_gamma == 1))
+			util_log(color->glc, GLC_INFORMATION, "color", "skipping color correction");
+		else if (ctx->flags & GLC_CTX_YCBCR_420JPEG) {
 			color_generate_ycbcr_lookup_table(color, ctx);
 			ctx->proc = &color_ycbcr;
 		} else if ((ctx->flags & GLC_CTX_BGR) | (ctx->flags & GLC_CTX_BGRA)) {
@@ -283,7 +289,13 @@ int color_color_msg(struct color_private_s *color, glc_color_message_t *msg)
 		 msg->ctx, ctx->brightness, ctx->contrast,
 		 ctx->red_gamma, ctx->green_gamma, ctx->blue_gamma);
 
-	if (ctx->flags & GLC_CTX_YCBCR_420JPEG) {
+	if ((ctx->brightness == 0) &&
+	    (ctx->contrast == 0) &&
+	    (ctx->red_gamma == 1) &&
+	    (ctx->green_gamma == 1) &&
+	    (ctx->blue_gamma == 1))
+		util_log(color->glc, GLC_INFORMATION, "color", "skipping color correction");
+	else if (ctx->flags & GLC_CTX_YCBCR_420JPEG) {
 		color_generate_ycbcr_lookup_table(color, ctx);
 		ctx->proc = &color_ycbcr;
 	} else if ((ctx->flags & GLC_CTX_BGR) | (ctx->flags & GLC_CTX_BGRA)) {
