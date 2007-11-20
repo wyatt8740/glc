@@ -215,9 +215,12 @@ void color_get_ctx(struct color_private_s *color, glc_ctx_i ctx_i,
 int color_ctx_msg(struct color_private_s *color, glc_ctx_message_t *msg)
 {
 	struct color_ctx_s *ctx;
+	glc_flags_t old_flags;
+
 	color_get_ctx(color, msg->ctx, &ctx);
 	pthread_rwlock_wrlock(&ctx->update);
 
+	old_flags = ctx->flags;
 	ctx->flags = msg->flags;
 	ctx->w = msg->w;
 	ctx->h = msg->h;
@@ -252,16 +255,32 @@ int color_ctx_msg(struct color_private_s *color, glc_ctx_message_t *msg)
 		    (ctx->contrast == 0) &&
 		    (ctx->red_gamma == 1) &&
 		    (ctx->green_gamma == 1) &&
-		    (ctx->blue_gamma == 1))
+		    (ctx->blue_gamma == 1)) {
 			util_log(color->glc, GLC_INFORMATION, "color", "skipping color correction");
-		else if (ctx->flags & GLC_CTX_YCBCR_420JPEG) {
+			ctx->proc = NULL;
+		} else if (ctx->flags & GLC_CTX_YCBCR_420JPEG) {
 			color_generate_ycbcr_lookup_table(color, ctx);
 			ctx->proc = &color_ycbcr;
 		} else if ((ctx->flags & GLC_CTX_BGR) | (ctx->flags & GLC_CTX_BGRA)) {
 			color_generate_rgb_lookup_table(color, ctx);
 			ctx->proc = &color_bgr;
-		} else /* just don't set proc -> no conversion done */
+		} else {
+			/* set proc NULL -> no conversion done */
 			util_log(color->glc, GLC_WARNING, "color", "unsupported ctx %d", msg->ctx);
+			ctx->proc = NULL;
+		}
+	} else if (((old_flags & GLC_CTX_BGR) | (old_flags & GLC_CTX_BGRA)) &&
+		   (msg->flags & GLC_CTX_YCBCR_420JPEG)) {
+		util_log(color->glc, GLC_WARNING, "color",
+			 "colorspace switched from RGB to Y'CbCr, recalculating lookup table");
+		color_generate_ycbcr_lookup_table(color, ctx);
+		ctx->proc = &color_ycbcr;
+	} else if (((msg->flags & GLC_CTX_BGR) | (msg->flags & GLC_CTX_BGRA)) &&
+		 (old_flags & GLC_CTX_YCBCR_420JPEG)) {
+		util_log(color->glc, GLC_WARNING, "color",
+			 "colorspace switched from Y'CbCr to RGB, recalculating lookup table");
+		color_generate_rgb_lookup_table(color, ctx);
+		ctx->proc = &color_bgr;
 	}
 
 	pthread_rwlock_unlock(&ctx->update);
@@ -293,15 +312,17 @@ int color_color_msg(struct color_private_s *color, glc_color_message_t *msg)
 	    (ctx->contrast == 0) &&
 	    (ctx->red_gamma == 1) &&
 	    (ctx->green_gamma == 1) &&
-	    (ctx->blue_gamma == 1))
+	    (ctx->blue_gamma == 1)) {
 		util_log(color->glc, GLC_INFORMATION, "color", "skipping color correction");
-	else if (ctx->flags & GLC_CTX_YCBCR_420JPEG) {
+		ctx->proc = NULL;
+	} else if (ctx->flags & GLC_CTX_YCBCR_420JPEG) {
 		color_generate_ycbcr_lookup_table(color, ctx);
 		ctx->proc = &color_ycbcr;
 	} else if ((ctx->flags & GLC_CTX_BGR) | (ctx->flags & GLC_CTX_BGRA)) {
 		color_generate_rgb_lookup_table(color, ctx);
 		ctx->proc = &color_bgr;
-	}
+	} else
+		ctx->proc = NULL; /* don't attempt anything... */
 
 	pthread_rwlock_unlock(&ctx->update);
 	return 0;
