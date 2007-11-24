@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
 	char *program = NULL;
 	char **program_args = NULL;
 	const char *ld_preload_old = NULL;
-	const char *library = "libglc-capture.so";
+	const char *library = "libglc-hook.so";
 	char *ld_preload;
 	size_t ld_preload_len;
 

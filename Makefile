@@ -34,8 +34,6 @@ QUICKLZ = support/quicklz/
 QUICKLZ_OBJ = $(BUILD)/quicklz.o
 USE_QUICKLZ = -D__QUICKLZ -I$(QUICKLZ)
 
-LIBS = -lpthread -lpacketstream -lGL -ldl -lasound -lXxf86vm -lm
-
 HEADERS = $(COMMON)/glc.h \
 	  $(COMMON)/util.h \
 	  $(COMMON)/thread.h \
@@ -55,58 +53,92 @@ HEADERS = $(COMMON)/glc.h \
 	  $(EXPORT)/wav.h \
 	  $(EXPORT)/yuv4mpeg.h
 
-LIB_OBJS = $(BUILD)/gl_capture.o \
-           $(BUILD)/gl_play.o \
-           $(BUILD)/util.o \
-           $(BUILD)/pack.o \
-           $(BUILD)/file.o \
-           $(BUILD)/img.o \
-           $(BUILD)/scale.o \
-           $(BUILD)/info.o \
-           $(BUILD)/thread.o \
-           $(BUILD)/audio_hook.o \
-           $(BUILD)/audio_play.o \
-           $(BUILD)/wav.o \
-           $(BUILD)/demux.o \
-           $(BUILD)/ycbcr.o \
-           $(BUILD)/yuv4mpeg.o \
-           $(BUILD)/rgb.o \
-           $(BUILD)/color.o \
-           $(LZO_OBJ) \
-           $(QUICKLZ_OBJ)
+CORE_OBJS = $(BUILD)/util.o \
+	    $(BUILD)/thread.o \
+	    $(BUILD)/scale.o \
+	    $(BUILD)/info.o \
+	    $(BUILD)/rgb.o \
+	    $(BUILD)/color.o \
+	    $(BUILD)/ycbcr.o \
+	    $(BUILD)/pack.o \
+	    $(BUILD)/file.o \
+	    $(LZO_OBJ) \
+	    $(QUICKLZ_OBJ)
 
-CAPT_OBJS = $(BUILD)/main.o \
-            $(BUILD)/alsa.o \
-            $(BUILD)/opengl.o \
-            $(BUILD)/x11.o
+CAPTURE_OBJS = $(BUILD)/gl_capture.o \
+	       $(BUILD)/audio_hook.o
 
-all: $(BUILD) $(BUILD)/libglc-capture.so.$(RELEASE) $(BUILD)/glc-play $(BUILD)/glc-capture
+PLAY_OBJS = $(BUILD)/demux.o \
+	    $(BUILD)/gl_play.o \
+	    $(BUILD)/audio_play.o
+
+EXPORT_OBJS = $(BUILD)/img.o \
+	      $(BUILD)/wav.o \
+	      $(BUILD)/yuv4mpeg.o
+
+HOOK_OBJS = $(BUILD)/main.o \
+	    $(BUILD)/alsa.o \
+	    $(BUILD)/opengl.o \
+	    $(BUILD)/x11.o
+
+
+all: $(BUILD) \
+     $(BUILD)/libglc-core.so.$(RELEASE) \
+     $(BUILD)/libglc-capture.so.$(RELEASE) \
+     $(BUILD)/libglc-play.so.$(RELEASE) \
+     $(BUILD)/libglc-export.so.$(RELEASE) \
+     $(BUILD)/libglc-hook.so.$(RELEASE) \
+     $(BUILD)/glc-play \
+     $(BUILD)/glc-capture
 
 $(BUILD):
 	mkdir $(BUILD)
 
+
+# core library
+$(BUILD)/libglc-core.so.$(RELEASE): $(CORE_OBJS)
+	$(LD) $(LDFLAGS) -Wl,-soname,libglc-core.so.$(VERSION) -shared \
+		 -lpthread -lpacketstream -lm \
+		$(CORE_OBJS) -o $(BUILD)/libglc-core.so.$(RELEASE)
+	ln -sf libglc-core.so.$(RELEASE) $(BUILD)/libglc-core.so.$(VERSION)
+	ln -sf libglc-core.so.$(RELEASE) $(BUILD)/libglc-core.so
+
 # capture library
-$(BUILD)/libglc-capture.so.$(RELEASE): $(BUILD)/libglc.so.$(RELEASE) $(CAPT_OBJS)
-	$(LD) $(LDFLAGS) -Wl,-soname,libglc-capture-so.$(VERSION) -L$(BUILD) -lglc -lelfhacks \
-		-shared -o $(BUILD)/libglc-capture.so.$(RELEASE) $(CAPT_OBJS)
+$(BUILD)/libglc-capture.so.$(RELEASE): $(CAPTURE_OBJS) $(BUILD)/libglc-core.so.$(RELEASE)
+	$(LD) $(LDFLAGS) -Wl,-soname,libglc-capture.so.$(VERSION) -shared \
+		-L$(BUILD) -lGL -ldl -lasound -lXxf86vm -lglc-core \
+		$(CAPTURE_OBJS) -o $(BUILD)/libglc-capture.so.$(RELEASE)
 	ln -sf libglc-capture.so.$(RELEASE) $(BUILD)/libglc-capture.so.$(VERSION)
 	ln -sf libglc-capture.so.$(RELEASE) $(BUILD)/libglc-capture.so
 
-$(BUILD)/main.o: $(LIB)/main.c $(LIB)/lib.h $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/main.o -c $(LIB)/main.c $(USE_LZO) $(USE_QUICKLZ)
+# playback library
+$(BUILD)/libglc-play.so.$(RELEASE): $(PLAY_OBJS) $(BUILD)/libglc-core.so.$(RELEASE)
+	$(LD) $(LDFLAGS) -Wl,-soname,libglc-play.so.$(VERSION) -shared \
+		-L$(BUILD) -lGL -lasound -lglc-core \
+		$(PLAY_OBJS) -o $(BUILD)/libglc-play.so.$(RELEASE)
+	ln -sf libglc-play.so.$(RELEASE) $(BUILD)/libglc-play.so.$(VERSION)
+	ln -sf libglc-play.so.$(RELEASE) $(BUILD)/libglc-play.so
 
-$(BUILD)/alsa.o: $(LIB)/alsa.c $(LIB)/lib.h $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/alsa.o -c $(LIB)/alsa.c
+# export library
+$(BUILD)/libglc-export.so.$(RELEASE): $(EXPORT_OBJS) $(BUILD)/libglc-core.so.$(RELEASE)
+	$(LD) $(LDFLAGS) -Wl,-soname,libglc-export.so.$(VERSION) -shared \
+		-L$(BUILD) -lglc-core \
+		$(EXPORT_OBJS) -o $(BUILD)/libglc-export.so.$(RELEASE)
+	ln -sf libglc-export.so.$(RELEASE) $(BUILD)/libglc-export.so.$(VERSION)
+	ln -sf libglc-export.so.$(RELEASE) $(BUILD)/libglc-export.so
 
-$(BUILD)/opengl.o: $(LIB)/opengl.c $(LIB)/lib.h $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/opengl.o -c $(LIB)/opengl.c
-
-$(BUILD)/x11.o: $(LIB)/x11.c $(LIB)/lib.h $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/x11.o -c $(LIB)/x11.c
+# hook library
+$(BUILD)/libglc-hook.so.$(RELEASE): $(BUILD)/libglc-capture.so.$(RELEASE) $(HOOK_OBJS)
+	$(LD) $(LDFLAGS) -Wl,-soname,libglc-hook-so.$(VERSION) \
+		-L$(BUILD) -lglc-core -lglc-capture -lelfhacks \
+		-shared -o $(BUILD)/libglc-hook.so.$(RELEASE) $(HOOK_OBJS)
+	ln -sf libglc-hook.so.$(RELEASE) $(BUILD)/libglc-hook.so.$(VERSION)
+	ln -sf libglc-hook.so.$(RELEASE) $(BUILD)/libglc-hook.so
 
 # player / tool
-$(BUILD)/glc-play: $(BUILD)/play.o $(BUILD)/libglc.so.$(RELEASE)
-	$(LD) $(LDFLAGS) -L$(BUILD) -lglc -o $(BUILD)/glc-play $(BUILD)/play.o
+$(BUILD)/glc-play: $(BUILD)/play.o $(BUILD)/libglc-play.so.$(RELEASE)
+	$(LD) $(LDFLAGS) -L$(BUILD) -lglc-core -lglc-play -lglc-export \
+		-o $(BUILD)/glc-play $(BUILD)/play.o
 
 $(BUILD)/play.o: $(SRC)/play.c $(HEADERS)
 	$(CC) $(CFLAGS) -o $(BUILD)/play.o -c $(SRC)/play.c
@@ -118,14 +150,6 @@ $(BUILD)/glc-capture: $(BUILD)/capture.o
 
 $(BUILD)/capture.o: $(SRC)/capture.c
 	$(CC) $(CFLAGS) -o $(BUILD)/capture.o -c $(SRC)/capture.c
-
-
-# libglc
-$(BUILD)/libglc.so.$(RELEASE): $(LIB_OBJS)
-	$(LD) $(LDFLAGS) -Wl,-soname,libglc.so.$(VERSION) $(LIBS) -shared \
-		$(LIB_OBJS) -o $(BUILD)/libglc.so.$(RELEASE)
-	ln -sf libglc.so.$(RELEASE) $(BUILD)/libglc.so.$(VERSION)
-	ln -sf libglc.so.$(RELEASE) $(BUILD)/libglc.so
 
 
 # common objects
@@ -188,6 +212,20 @@ $(BUILD)/yuv4mpeg.o: $(EXPORT)/yuv4mpeg.c $(HEADERS)
 	$(CC) $(SO_CFLAGS) -o $(BUILD)/yuv4mpeg.o -c $(EXPORT)/yuv4mpeg.c
 
 
+# hook objects
+$(BUILD)/main.o: $(LIB)/main.c $(LIB)/lib.h $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/main.o -c $(LIB)/main.c $(USE_LZO) $(USE_QUICKLZ)
+
+$(BUILD)/alsa.o: $(LIB)/alsa.c $(LIB)/lib.h $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/alsa.o -c $(LIB)/alsa.c
+
+$(BUILD)/opengl.o: $(LIB)/opengl.c $(LIB)/lib.h $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/opengl.o -c $(LIB)/opengl.c
+
+$(BUILD)/x11.o: $(LIB)/x11.c $(LIB)/lib.h $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/x11.o -c $(LIB)/x11.c
+
+
 # support code
 $(LZO_OBJ): $(MINILZO)minilzo.c $(MINILZO)lzoconf.h $(MINILZO)lzodefs.h $(MINILZO)minilzo.h
 	$(CC) $(SO_CFLAGS) -o $(LZO_OBJ) -c $(MINILZO)minilzo.c
@@ -201,28 +239,56 @@ install-scripts: $(SCRIPTS)/glc-encode $(SCRIPTS)/glc-capture
 	install -Dm 0644 $(SCRIPTS)/capture.sh $(DESTDIR)/usr/share/glc/capture.sh
 	install -Dm 0644 $(SCRIPTS)/play.sh $(DESTDIR)/usr/share/glc/play.sh
 
-install-libs: $(BUILD)/libglc.so $(BUILD)/libglc-capture.so 
-	install -Dm 0755 $(BUILD)/libglc.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc.so.$(RELEASE)
-	ln -sf libglc.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc.so.$(VERSION)
-	ln -sf libglc.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc.so
+install-libs: $(BUILD)/libglc-core.so.$(RELEASE) \
+	      $(BUILD)/libglc-capture.so.$(RELEASE) \
+	      $(BUILD)/libglc-play.so.$(RELEASE) \
+	      $(BUILD)/libglc-export.so.$(RELEASE) \
+	      $(BUILD)/libglc-hook.so.$(RELEASE)
+	install -Dm 0755 $(BUILD)/libglc-core.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-core.so.$(RELEASE)
+	ln -sf libglc-core.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-core.so.$(VERSION)
+	ln -sf libglc-core.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-core.so
 
 	install -Dm 0755 $(BUILD)/libglc-capture.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-capture.so.$(RELEASE)
 	ln -sf libglc-capture.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-capture.so.$(VERSION)
 	ln -sf libglc-capture.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-capture.so
+
+	install -Dm 0755 $(BUILD)/libglc-play.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-play.so.$(RELEASE)
+	ln -sf libglc-play.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-play.so.$(VERSION)
+	ln -sf libglc-play.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-play.so
+
+	install -Dm 0755 $(BUILD)/libglc-export.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-export.so.$(RELEASE)
+	ln -sf libglc-export.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-export.so.$(VERSION)
+	ln -sf libglc-export.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-export.so
+
+	install -Dm 0755 $(BUILD)/libglc-hook.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-hook.so.$(RELEASE)
+	ln -sf libglc-hook.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-hook.so.$(VERSION)
+	ln -sf libglc-hook.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-hook.so
 
 install: install-libs $(BUILD)/glc-play
 	install -Dm 0755 $(BUILD)/glc-play $(DESTDIR)/usr/bin/glc-play
 	install -Dm 0755 $(BUILD)/glc-capture $(DESTDIR)/usr/bin/glc-capture
 
 clean:
-	rm -f $(LIB_OBJS) \
-	      $(CAPT_OBJS) \
-	      $(BUILD)/libglc.so.$(RELEASE) \
-	      $(BUILD)/libglc.so.$(VERSION) \
-	      $(BUILD)/libglc.so \
+	rm -f $(CORE_OBJS) \
+	      $(CAPTURE_OBJS) \
+	      $(PLAY_OBJS) \
+	      $(EXPORT_OBJS) \
+	      $(HOOK_OBJS) \
+	      $(BUILD)/libglc-core.so.$(RELEASE) \
+	      $(BUILD)/libglc-core.so.$(VERSION) \
+	      $(BUILD)/libglc-core.so \
 	      $(BUILD)/libglc-capture.so.$(RELEASE) \
 	      $(BUILD)/libglc-capture.so.$(VERSION) \
 	      $(BUILD)/libglc-capture.so \
+	      $(BUILD)/libglc-play.so.$(RELEASE) \
+	      $(BUILD)/libglc-play.so.$(VERSION) \
+	      $(BUILD)/libglc-play.so \
+	      $(BUILD)/libglc-export.so.$(RELEASE) \
+	      $(BUILD)/libglc-export.so.$(VERSION) \
+	      $(BUILD)/libglc-export.so \
+	      $(BUILD)/libglc-hook.so.$(RELEASE) \
+	      $(BUILD)/libglc-hook.so.$(VERSION) \
+	      $(BUILD)/libglc-hook.so \
 	      $(BUILD)/play.o \
 	      $(BUILD)/glc-play \
 	      $(BUILD)/capture.o \
