@@ -46,6 +46,7 @@ HEADERS = $(COMMON)/glc.h \
 	  $(CORE)/color.h \
 	  $(CAPTURE)/gl_capture.h \
 	  $(CAPTURE)/audio_hook.h \
+	  $(CAPTURE)/audio_capture.h \
 	  $(PLAY)/gl_play.h \
 	  $(PLAY)/audio_play.h \
 	  $(PLAY)/demux.h \
@@ -66,7 +67,8 @@ CORE_OBJS = $(BUILD)/util.o \
 	    $(QUICKLZ_OBJ)
 
 CAPTURE_OBJS = $(BUILD)/gl_capture.o \
-	       $(BUILD)/audio_hook.o
+	       $(BUILD)/audio_hook.o \
+	       $(BUILD)/audio_capture.o
 
 PLAY_OBJS = $(BUILD)/demux.o \
 	    $(BUILD)/gl_play.o \
@@ -189,6 +191,9 @@ $(BUILD)/gl_capture.o: $(CAPTURE)/gl_capture.c $(HEADERS)
 
 $(BUILD)/audio_hook.o: $(CAPTURE)/audio_hook.c $(HEADERS)
 	$(CC) $(SO_CFLAGS) -o $(BUILD)/audio_hook.o -c $(CAPTURE)/audio_hook.c
+
+$(BUILD)/audio_capture.o: $(CAPTURE)/audio_capture.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/audio_capture.o -c $(CAPTURE)/audio_capture.c
 
 # play
 $(BUILD)/demux.o: $(PLAY)/demux.c $(HEADERS)
