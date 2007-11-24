@@ -10,7 +10,7 @@
 #include "../common/glc.h"
 
 /**
- * \addtogroup capture
+ * \addtogroup audio_capture
  *  \{
  */
 
