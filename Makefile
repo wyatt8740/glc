@@ -11,7 +11,7 @@ MLIBDIR = lib
 DESTDIR = 
 BUILD = build
 SRC = src
-LIB = $(SRC)/lib
+HOOK = $(SRC)/hook
 COMMON = $(SRC)/common
 CORE = $(SRC)/core
 CAPTURE = $(SRC)/capture
@@ -213,17 +213,17 @@ $(BUILD)/yuv4mpeg.o: $(EXPORT)/yuv4mpeg.c $(HEADERS)
 
 
 # hook objects
-$(BUILD)/main.o: $(LIB)/main.c $(LIB)/lib.h $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/main.o -c $(LIB)/main.c $(USE_LZO) $(USE_QUICKLZ)
+$(BUILD)/main.o: $(HOOK)/main.c $(HOOK)/lib.h $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/main.o -c $(HOOK)/main.c $(USE_LZO) $(USE_QUICKLZ)
 
-$(BUILD)/alsa.o: $(LIB)/alsa.c $(LIB)/lib.h $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/alsa.o -c $(LIB)/alsa.c
+$(BUILD)/alsa.o: $(HOOK)/alsa.c $(HOOK)/lib.h $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/alsa.o -c $(HOOK)/alsa.c
 
-$(BUILD)/opengl.o: $(LIB)/opengl.c $(LIB)/lib.h $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/opengl.o -c $(LIB)/opengl.c
+$(BUILD)/opengl.o: $(HOOK)/opengl.c $(HOOK)/lib.h $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/opengl.o -c $(HOOK)/opengl.c
 
-$(BUILD)/x11.o: $(LIB)/x11.c $(LIB)/lib.h $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/x11.o -c $(LIB)/x11.c
+$(BUILD)/x11.o: $(HOOK)/x11.c $(HOOK)/lib.h $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/x11.o -c $(HOOK)/x11.c
 
 
 # support code
