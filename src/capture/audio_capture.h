@@ -18,6 +18,8 @@ __PUBLIC void *audio_capture_init(glc_t *glc, ps_buffer_t *to,
 				  const char *device,
 				  unsigned int rate,
 				  unsigned int channels);
+__PUBLIC int audio_capture_pause(void *audiopriv);
+__PUBLIC int audio_capture_resume(void *audiopriv);
 __PUBLIC int audio_capture_close(void *audiopriv);
 
 /**  \} */

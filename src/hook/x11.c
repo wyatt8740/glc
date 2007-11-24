@@ -142,6 +142,7 @@ void x11_event(Display *dpy, XEvent *event)
 				return;
 
 			if (x11.glc->flags & GLC_CAPTURE) { /* stop */
+				alsa_pause();
 				x11.glc->flags &= ~GLC_CAPTURE;
 				x11.stop = util_time(x11.glc);
 				util_log(x11.glc, GLC_INFORMATION, "x11", "stopped capturing");
@@ -153,7 +154,8 @@ void x11_event(Display *dpy, XEvent *event)
 							 strerror(ret), ret);
 						return; /* don't set GLC_CAPTURE flag */
 					}
-				}
+				} else
+					alsa_resume();
 
 				util_timediff(x11.glc, util_time(x11.glc) - x11.stop);
 				x11.glc->flags |= GLC_CAPTURE;

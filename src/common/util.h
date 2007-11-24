@@ -50,6 +50,8 @@ __PUBLIC void util_log_info(glc_t *glc);
 
 __PUBLIC long int util_cpus();
 
+__PUBLIC glc_audio_i util_audio_stream_id(glc_t *glc);
+
 __PUBLIC int util_write_end_of_stream(glc_t *glc, ps_buffer_t *to);
 
 /**  \} */

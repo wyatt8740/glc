@@ -65,7 +65,6 @@ struct audio_hook_private_s {
 	glc_t *glc;
 	ps_buffer_t *to;
 
-	glc_audio_i stream_count;
 	struct audio_hook_stream_s *stream;
 };
 
@@ -150,7 +149,7 @@ int audio_hook_get_stream_alsa(struct audio_hook_private_s *audio_hook, snd_pcm_
 		find->pcm = pcm;
 
 		ps_packet_init(&find->packet, audio_hook->to);
-		find->audio_i = ++audio_hook->stream_count;
+		find->audio_i = util_audio_stream_id(audio_hook->glc);
 		sem_init(&find->capture, 0, 0);
 		sem_init(&find->capture_finished, 0, 0);
 

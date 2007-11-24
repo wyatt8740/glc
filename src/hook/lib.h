@@ -61,6 +61,8 @@ __PRIVATE void *wrapped_func(const char *symbol);
 __PRIVATE int alsa_init(glc_t *glc);
 __PRIVATE int alsa_start(ps_buffer_t *buffer);
 __PRIVATE int alsa_close();
+__PRIVATE int alsa_pause();
+__PRIVATE int alsa_resume();
 __PRIVATE int alsa_unhook_so(const char *soname);
 /**  \} */
 

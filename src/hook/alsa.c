@@ -17,6 +17,7 @@
 #include "../common/util.h"
 #include "lib.h"
 #include "../capture/audio_hook.h"
+#include "../capture/audio_capture.h"
 
 /**
  * \addtogroup hook
@@ -28,18 +29,32 @@
  *  \{
  */
 
+
+struct alsa_capture_stream_s {
+	void *capture;
+	char *device;
+	unsigned int channels;
+	unsigned int rate;
+
+	struct alsa_capture_stream_s *next;
+};
+
 struct alsa_private_s {
 	glc_t *glc;
-
-	void *audio;
-	int capture;
+	
 	int started;
+	int capture;
+
+	void *audio_hook;
+
+	struct alsa_capture_stream_s *capture_stream;
 
 	void *libasound_handle;
 	int (*snd_pcm_open)(snd_pcm_t **, const char *, snd_pcm_stream_t, int);
 	snd_pcm_sframes_t (*snd_pcm_writei)(snd_pcm_t *, const void *, snd_pcm_uframes_t);
 	snd_pcm_sframes_t (*snd_pcm_writen)(snd_pcm_t *, void **, snd_pcm_uframes_t);
-	int (*snd_pcm_mmap_begin)(snd_pcm_t *, const snd_pcm_channel_area_t **, snd_pcm_uframes_t *, snd_pcm_uframes_t *);
+	int (*snd_pcm_mmap_begin)(snd_pcm_t *, const snd_pcm_channel_area_t **,
+				  snd_pcm_uframes_t *, snd_pcm_uframes_t *);
 	snd_pcm_sframes_t (*snd_pcm_mmap_commit)(snd_pcm_t *, snd_pcm_uframes_t, snd_pcm_uframes_t);
 };
 
@@ -47,10 +62,13 @@ __PRIVATE struct alsa_private_s alsa;
 
 __PRIVATE void get_real_alsa();
 
+__PRIVATE int alsa_parse_capture_cfg(const char *cfg);
+
 int alsa_init(glc_t *glc)
 {
 	alsa.glc = glc;
 	alsa.started = 0;
+	alsa.capture_stream = NULL;
 
 	util_log(alsa.glc, GLC_DEBUG, "alsa", "initializing");
 
@@ -65,18 +83,76 @@ int alsa_init(glc_t *glc)
 	} else
 		alsa.glc->flags |= GLC_AUDIO_ALLOW_SKIP;
 
+	if (getenv("GLC_AUDIO_RECORD"))
+		alsa_parse_capture_cfg(getenv("GLC_AUDIO_RECORD"));
+
 	get_real_alsa();
+	return 0;
+}
+
+int alsa_parse_capture_cfg(const char *cfg)
+{
+	struct alsa_capture_stream_s *stream;
+	const char *args, *next, *device = cfg;
+	unsigned int channels, rate;
+	size_t len;
+
+	while (device != NULL) {
+		while (*device == ';')
+			device++;
+		if (*device == '\0')
+			break;
+
+		channels = 1;
+		rate = 44100;
+
+		/* check if some args have been given */
+		if ((args = strstr(device, ",")))
+			sscanf(args, ",%u,%u", &rate, &channels);
+		next = strstr(device, ";");
+
+		stream = malloc(sizeof(struct alsa_capture_stream_s));
+		memset(stream, 0, sizeof(struct alsa_capture_stream_s));
+
+		if (args)
+			len = args - device;
+		else if (next)
+			len = next - device;
+		else
+			len = strlen(device);
+
+		stream->device = (char *) malloc(sizeof(char) * len);
+		memcpy(stream->device, device, len);
+		stream->device[len] = '\0';
+
+		stream->channels = channels;
+		stream->rate = rate;
+		stream->next = alsa.capture_stream;
+		alsa.capture_stream = stream;
+
+		device = next;
+	}
+
 	return 0;
 }
 
 int alsa_start(ps_buffer_t *buffer)
 {
+	struct alsa_capture_stream_s *stream = alsa.capture_stream;
+
 	if (alsa.started)
 		return EINVAL;
 
 	if (alsa.capture) {
-		if (!(alsa.audio = audio_hook_init(alsa.glc, buffer)))
+		if (!(alsa.audio_hook = audio_hook_init(alsa.glc, buffer)))
 			return EAGAIN;
+	}
+
+	/* start capture streams */
+	while (stream != NULL) {
+		stream->capture = audio_capture_init(alsa.glc, buffer, stream->device,
+						     stream->rate, stream->channels);
+		stream = stream->next;
 	}
 
 	alsa.started = 1;
@@ -85,15 +161,53 @@ int alsa_start(ps_buffer_t *buffer)
 
 int alsa_close()
 {
+	struct alsa_capture_stream_s *del;
+
 	if (!alsa.started)
 		return 0;
 
 	util_log(alsa.glc, GLC_DEBUG, "alsa", "closing");
 
 	if (alsa.capture)
-		audio_hook_close(alsa.audio);
-	/*if (alsa.libasound_handle)
-		dlclose(alsa.libasound_handle);*/
+		audio_hook_close(alsa.audio_hook);
+
+	while (alsa.capture_stream != NULL) {
+		del = alsa.capture_stream;
+		alsa.capture_stream = alsa.capture_stream->next;
+
+		if (del->capture)
+			audio_capture_close(del->capture);
+
+		free(del->device);
+		free(del);
+	}
+
+	return 0;
+}
+
+int alsa_pause()
+{
+	struct alsa_capture_stream_s *stream = alsa.capture_stream;
+
+	while (stream != NULL) {
+		if (stream->capture)
+			audio_capture_pause(stream->capture);
+		stream = stream->next;
+	}
+
+	return 0;
+}
+
+int alsa_resume()
+{
+	struct alsa_capture_stream_s *stream = alsa.capture_stream;
+
+	while (stream != NULL) {
+		if (stream->capture)
+			audio_capture_resume(stream->capture);
+		stream = stream->next;
+	}
+
 	return 0;
 }
 
@@ -179,7 +293,7 @@ snd_pcm_sframes_t __alsa_snd_pcm_writei(snd_pcm_t *pcm, const void *buffer, snd_
 	INIT_GLC
 	snd_pcm_sframes_t ret = alsa.snd_pcm_writei(pcm, buffer, size);
 	if ((alsa.capture) && (ret > 0) && (alsa.glc->flags & GLC_CAPTURE))
-		audio_hook_alsa_i(alsa.audio, pcm, buffer, ret);
+		audio_hook_alsa_i(alsa.audio_hook, pcm, buffer, ret);
 	return ret;
 }
 
@@ -193,7 +307,7 @@ snd_pcm_sframes_t __alsa_snd_pcm_writen(snd_pcm_t *pcm, void **bufs, snd_pcm_ufr
 	INIT_GLC
 	snd_pcm_sframes_t ret = alsa.snd_pcm_writen(pcm, bufs, size);
 	if ((alsa.capture) && (ret > 0) && (alsa.glc->flags & GLC_CAPTURE))
-		audio_hook_alsa_n(alsa.audio, pcm, bufs, ret);
+		audio_hook_alsa_n(alsa.audio_hook, pcm, bufs, ret);
 	return ret;
 }
 
@@ -207,7 +321,7 @@ int __alsa_snd_pcm_mmap_begin(snd_pcm_t *pcm, const snd_pcm_channel_area_t **are
 	INIT_GLC
 	int ret = alsa.snd_pcm_mmap_begin(pcm, areas, offset, frames);
 	if ((alsa.capture) && (ret >= 0) && (alsa.glc->flags & GLC_CAPTURE))
-		audio_hook_alsa_mmap_begin(alsa.audio, pcm, *areas);
+		audio_hook_alsa_mmap_begin(alsa.audio_hook, pcm, *areas);
 	return ret;
 }
 
@@ -220,7 +334,7 @@ snd_pcm_sframes_t __alsa_snd_pcm_mmap_commit(snd_pcm_t *pcm, snd_pcm_uframes_t o
 {
 	INIT_GLC
 	if (alsa.capture && (alsa.glc->flags & GLC_CAPTURE))
-		audio_hook_alsa_mmap_commit(alsa.audio, pcm, offset,  frames);
+		audio_hook_alsa_mmap_commit(alsa.audio_hook, pcm, offset,  frames);
 	return alsa.snd_pcm_mmap_commit(pcm, offset, frames);
 }
 

@@ -37,6 +37,7 @@ int main(int argc, char *argv[])
 		{"fps",			1, NULL, 'f'},
 		{"resize",		1, NULL, 'r'},
 		{"crop",		1, NULL, 'y'},
+		{"record-audio",	1, NULL, 't'},
 		{"start",		0, NULL, 's'},
 		{"colorspace",		1, NULL, 'e'},
 		{"hotkey",		1, NULL, 'k'},
@@ -67,7 +68,7 @@ int main(int argc, char *argv[])
 	   is encountered. */
 	setenv("POSIXLY_CORRECT", "1", 1);
 
-	while ((opt = getopt_long(argc, argv, "o:f:r:y:se:k:npz:miv:l:waqgjb:c:u:d:h", long_options, &option_index)) != -1) {
+	while ((opt = getopt_long(argc, argv, "o:f:r:y:t:se:k:npz:miv:l:waqgjb:c:u:d:h", long_options, &option_index)) != -1) {
 		switch(opt) {
 		case 'o':
 			setenv("GLC_FILE", optarg, 1);
@@ -80,6 +81,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'y':
 			setenv("GLC_CROP", optarg, 1);
+			break;
+		case 't':
+			setenv("GLC_AUDIO_RECORD", optarg, 1);
 			break;
 		case 's':
 			setenv("GLC_START", "1", 1);
@@ -186,6 +190,8 @@ usage:
 	       "  -f, --fps=FPS              capture at FPS, default value is 30\n"
 	       "  -r, --resize=FACTOR        resize pictures with scale factor FACTOR\n"
 	       "  -y, --crop=WxH+X+Y         capture only [width]x[height][+[x][+[y]]]\n"
+	       "  -t, --record-audio=CONFIG  record specified alsa devices\n"
+	       "                               format is device,rate,channels;device2...\n"
 	       "  -s, --start                start capturing immediately\n"
 	       "  -e, --colorspace=CSP       keep as 'bgr' or convert to '420jpeg'\n"
 	       "                               default value is '420jpeg'\n"

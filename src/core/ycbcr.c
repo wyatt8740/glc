@@ -422,9 +422,15 @@ int ycbcr_ctx_msg(struct ycbcr_private_s *ycbcr, glc_ctx_message_t *ctx_msg)
 
 	if (ctx->scale == 1.0)
 		ctx->convert = &ycbcr_bgr_to_jpeg420;
-	else if (ctx->scale == 0.5)
+	else if (ctx->scale == 0.5) {
+		util_log(ycbcr->glc, GLC_DEBUG, "ycbcr",
+			 "scaling to half-size (from %ux%u to %ux%u)",
+			 ctx->w, ctx->h, ctx->yw, ctx->yh);
 		ctx->convert = &ycbcr_bgr_to_jpeg420_half;
-	else {
+	} else {
+		util_log(ycbcr->glc, GLC_DEBUG, "ycbcr",
+			 "scaling with factor %f (from %ux%u to %ux%u)",
+			 ctx->scale, ctx->w, ctx->h, ctx->yw, ctx->yh);
 		ctx->convert = &ycbcr_bgr_to_jpeg420_scale;
 		ycbcr_generate_map(ycbcr, ctx);
 	}

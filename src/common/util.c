@@ -37,6 +37,9 @@ struct util_private_s {
 	glc_stime_t timediff;
 	FILE *log_file;
 	pthread_mutex_t log_mutex;
+
+	glc_audio_i audio_streams;
+	pthread_mutex_t audio_streams_mutex;
 };
 
 int util_app_name(char **path, u_int32_t *path_size);
@@ -94,7 +97,9 @@ int util_init(glc_t *glc)
 
 	util->glc = glc;
 	gettimeofday(&util->init_time, NULL);
+	util->audio_streams = 0;
 	pthread_mutex_init(&util->log_mutex, NULL);
+	pthread_mutex_init(&util->audio_streams_mutex, NULL);
 
 	glc->util = util;
 	return 0;
@@ -109,6 +114,7 @@ int util_free(glc_t *glc)
 {
 	struct util_private_s *util = (struct util_private_s *) glc->util;
 	pthread_mutex_destroy(&util->log_mutex);
+	pthread_mutex_destroy(&util->audio_streams_mutex);
 	free(util);
 	return 0;
 }
@@ -342,6 +348,23 @@ int util_write_end_of_stream(glc_t *glc, ps_buffer_t *to)
 
 finish:
 	return ret;
+}
+
+/**
+ * \brief give unique audio stream
+ * \param glc glc
+ * \return unique audio stream number
+ */
+glc_audio_i util_audio_stream_id(glc_t *glc)
+{
+	struct util_private_s *util = glc->util;
+	glc_audio_i id;
+
+	pthread_mutex_lock(&util->audio_streams_mutex);
+	id = ++util->audio_streams;
+	pthread_mutex_unlock(&util->audio_streams_mutex);
+
+	return id;
 }
 
 /**
