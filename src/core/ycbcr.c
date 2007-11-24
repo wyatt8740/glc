@@ -444,8 +444,8 @@ int ycbcr_generate_map(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx)
 	float d, ofx, ofy, fx0, fx1, fy0, fy1;
 
 	scale_maps_size = ctx->yw * ctx->yh * 4 + ctx->cw * ctx->ch * 4;
-	util_log(ycbcr->glc, GLC_DEBUG, "ycbcr", "generating %zd byte scale map for ctx %d",
-		 scale_maps_size, ctx->ctx_i);
+	util_log(ycbcr->glc, GLC_DEBUG, "ycbcr", "generating %zd + %zd byte scale map for ctx %d",
+		 scale_maps_size * sizeof(unsigned int), scale_maps_size * sizeof(float), ctx->ctx_i);
 
 	if (ctx->pos)
 		ctx->pos = (unsigned int *) realloc(ctx->pos, sizeof(unsigned int) * scale_maps_size);

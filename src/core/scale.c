@@ -432,8 +432,8 @@ int scale_generate_rgb_map(struct scale_private_s *scale, struct scale_ctx_s *ct
 	float d;
 	size_t smap_size = ctx->sw * ctx->sh * 3 * 4;
 
-	util_log(scale->glc, GLC_DEBUG, "scale", "generating %zd byte scale map for ctx %d",
-		 smap_size, ctx->ctx);
+	util_log(scale->glc, GLC_DEBUG, "scale", "generating %zd + %zd byte scale map for ctx %d",
+		 smap_size * sizeof(unsigned int), smap_size * sizeof(float), ctx->ctx);
 
 	if (ctx->pos)
 		ctx->pos = (unsigned int *) realloc(ctx->pos, sizeof(unsigned int) * smap_size);
