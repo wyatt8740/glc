@@ -22,8 +22,8 @@
 
 #include "../common/glc.h"
 #include "../common/util.h"
-#include "../stream/pack.h"
-#include "../stream/file.h"
+#include "../core/pack.h"
+#include "../core/file.h"
 #include "lib.h"
 
 /**

@@ -13,7 +13,10 @@ BUILD = build
 SRC = src
 LIB = $(SRC)/lib
 COMMON = $(SRC)/common
-STREAM = $(SRC)/stream
+CORE = $(SRC)/core
+CAPTURE = $(SRC)/capture
+PLAY = $(SRC)/play
+EXPORT = $(SRC)/export
 SCRIPTS = scripts
 
 VERSION=0
@@ -36,21 +39,21 @@ LIBS = -lpthread -lpacketstream -lGL -ldl -lasound -lXxf86vm -lm
 HEADERS = $(COMMON)/glc.h \
 	  $(COMMON)/util.h \
 	  $(COMMON)/thread.h \
-	  $(STREAM)/gl_capture.h \
-	  $(STREAM)/gl_play.h \
-	  $(STREAM)/pack.h \
-	  $(STREAM)/file.h \
-	  $(STREAM)/img.h \
-	  $(STREAM)/scale.h \
-	  $(STREAM)/info.h \
-	  $(STREAM)/audio_capture.h \
-	  $(STREAM)/audio_play.h \
-	  $(STREAM)/wav.h \
-	  $(STREAM)/demux.h \
-	  $(STREAM)/ycbcr.h \
-	  $(STREAM)/yuv4mpeg.h \
-	  $(STREAM)/rgb.h \
-	  $(STREAM)/color.h
+	  $(CORE)/pack.h \
+	  $(CORE)/file.h \
+	  $(CORE)/scale.h \
+	  $(CORE)/info.h \
+	  $(CORE)/ycbcr.h \
+	  $(CORE)/rgb.h \
+	  $(CORE)/color.h \
+	  $(CAPTURE)/gl_capture.h \
+	  $(CAPTURE)/audio_hook.h \
+	  $(PLAY)/gl_play.h \
+	  $(PLAY)/audio_play.h \
+	  $(PLAY)/demux.h \
+	  $(EXPORT)/img.h \
+	  $(EXPORT)/wav.h \
+	  $(EXPORT)/yuv4mpeg.h
 
 LIB_OBJS = $(BUILD)/gl_capture.o \
            $(BUILD)/gl_play.o \
@@ -61,7 +64,7 @@ LIB_OBJS = $(BUILD)/gl_capture.o \
            $(BUILD)/scale.o \
            $(BUILD)/info.o \
            $(BUILD)/thread.o \
-           $(BUILD)/audio_capture.o \
+           $(BUILD)/audio_hook.o \
            $(BUILD)/audio_play.o \
            $(BUILD)/wav.o \
            $(BUILD)/demux.o \
@@ -133,53 +136,59 @@ $(BUILD)/thread.o: $(COMMON)/thread.c $(HEADERS)
 	$(CC) $(SO_CFLAGS) -o $(BUILD)/thread.o -c $(COMMON)/thread.c
 
 
-# stream processor objects
-$(BUILD)/gl_capture.o: $(STREAM)/gl_capture.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/gl_capture.o -c $(STREAM)/gl_capture.c
+# glc core
+$(BUILD)/pack.o: $(CORE)/pack.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/pack.o -c $(CORE)/pack.c $(USE_LZO) $(USE_QUICKLZ)
 
-$(BUILD)/gl_play.o: $(STREAM)/gl_play.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/gl_play.o -c $(STREAM)/gl_play.c
+$(BUILD)/file.o: $(CORE)/file.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/file.o -c $(CORE)/file.c
 
-$(BUILD)/pack.o: $(STREAM)/pack.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/pack.o -c $(STREAM)/pack.c $(USE_LZO) $(USE_QUICKLZ)
+$(BUILD)/scale.o: $(CORE)/scale.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/scale.o -c $(CORE)/scale.c
 
-$(BUILD)/file.o: $(STREAM)/file.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/file.o -c $(STREAM)/file.c
+$(BUILD)/info.o: $(CORE)/info.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/info.o -c $(CORE)/info.c
 
-$(BUILD)/img.o: $(STREAM)/img.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/img.o -c $(STREAM)/img.c
+$(BUILD)/ycbcr.o: $(CORE)/ycbcr.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/ycbcr.o -c $(CORE)/ycbcr.c
 
-$(BUILD)/scale.o: $(STREAM)/scale.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/scale.o -c $(STREAM)/scale.c
+$(BUILD)/rgb.o: $(CORE)/rgb.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/rgb.o -c $(CORE)/rgb.c
 
-$(BUILD)/info.o: $(STREAM)/info.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/info.o -c $(STREAM)/info.c
-
-$(BUILD)/audio_capture.o: $(STREAM)/audio_capture.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/audio_capture.o -c $(STREAM)/audio_capture.c
-
-$(BUILD)/audio_play.o: $(STREAM)/audio_play.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/audio_play.o -c $(STREAM)/audio_play.c
-
-$(BUILD)/wav.o: $(STREAM)/wav.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/wav.o -c $(STREAM)/wav.c
-
-$(BUILD)/demux.o: $(STREAM)/demux.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/demux.o -c $(STREAM)/demux.c
-
-$(BUILD)/ycbcr.o: $(STREAM)/ycbcr.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/ycbcr.o -c $(STREAM)/ycbcr.c
-
-$(BUILD)/yuv4mpeg.o: $(STREAM)/yuv4mpeg.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/yuv4mpeg.o -c $(STREAM)/yuv4mpeg.c
-
-$(BUILD)/rgb.o: $(STREAM)/rgb.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/rgb.o -c $(STREAM)/rgb.c
-
-$(BUILD)/color.o: $(STREAM)/color.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/color.o -c $(STREAM)/color.c
+$(BUILD)/color.o: $(CORE)/color.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/color.o -c $(CORE)/color.c
 
 
+# capture
+$(BUILD)/gl_capture.o: $(CAPTURE)/gl_capture.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/gl_capture.o -c $(CAPTURE)/gl_capture.c
+
+$(BUILD)/audio_hook.o: $(CAPTURE)/audio_hook.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/audio_hook.o -c $(CAPTURE)/audio_hook.c
+
+# play
+$(BUILD)/demux.o: $(PLAY)/demux.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/demux.o -c $(PLAY)/demux.c
+
+$(BUILD)/gl_play.o: $(PLAY)/gl_play.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/gl_play.o -c $(PLAY)/gl_play.c
+
+$(BUILD)/audio_play.o: $(PLAY)/audio_play.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/audio_play.o -c $(PLAY)/audio_play.c
+
+
+# export
+$(BUILD)/img.o: $(EXPORT)/img.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/img.o -c $(EXPORT)/img.c
+
+$(BUILD)/wav.o: $(EXPORT)/wav.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/wav.o -c $(EXPORT)/wav.c
+
+$(BUILD)/yuv4mpeg.o: $(EXPORT)/yuv4mpeg.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) -o $(BUILD)/yuv4mpeg.o -c $(EXPORT)/yuv4mpeg.c
+
+
+# support code
 $(LZO_OBJ): $(MINILZO)minilzo.c $(MINILZO)lzoconf.h $(MINILZO)lzodefs.h $(MINILZO)minilzo.h
 	$(CC) $(SO_CFLAGS) -o $(LZO_OBJ) -c $(MINILZO)minilzo.c
 

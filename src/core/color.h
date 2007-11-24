@@ -1,5 +1,5 @@
 /**
- * \file src/stream/color.h
+ * \file src/core/color.h
  * \brief color correction
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007

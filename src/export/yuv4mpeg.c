@@ -1,5 +1,5 @@
 /**
- * \file src/stream/yuv4mpeg.c
+ * \file src/export/yuv4mpeg.c
  * \brief yuv4mpeg output
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
@@ -24,7 +24,7 @@
 #include "yuv4mpeg.h"
 
 /**
- * \addtogroup stream
+ * \addtogroup export
  *  \{
  */
 

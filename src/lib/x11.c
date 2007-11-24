@@ -18,7 +18,7 @@
 #include "../common/glc.h"
 #include "../common/util.h"
 #include "lib.h"
-#include "../stream/gl_capture.h"
+#include "../capture/gl_capture.h"
 
 /**
  * \addtogroup lib

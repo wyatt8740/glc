@@ -1,5 +1,5 @@
 /**
- * \file src/stream/audio_play.c
+ * \file src/play/audio_play.c
  * \brief audio playback
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
@@ -26,7 +26,7 @@
 #include "audio_play.h"
 
 /**
- * \addtogroup stream
+ * \addtogroup play
  *  \{
  */
 

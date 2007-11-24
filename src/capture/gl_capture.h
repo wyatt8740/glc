@@ -1,5 +1,5 @@
 /**
- * \file src/stream/gl_capture.h
+ * \file src/capture/gl_capture.h
  * \brief OpenGL capture
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007

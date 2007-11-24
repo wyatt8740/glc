@@ -1,5 +1,5 @@
 /**
- * \file src/stream/ycbcr.c
+ * \file src/core/ycbcr.c
  * \brief convert BGR to Y'CbCr and scale
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
@@ -23,7 +23,7 @@
 #include "ycbcr.h"
 
 /**
- * \addtogroup stream
+ * \addtogroup core
  *  \{
  */
 

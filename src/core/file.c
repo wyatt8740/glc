@@ -1,5 +1,5 @@
 /**
- * \file src/stream/file.c
+ * \file src/core/file.c
  * \brief file io
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
@@ -26,7 +26,7 @@
 #include "file.h"
 
 /**
- * \addtogroup stream
+ * \addtogroup core
  *  \{
  */
 

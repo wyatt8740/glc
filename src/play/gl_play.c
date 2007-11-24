@@ -1,5 +1,5 @@
 /**
- * \file src/stream/gl_play.c
+ * \file src/play/gl_play.c
  * \brief OpenGL playback
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
@@ -30,7 +30,7 @@
 #include "gl_play.h"
 
 /**
- * \addtogroup stream
+ * \addtogroup play
  *  \{
  */
 

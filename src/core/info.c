@@ -1,5 +1,5 @@
 /**
- * \file src/stream/info.c
+ * \file src/core/info.c
  * \brief stream information
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
@@ -20,7 +20,7 @@
 #include "info.h"
 
 /**
- * \addtogroup stream
+ * \addtogroup core
  *  \{
  */
 

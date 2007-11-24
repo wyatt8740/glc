@@ -1,5 +1,5 @@
 /**
- * \file src/stream/img.c
+ * \file src/export/img.c
  * \brief export to images
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
@@ -22,7 +22,7 @@
 #include "img.h"
 
 /**
- * \addtogroup stream
+ * \addtogroup export
  *  \{
  */
 

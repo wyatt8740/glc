@@ -1,5 +1,5 @@
 /**
- * \file src/stream/demux.c
+ * \file src/play/demux.c
  * \brief audio/picture stream demuxer
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
@@ -26,7 +26,7 @@
 #include "audio_play.h"
 
 /**
- * \addtogroup stream
+ * \addtogroup play
  *  \{
  */
 

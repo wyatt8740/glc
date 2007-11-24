@@ -1,5 +1,5 @@
 /**
- * \file src/stream/color.c
+ * \file src/core/color.c
  * \brief color correction
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
@@ -25,7 +25,7 @@
 #include "color.h"
 
 /**
- * \addtogroup stream
+ * \addtogroup core
  *  \{
  */
 

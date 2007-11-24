@@ -1,5 +1,5 @@
 /**
- * \file src/stream/gl_capture.c
+ * \file src/capture/gl_capture.c
  * \brief OpenGL capture
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
@@ -30,7 +30,7 @@
 #include "gl_capture.h"
 
 /**
- * \addtogroup stream
+ * \addtogroup capture
  *  \{
  */
 

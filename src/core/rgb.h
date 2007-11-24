@@ -1,5 +1,5 @@
 /**
- * \file src/stream/rgb.h
+ * \file src/core/rgb.h
  * \brief convert Y'CbCr to BGR
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007

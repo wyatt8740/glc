@@ -1,6 +1,6 @@
 /**
- * \file src/stream/scale.c
- * \brief bilinear filtering
+ * \file src/core/scale.c
+ * \brief software scaler
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
  */
@@ -23,12 +23,12 @@
 #include "scale.h"
 
 /**
- * \addtogroup stream
+ * \addtogroup core
  *  \{
  */
 
 /**
- * \defgroup scale bilinear filtering
+ * \defgroup scale software scaler
  *  \{
  */
 

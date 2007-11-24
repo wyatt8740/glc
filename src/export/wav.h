@@ -1,5 +1,5 @@
 /**
- * \file src/stream/wav.h
+ * \file src/export/wav.h
  * \brief export audio to wav
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007

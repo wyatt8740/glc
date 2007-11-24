@@ -1,5 +1,5 @@
 /**
- * \file src/stream/img.h
+ * \file src/export/img.h
  * \brief export to images
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007

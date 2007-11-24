@@ -1,6 +1,6 @@
 /**
- * \file src/stream/scale.h
- * \brief bilinear filtering
+ * \file src/core/scale.h
+ * \brief software scaler
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
  */

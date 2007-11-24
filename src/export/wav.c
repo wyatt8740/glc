@@ -1,5 +1,5 @@
 /**
- * \file src/stream/wav.c
+ * \file src/export/wav.c
  * \brief export audio to wav
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
@@ -24,7 +24,7 @@
 #include "wav.h"
 
 /**
- * \addtogroup stream
+ * \addtogroup export
  *  \{
  */
 

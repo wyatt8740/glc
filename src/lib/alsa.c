@@ -14,9 +14,9 @@
 #include <elfhacks.h>
 #include <alsa/asoundlib.h>
 
-#include "../stream/audio_capture.h"
 #include "../common/util.h"
 #include "lib.h"
+#include "../capture/audio_hook.h"
 
 /**
  * \addtogroup lib
@@ -75,7 +75,7 @@ int alsa_start(ps_buffer_t *buffer)
 		return EINVAL;
 
 	if (alsa.capture) {
-		if (!(alsa.audio = audio_capture_init(alsa.glc, buffer)))
+		if (!(alsa.audio = audio_hook_init(alsa.glc, buffer)))
 			return EAGAIN;
 	}
 
@@ -91,7 +91,7 @@ int alsa_close()
 	util_log(alsa.glc, GLC_DEBUG, "alsa", "closing");
 
 	if (alsa.capture)
-		audio_capture_close(alsa.audio);
+		audio_hook_close(alsa.audio);
 	/*if (alsa.libasound_handle)
 		dlclose(alsa.libasound_handle);*/
 	return 0;
@@ -179,7 +179,7 @@ snd_pcm_sframes_t __alsa_snd_pcm_writei(snd_pcm_t *pcm, const void *buffer, snd_
 	INIT_GLC
 	snd_pcm_sframes_t ret = alsa.snd_pcm_writei(pcm, buffer, size);
 	if ((alsa.capture) && (ret > 0) && (alsa.glc->flags & GLC_CAPTURE))
-		audio_capture_alsa_i(alsa.audio, pcm, buffer, ret);
+		audio_hook_alsa_i(alsa.audio, pcm, buffer, ret);
 	return ret;
 }
 
@@ -193,7 +193,7 @@ snd_pcm_sframes_t __alsa_snd_pcm_writen(snd_pcm_t *pcm, void **bufs, snd_pcm_ufr
 	INIT_GLC
 	snd_pcm_sframes_t ret = alsa.snd_pcm_writen(pcm, bufs, size);
 	if ((alsa.capture) && (ret > 0) && (alsa.glc->flags & GLC_CAPTURE))
-		audio_capture_alsa_n(alsa.audio, pcm, bufs, ret);
+		audio_hook_alsa_n(alsa.audio, pcm, bufs, ret);
 	return ret;
 }
 
@@ -207,7 +207,7 @@ int __alsa_snd_pcm_mmap_begin(snd_pcm_t *pcm, const snd_pcm_channel_area_t **are
 	INIT_GLC
 	int ret = alsa.snd_pcm_mmap_begin(pcm, areas, offset, frames);
 	if ((alsa.capture) && (ret >= 0) && (alsa.glc->flags & GLC_CAPTURE))
-		audio_capture_alsa_mmap_begin(alsa.audio, pcm, *areas);
+		audio_hook_alsa_mmap_begin(alsa.audio, pcm, *areas);
 	return ret;
 }
 
@@ -220,7 +220,7 @@ snd_pcm_sframes_t __alsa_snd_pcm_mmap_commit(snd_pcm_t *pcm, snd_pcm_uframes_t o
 {
 	INIT_GLC
 	if (alsa.capture && (alsa.glc->flags & GLC_CAPTURE))
-		audio_capture_alsa_mmap_commit(alsa.audio, pcm, offset,  frames);
+		audio_hook_alsa_mmap_commit(alsa.audio, pcm, offset,  frames);
 	return alsa.snd_pcm_mmap_commit(pcm, offset, frames);
 }
 

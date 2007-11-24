@@ -1,5 +1,5 @@
 /**
- * \file src/stream/demux.h
+ * \file src/play/demux.h
  * \brief audio/picture stream demuxer
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007

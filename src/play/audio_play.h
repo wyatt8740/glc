@@ -1,5 +1,5 @@
 /**
- * \file src/stream/audio_play.h
+ * \file src/play/audio_play.h
  * \brief audio playback
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007

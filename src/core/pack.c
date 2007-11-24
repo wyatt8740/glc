@@ -1,5 +1,5 @@
 /**
- * \file src/stream/pack.c
+ * \file src/core/pack.c
  * \brief stream compression
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
@@ -23,7 +23,7 @@
 #include "pack.h"
 
 /**
- * \addtogroup stream
+ * \addtogroup core
  *  \{
  */
 

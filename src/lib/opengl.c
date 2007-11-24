@@ -16,9 +16,9 @@
 
 #include "../common/glc.h"
 #include "../common/util.h"
-#include "../stream/gl_capture.h"
-#include "../stream/scale.h"
-#include "../stream/ycbcr.h"
+#include "../capture/gl_capture.h"
+#include "../core/scale.h"
+#include "../core/ycbcr.h"
 #include "lib.h"
 
 /**

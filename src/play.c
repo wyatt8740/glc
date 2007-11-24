@@ -18,16 +18,19 @@
 
 #include "common/glc.h"
 #include "common/util.h"
-#include "stream/file.h"
-#include "stream/pack.h"
-#include "stream/img.h"
-#include "stream/info.h"
-#include "stream/wav.h"
-#include "stream/demux.h"
-#include "stream/ycbcr.h"
-#include "stream/yuv4mpeg.h"
-#include "stream/rgb.h"
-#include "stream/color.h"
+
+#include "core/file.h"
+#include "core/pack.h"
+#include "core/rgb.h"
+#include "core/color.h"
+#include "core/info.h"
+#include "core/ycbcr.h"
+
+#include "export/img.h"
+#include "export/wav.h"
+#include "export/yuv4mpeg.h"
+
+#include "play/demux.h"
 
 /**
  * \defgroup play stream player

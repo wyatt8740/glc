@@ -37,7 +37,10 @@
 
 /**
  * \defgroup lib wrapper library
- * \defgroup stream stream processing
+ * \defgroup capture capture
+ * \defgroup core core
+ * \defgroup export export format filters
+ * \defgroup play playback
  * \defgroup common common utilities and data structures
  * \defgroup support optional support libraries
  */

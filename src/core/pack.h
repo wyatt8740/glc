@@ -1,5 +1,5 @@
 /**
- * \file src/stream/pack.h
+ * \file src/core/pack.h
  * \brief stream compression
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007

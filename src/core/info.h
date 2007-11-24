@@ -1,5 +1,5 @@
 /**
- * \file src/stream/info.h
+ * \file src/core/info.h
  * \brief stream information
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007

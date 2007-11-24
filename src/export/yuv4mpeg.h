@@ -1,5 +1,5 @@
 /**
- * \file test/stream/yuv4mpeg.h
+ * \file test/export/yuv4mpeg.h
  * \brief yuv4mpeg output
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
