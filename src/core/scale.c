@@ -344,7 +344,46 @@ void scale_ycbcr_half(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 void scale_ycbcr_scale(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 		       unsigned char *from, unsigned char *to)
 {
+	unsigned int x, y, sp, cw, ch;
+	unsigned char *Y_to, *Cb_to, *Cr_to;
+	unsigned char *Y_from, *Cb_from, *Cr_from;
 
+	Y_from = from;
+	Cb_from = &from[ctx->w * ctx->h];
+	Cr_from = &Cb_from[(ctx->w / 2) * (ctx->h / 2)];
+
+	cw = ctx->sw / 2;
+	ch = ctx->sh / 2;
+	Y_to = to;
+	Cb_to = &to[ctx->sw * ctx->sh];
+	Cr_to = &Cb_to[cw * ch];
+
+	for (y = 0; y < ctx->sh; y++) {
+		for (x = 0; x < ctx->sw; x++) {
+			sp = (x + y * ctx->sw) * 4;
+
+			Y_to[x + y * ctx->sw] = Y_from[ctx->pos[sp + 0]] * ctx->factor[sp + 0]
+					      + Y_from[ctx->pos[sp + 1]] * ctx->factor[sp + 1]
+					      + Y_from[ctx->pos[sp + 2]] * ctx->factor[sp + 2]
+					      + Y_from[ctx->pos[sp + 3]] * ctx->factor[sp + 3];
+		}
+	}
+
+	for (y = 0; y < ch; y++) {
+		for (x = 0; x < cw; x++) {
+			sp = ctx->sw * ctx->sh * 4 + (x + y * cw) * 4;
+
+			Cb_to[x + y * cw] = Cb_from[ctx->pos[sp + 0]] * ctx->factor[sp + 0]
+					  + Cb_from[ctx->pos[sp + 1]] * ctx->factor[sp + 1]
+					  + Cb_from[ctx->pos[sp + 2]] * ctx->factor[sp + 2]
+					  + Cb_from[ctx->pos[sp + 3]] * ctx->factor[sp + 3];
+
+			Cr_to[x + y * cw] = Cr_from[ctx->pos[sp + 0]] * ctx->factor[sp + 0]
+					  + Cr_from[ctx->pos[sp + 1]] * ctx->factor[sp + 1]
+					  + Cr_from[ctx->pos[sp + 2]] * ctx->factor[sp + 2]
+					  + Cr_from[ctx->pos[sp + 3]] * ctx->factor[sp + 3];
+		}
+	}
 }
 
 int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
@@ -376,9 +415,6 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 			ctx_msg->flags &= ~GLC_CTX_DWORD_ALIGNED;
 		}
 	}
-
-	ctx_msg->w = ctx->sw;
-	ctx_msg->h = ctx->sh;
 
 	ctx->proc = NULL; /* do not try anything stupid... */
 
@@ -420,6 +456,9 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 			scale_generate_ycbcr_map(scale, ctx);
 		}
 	}
+
+	ctx_msg->w = ctx->sw;
+	ctx_msg->h = ctx->sh;
 
 	pthread_rwlock_unlock(&ctx->update);
 	return 0;
@@ -486,6 +525,99 @@ int scale_generate_rgb_map(struct scale_private_s *scale, struct scale_ctx_s *ct
 
 int scale_generate_ycbcr_map(struct scale_private_s *scale, struct scale_ctx_s *ctx)
 {
+	float ofx, ofy, fx0, fx1, fy0, fy1;
+	unsigned int tp, x, y, r, cw, ch;
+	float d;
+	size_t smap_size = ctx->sw * ctx->sh * 5; /* yw*yh*4 + (ch*cw)*4, ch = yh/2, cw = yw/2 */
+
+	util_log(scale->glc, GLC_DEBUG, "scale", "generating %zd B + %zd B scale map for ctx %d",
+		 smap_size * sizeof(unsigned int), smap_size * sizeof(float), ctx->ctx);
+
+	if (ctx->pos)
+		ctx->pos = (unsigned int *) realloc(ctx->pos, sizeof(unsigned int) * smap_size);
+	else
+		ctx->pos = (unsigned int *) malloc(sizeof(unsigned int) * smap_size);
+	if (ctx->factor)
+		ctx->factor = (float *) realloc(ctx->pos, sizeof(float) * smap_size);
+	else
+		ctx->factor = (float *) malloc(sizeof(float) * smap_size);
+
+	r = 0;
+	do {
+		d = (float) (ctx->w - r++) / (float) ctx->sw;
+		util_log(scale->glc, GLC_DEBUG, "scale", "Y: d = %f", d);
+	} while ((d * (float) (ctx->sh - 1) + 1.0 > ctx->h) |
+		 (d * (float) (ctx->sw - 1) + 1.0 > ctx->w));
+
+	ofx = ofy = 0;
+	for (y = 0; y < ctx->sh; y++) {
+		for (x = 0; x < ctx->sw; x++) {
+			tp = (x + y * ctx->sw) * 4;
+
+			ctx->pos[tp + 0] = ((unsigned int) ofx + 0) +
+			                   ((unsigned int) ofy + 0) * ctx->w;
+			ctx->pos[tp + 1] = ((unsigned int) ofx + 1) +
+			                   ((unsigned int) ofy + 0) * ctx->w;
+			ctx->pos[tp + 2] = ((unsigned int) ofx + 0) +
+			                   ((unsigned int) ofy + 1) * ctx->w;
+			ctx->pos[tp + 3] = ((unsigned int) ofx + 1) +
+			                   ((unsigned int) ofy + 1) * ctx->w;
+
+			fx1 = (float) x * d - (float) ((unsigned int) ofx);
+			fx0 = 1.0 - fx1;
+			fy1 = (float) y * d - (float) ((unsigned int) ofy);
+			fy0 = 1.0 - fy1;
+
+			ctx->factor[tp + 0] = fx0 * fy0;
+			ctx->factor[tp + 1] = fx1 * fy0;
+			ctx->factor[tp + 2] = fx0 * fy1;
+			ctx->factor[tp + 3] = fx1 * fy1;
+
+			ofx += d;
+		}
+		ofy += d;
+		ofx = 0;
+	}
+
+	cw = ctx->sw / 2;
+	ch = ctx->sh / 2;
+	r = (r < 2) ? (0) : (r - 2);
+	do {
+		d = (float) ((ctx->w / 2) - r++) / (float) cw;
+		util_log(scale->glc, GLC_DEBUG, "scale", "C: d = %f", d);
+	} while ((d * (float) (ch - 1) + 1.0 > (ctx->h / 2)) |
+		 (d * (float) (cw - 1) + 1.0 > (ctx->w / 2)));
+
+	ofx = ofy = 0;
+	for (y = 0; y < ch; y++) {
+		for (x = 0; x < cw; x++) {
+			tp = ctx->sw * ctx->sh * 4 + (x + y * cw) * 4;
+
+			ctx->pos[tp + 0] = ((unsigned int) ofx + 0) +
+			                   ((unsigned int) ofy + 0) * (ctx->w / 2);
+			ctx->pos[tp + 1] = ((unsigned int) ofx + 1) +
+			                   ((unsigned int) ofy + 0) * (ctx->w / 2);
+			ctx->pos[tp + 2] = ((unsigned int) ofx + 0) +
+			                   ((unsigned int) ofy + 1) * (ctx->w / 2);
+			ctx->pos[tp + 3] = ((unsigned int) ofx + 1) +
+			                   ((unsigned int) ofy + 1) * (ctx->w / 2);
+
+			fx1 = (float) x * d - (float) ((unsigned int) ofx);
+			fx0 = 1.0 - fx1;
+			fy1 = (float) y * d - (float) ((unsigned int) ofy);
+			fy0 = 1.0 - fy1;
+
+			ctx->factor[tp + 0] = fx0 * fy0;
+			ctx->factor[tp + 1] = fx1 * fy0;
+			ctx->factor[tp + 2] = fx0 * fy1;
+			ctx->factor[tp + 3] = fx1 * fy1;
+
+			ofx += d;
+		}
+		ofy += d;
+		ofx = 0;
+	}
+
 	return 0;
 }
 
