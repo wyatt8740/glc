@@ -5,7 +5,6 @@
  * \date 2007
  */
 
-
 /* audio_hook.c -- audio capture
  * Copyright (C) 2007 Pyry Haulos
  * For conditions of distribution and use, see copyright notice in glc.h
@@ -269,7 +268,7 @@ int audio_hook_alsa_n(void *audiopriv, snd_pcm_t *pcm, void **bufs, snd_pcm_ufra
 	}
 
 	if (stream->flags & GLC_AUDIO_INTERLEAVED) {
-		util_log(audio_hook->glc, GLC_ERROR, "audio",
+		util_log(audio_hook->glc, GLC_ERROR, "audio_hook",
 			 "stream format (interleaved) incompatible with snd_pcm_writen()");
 		return EINVAL;
 	}
@@ -320,7 +319,7 @@ int audio_hook_alsa_mmap_commit(void *audiopriv, snd_pcm_t *pcm, snd_pcm_uframes
 
 	if (!stream->mmap_areas) {
 		/* this might actually happen */
-		util_log(audio_hook->glc, GLC_WARNING, "audio",
+		util_log(audio_hook->glc, GLC_WARNING, "audio_hook",
 			 "snd_pcm_mmap_commit() before snd_pcm_mmap_begin()");
 		return EINVAL;
 	}
@@ -404,7 +403,7 @@ int audio_hook_alsa_fmt(struct audio_hook_private_s *audio_hook, struct audio_ho
 	stream->flags = 0; /* zero flags */
 	stream->flags |= pcm_fmt_to_glc_fmt(format);
 	if (stream->flags & GLC_AUDIO_FORMAT_UNKNOWN) {
-		util_log(audio_hook->glc, GLC_ERROR, "audio",
+		util_log(audio_hook->glc, GLC_ERROR, "audio_hook",
 			 "unsupported audio format 0x%02x", format);
 		return ENOTSUP;
 	}
@@ -422,7 +421,7 @@ int audio_hook_alsa_fmt(struct audio_hook_private_s *audio_hook, struct audio_ho
 		stream->flags |= GLC_AUDIO_INTERLEAVED; /* convert to interleaved */
 		stream->complex = 1; /* do conversion */
 	} else {
-		util_log(audio_hook->glc, GLC_ERROR, "audio",
+		util_log(audio_hook->glc, GLC_ERROR, "audio_hook",
 			 "unsupported access mode 0x%02x", access);
 		return ENOTSUP;
 	}
@@ -457,7 +456,7 @@ int audio_hook_alsa_fmt(struct audio_hook_private_s *audio_hook, struct audio_ho
 err:
 	if (params)
 		snd_pcm_hw_params_free(params);
-	util_log(audio_hook->glc, GLC_ERROR, "audio",
+	util_log(audio_hook->glc, GLC_ERROR, "audio_hook",
 		 "can't extract hardware configuration: %s (%d)", snd_strerror(ret), ret);
 	return ret;
 }
