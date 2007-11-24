@@ -33,11 +33,6 @@
 
 #include "play/demux.h"
 
-/**
- * \defgroup play stream player
- *  \{
- */
-
 int show_info_value(glc_t *glc, const char *value);
 
 int main(int argc, char *argv[])
@@ -358,5 +353,3 @@ int show_info_value(glc_t *glc, const char *value)
 		return EXIT_FAILURE;
 	return EXIT_SUCCESS;
 }
-
-/**  \} */

@@ -265,7 +265,7 @@ int util_free_info(glc_t *glc)
  *
  * Currently this function resolves /proc/self/exe.
  * \param path returned application name
- * \param path_size size of name string, including \0
+ * \param path_size size of name string, including 0
  * \return 0 on success otherwise an error code
  */
 int util_app_name(char **path, u_int32_t *path_size)

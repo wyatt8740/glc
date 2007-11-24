@@ -1,5 +1,5 @@
 /**
- * \file src/lib/alsa.c
+ * \file src/hook/alsa.c
  * \brief alsa wrapper
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
@@ -19,7 +19,7 @@
 #include "../capture/audio_hook.h"
 
 /**
- * \addtogroup lib
+ * \addtogroup hook
  *  \{
  */
 

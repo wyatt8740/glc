@@ -679,7 +679,7 @@ int gl_capture_refresh_color(void *glpriv)
 	return 0;
 }
 
-/** \TODO support GammaRamp */
+/** \todo support GammaRamp */
 int gl_capture_update_color(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
 {
 	glc_message_header_t msg_hdr;

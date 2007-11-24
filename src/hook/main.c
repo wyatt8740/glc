@@ -1,5 +1,5 @@
 /**
- * \file src/lib/main.c
+ * \file src/hook/main.c
  * \brief main wrapper library
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
@@ -27,7 +27,7 @@
 #include "lib.h"
 
 /**
- * \addtogroup lib
+ * \addtogroup hook
  *  \{
  */
 

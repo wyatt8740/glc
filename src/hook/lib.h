@@ -1,5 +1,5 @@
 /**
- * \file src/lib/lib.h
+ * \file src/hook/lib.h
  * \brief wrapper library
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
@@ -24,7 +24,7 @@
 #include <pthread.h>
 
 /**
- * \addtogroup lib
+ * \addtogroup hook
  *  \{
  */
 

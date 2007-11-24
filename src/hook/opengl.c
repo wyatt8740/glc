@@ -1,5 +1,5 @@
 /**
- * \file src/lib/opengl.c
+ * \file src/hook/opengl.c
  * \brief opengl wrapper
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
@@ -22,7 +22,7 @@
 #include "lib.h"
 
 /**
- * \addtogroup lib
+ * \addtogroup hook
  *  \{
  */
 

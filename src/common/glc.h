@@ -36,7 +36,7 @@
 #include <semaphore.h>
 
 /**
- * \defgroup lib wrapper library
+ * \defgroup hook wrapper library
  * \defgroup capture capture
  * \defgroup core core
  * \defgroup export export format filters

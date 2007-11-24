@@ -1,6 +1,6 @@
 /**
  * \file src/capture/audio_hook.h
- * \brief audio capture
+ * \brief audio capture hooks
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
  */

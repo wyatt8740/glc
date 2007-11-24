@@ -1,5 +1,5 @@
 /**
- * \file src/lib/x11.c
+ * \file src/hook/x11.c
  * \brief libX11 wrapper
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
@@ -21,7 +21,7 @@
 #include "../capture/gl_capture.h"
 
 /**
- * \addtogroup lib
+ * \addtogroup hook
  *  \{
  */
 

@@ -19,11 +19,6 @@
 #include <getopt.h>
 #include <string.h>
 
-/**
- * \defgroup capture capture utility
- *  \{
- */
-
 int main(int argc, char *argv[])
 {
 	char opt;
@@ -227,5 +222,3 @@ usage:
 	       "  -h, --help                 show this help\n");
 	return EXIT_FAILURE;
 }
-
-/**  \} */
