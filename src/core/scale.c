@@ -282,7 +282,63 @@ void scale_rgb_scale(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 void scale_ycbcr_half(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 		      unsigned char *from, unsigned char *to)
 {
+	unsigned int x, y, ox, oy, cw_from, ch_from, cw_to, ch_to, op1, op2, op3, op4;
+	unsigned char *Y_to, *Cb_to, *Cr_to;
+	unsigned char *Y_from, *Cb_from, *Cr_from;
 
+	cw_from = ctx->w / 2;
+	ch_from = ctx->h / 2;
+	Y_from = from;
+	Cb_from = &from[ctx->w * ctx->h];
+	Cr_from = &Cb_from[cw_from * ch_from];
+
+	cw_to = ctx->sw / 2;
+	ch_to = ctx->sh / 2;
+	Y_to = to;
+	Cb_to = &to[ctx->sw * ctx->sh];
+	Cr_to = &Cb_to[cw_to * ch_to];
+
+	ox = oy = 0;
+	for (y = 0; y < ch_to; y++) {
+		for (x = 0; x < cw_to; x++) {
+			op1 = (oy + 0) * cw_from + (ox + 0);
+			op2 = (oy + 0) * cw_from + (ox + 1);
+			op3 = (oy + 1) * cw_from + (ox + 0);
+			op4 = (oy + 1) * cw_from + (ox + 1);
+
+			Cb_to[y * cw_to + x] = (Cb_from[op1] +
+						Cb_from[op2] +
+						Cb_from[op3] +
+						Cb_from[op4]) >> 2;
+			Cr_to[y * cw_to + x] = (Cr_from[op1] +
+						Cr_from[op2] +
+						Cr_from[op3] +
+						Cr_from[op4]) >> 2;
+
+			ox += 2;
+		}
+		ox = 0;
+		oy += 2;
+	}
+
+	ox = oy = 0;
+	for (y = 0; y < ctx->sh; y++) {
+		for (x = 0; x < ctx->sw; x++) {
+			op1 = (oy + 0) * ctx->w + (ox + 0);
+			op2 = (oy + 0) * ctx->w + (ox + 1);
+			op3 = (oy + 1) * ctx->w + (ox + 0);
+			op4 = (oy + 1) * ctx->w + (ox + 1);
+
+			Y_to[y * ctx->sw + x] = (Y_from[op1] +
+						 Y_from[op2] +
+						 Y_from[op3] +
+						 Y_from[op4]) >> 2;
+
+			ox += 2;
+		}
+		ox = 0;
+		oy += 2;
+	}
 }
 
 void scale_ycbcr_scale(struct scale_private_s *scale, struct scale_ctx_s *ctx,
