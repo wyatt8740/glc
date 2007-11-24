@@ -86,7 +86,7 @@ int x11_init(glc_t *glc)
 		x11.capture = XK_F8;
 	}
 
-	x11.stop = util_timestamp(x11.glc);
+	x11.stop = util_time(x11.glc);
 
 	return 0;
 }
@@ -143,7 +143,7 @@ void x11_event(Display *dpy, XEvent *event)
 
 			if (x11.glc->flags & GLC_CAPTURE) { /* stop */
 				x11.glc->flags &= ~GLC_CAPTURE;
-				x11.stop = util_timestamp(x11.glc);
+				x11.stop = util_time(x11.glc);
 				util_log(x11.glc, GLC_INFORMATION, "x11", "stopped capturing");
 			} else { /* start */
 				if (!lib.running) {
@@ -155,7 +155,7 @@ void x11_event(Display *dpy, XEvent *event)
 					}
 				}
 
-				util_timediff(x11.glc, util_timestamp(x11.glc) - x11.stop);
+				util_timediff(x11.glc, util_time(x11.glc) - x11.stop);
 				x11.glc->flags |= GLC_CAPTURE;
 				util_log(x11.glc, GLC_INFORMATION, "x11", "started capturing");
 

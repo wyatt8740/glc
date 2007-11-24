@@ -578,7 +578,7 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 	msg.type = GLC_MESSAGE_PICTURE;
 	pic.ctx = ctx->ctx_i;
 
-	now = util_timestamp(gl_capture->glc);
+	now = util_time(gl_capture->glc);
 	if (gl_capture->use_pbo)
 		pic.timestamp = ctx->pbo_timestamp;
 	else
@@ -593,7 +593,7 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 
 	if ((gl_capture->use_pbo) && (!ctx->pbo_active)) {
 		ret = gl_capture_start_pbo(gl_capture, ctx);
-		ctx->pbo_timestamp = util_timestamp(gl_capture->glc);
+		ctx->pbo_timestamp = util_time(gl_capture->glc);
 		goto finish;
 	}
 
@@ -627,7 +627,7 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 	}
 
 	if (gl_capture->glc->flags & GLC_LOCK_FPS) {
-		now = util_timestamp(gl_capture->glc);
+		now = util_time(gl_capture->glc);
 
 		if (now - ctx->last < gl_capture->fps)
 			usleep(gl_capture->fps + ctx->last - now);

@@ -248,7 +248,7 @@ int audio_capture_alsa_i(void *audiopriv, snd_pcm_t *pcm, const void *buffer, sn
 	if ((ret = audio_capture_set_data_size(stream, snd_pcm_frames_to_bytes(pcm, size))))
 		return ret;
 
-	stream->capture_time = util_timestamp(audio_capture->glc);
+	stream->capture_time = util_time(audio_capture->glc);
 	memcpy(stream->capture_data, buffer, stream->capture_size);
 	sem_post(&stream->capture);
 
@@ -279,7 +279,7 @@ int audio_capture_alsa_n(void *audiopriv, snd_pcm_t *pcm, void **bufs, snd_pcm_u
 
 	if ((ret = audio_capture_set_data_size(stream, snd_pcm_frames_to_bytes(pcm, size))))
 		return ret;
-	stream->capture_time = util_timestamp(audio_capture->glc);
+	stream->capture_time = util_time(audio_capture->glc);
 	
 	for (c = 0; c < stream->channels; c++)
 		memcpy(&stream->capture_data[c * snd_pcm_samples_to_bytes(pcm, size)], bufs[c],
@@ -330,7 +330,7 @@ int audio_capture_alsa_mmap_commit(void *audiopriv, snd_pcm_t *pcm, snd_pcm_ufra
 
 	if ((ret = audio_capture_set_data_size(stream, snd_pcm_frames_to_bytes(pcm, frames))))
 		return ret;
-	stream->capture_time = util_timestamp(audio_capture->glc);
+	stream->capture_time = util_time(audio_capture->glc);
 	
 	if (stream->flags & GLC_AUDIO_INTERLEAVED)
 		memcpy(stream->capture_data,

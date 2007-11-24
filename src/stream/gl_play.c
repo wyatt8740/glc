@@ -385,7 +385,7 @@ int gl_play_read_callback(glc_thread_state_t *state)
 		/* draw first, measure and sleep after */
 		gl_play_draw_picture(gl_play, &state->read_data[GLC_PICTURE_HEADER_SIZE]);
 
-		time = util_timestamp(gl_play->glc);
+		time = util_time(gl_play->glc);
 
 		if (pic_hdr->timestamp > time)
 			usleep(pic_hdr->timestamp - time);

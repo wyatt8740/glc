@@ -44,6 +44,8 @@ int util_utc_date(char **date, u_int32_t *date_size);
 
 void util_write_time(glc_t *glc, FILE *stream);
 
+glc_utime_t util_real_time(glc_t *glc);
+
 /**
  * \brief create glc_t
  *
@@ -112,14 +114,24 @@ int util_free(glc_t *glc)
 }
 
 /**
- * \brief current time in microseconds
+ * \brief current time in microseconds with timediff applied
  *
  * Time is absolute time - startup time - active time difference.
  * \see util_timediff()
  * \param glc glc
  * \return current relative time
  */
-glc_utime_t util_timestamp(glc_t *glc)
+glc_utime_t util_time(glc_t *glc)
+{
+	return util_real_time(glc) - ((struct util_private_s *) glc->util)->timediff;
+}
+
+/**
+ * \brief current time in microseconds without timediff
+ * \param glc glc
+ * \return time elapsed since initialization
+ */
+glc_utime_t util_real_time(glc_t *glc)
 {
 	struct util_private_s *util = (struct util_private_s *) glc->util;
 	struct timeval tv;
@@ -134,7 +146,7 @@ glc_utime_t util_timestamp(glc_t *glc)
 		tv.tv_usec += 1000000;
 	}
 
-	return (glc_utime_t) (tv.tv_sec * 1000000 + (glc_utime_t) tv.tv_usec - util->timediff);
+	return (glc_utime_t) (tv.tv_sec * 1000000 + (glc_utime_t) tv.tv_usec);
 }
 
 /**
@@ -448,7 +460,7 @@ void util_log_info(glc_t *glc)
 
 void util_write_time(glc_t *glc, FILE *stream)
 {
-	fprintf(stream, "[%7.2fs]", (double) util_timestamp(glc) / 1000000.0);
+	fprintf(stream, "[%7.2fs]", (double) util_real_time(glc) / 1000000.0);
 }
 
 /**  \} */
