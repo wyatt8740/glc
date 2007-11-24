@@ -118,7 +118,6 @@ int rgb_init_lookup(struct rgb_private_s *rgb);
 int rgb_convert_lookup(struct rgb_private_s *rgb, struct rgb_ctx_s *ctx,
 		       unsigned char *from, unsigned char *to);
 
-
 int rgb_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 {
 	struct rgb_private_s *rgb = malloc(sizeof(struct rgb_private_s));

@@ -62,10 +62,10 @@ Y', Cb, Cr      in {0, 1, 2, ..., 255}
 struct ycbcr_ctx_s;
 struct ycbcr_private_s;
 
-typedef void (*YCbCrConvertProc)(struct ycbcr_private_s *ycbcr,
-				 struct ycbcr_ctx_s *ctx,
-				 unsigned char *from,
-				 unsigned char *to);
+typedef void (*ycbcr_convert_proc)(struct ycbcr_private_s *ycbcr,
+				   struct ycbcr_ctx_s *ctx,
+				   unsigned char *from,
+				   unsigned char *to);
 
 struct ycbcr_ctx_s {
 	glc_ctx_i ctx_i;
@@ -79,7 +79,7 @@ struct ycbcr_ctx_s {
 	unsigned int *pos;
 	float *factor;
 
-	YCbCrConvertProc convert;
+	ycbcr_convert_proc convert;
 
 	pthread_rwlock_t update;
 	struct ycbcr_ctx_s *next;
