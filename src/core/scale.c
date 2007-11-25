@@ -70,7 +70,7 @@ int scale_write_callback(glc_thread_state_t *state);
 void scale_finish_callback(void *ptr, int err);
 
 int scale_pic_msg(struct scale_private_s *scale, struct scale_ctx_s *ctx, unsigned char *from, unsigned char *to);
-int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg);
+int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg, glc_thread_state_t *state);
 int scale_get_ctx(struct scale_private_s *scale, glc_ctx_i ctx_i, struct scale_ctx_s **ctx);
 
 int scale_generate_rgb_map(struct scale_private_s *scale, struct scale_ctx_s *ctx);
@@ -136,7 +136,7 @@ int scale_read_callback(glc_thread_state_t *state) {
 	glc_picture_header_t *pic_header;
 
 	if (state->header.type == GLC_MESSAGE_CTX)
-		scale_ctx_msg(scale, (glc_ctx_message_t *) state->read_data);
+		return scale_ctx_msg(scale, (glc_ctx_message_t *) state->read_data, state);
 
 	if (state->header.type == GLC_MESSAGE_PICTURE) {
 		pic_header = (glc_picture_header_t *) state->read_data;
@@ -400,13 +400,15 @@ void scale_ycbcr_scale(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 	}
 }
 
-int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
+int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg, glc_thread_state_t *state)
 {
 	struct scale_ctx_s *ctx;
+	glc_flags_t old_flags;
 
 	scale_get_ctx(scale, ctx_msg->ctx, &ctx);
 	pthread_rwlock_wrlock(&ctx->update);
 
+	old_flags = ctx->flags;
 	ctx->flags = ctx_msg->flags;
 	ctx->w = ctx_msg->w;
 	ctx->h = ctx_msg->h;
@@ -473,10 +475,20 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 
 		ctx_msg->flags &= ~GLC_CTX_BGRA; /* conversion is always done */
 		ctx_msg->flags |= GLC_CTX_BGR;
+		ctx_msg->w = ctx->rw;
+		ctx_msg->h = ctx->rh;
 		ctx->size = ctx->rw * ctx->rh * 3;
+
+		if ((scale->glc->flags & GLC_SCALE_SIZE) &&
+		    (ctx_msg->flags & GLC_CTX_UPDATE) &&
+		    ((old_flags & ~(GLC_CTX_CREATE | GLC_CTX_UPDATE)) ==
+		     (ctx_msg->flags & ~(GLC_CTX_CREATE | GLC_CTX_UPDATE))))
+			state->flags |= GLC_THREAD_STATE_SKIP_WRITE;
 	} else if (ctx_msg->flags & GLC_CTX_YCBCR_420JPEG) {
 		ctx->sw -= ctx->sw % 2;
 		ctx->sh -= ctx->sh % 2;
+		ctx_msg->w = ctx->rw;
+		ctx_msg->h = ctx->rh;
 		ctx->size = ctx->rw * ctx->rh + 2 * ((ctx->rw / 2) * (ctx->rh / 2));
 
 		if ((ctx->scale == 0.5) && !(scale->glc->flags & GLC_SCALE_SIZE)) {
@@ -491,10 +503,15 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 			ctx->proc = scale_ycbcr_scale;
 			scale_generate_ycbcr_map(scale, ctx);
 		}
+
+		if ((scale->glc->flags & GLC_SCALE_SIZE) &&
+		    (ctx_msg->flags & GLC_CTX_UPDATE) &&
+		    ((old_flags & ~(GLC_CTX_CREATE | GLC_CTX_UPDATE)) ==
+		     (ctx_msg->flags & ~(GLC_CTX_CREATE | GLC_CTX_UPDATE))))
+			state->flags |= GLC_THREAD_STATE_SKIP_WRITE;
 	}
 
-	ctx_msg->w = ctx->rw;
-	ctx_msg->h = ctx->rh;
+	state->flags |= GLC_THREAD_COPY;
 
 	pthread_rwlock_unlock(&ctx->update);
 	return 0;
@@ -574,7 +591,7 @@ int scale_generate_ycbcr_map(struct scale_private_s *scale, struct scale_ctx_s *
 	else
 		ctx->pos = (unsigned int *) malloc(sizeof(unsigned int) * smap_size);
 	if (ctx->factor)
-		ctx->factor = (float *) realloc(ctx->pos, sizeof(float) * smap_size);
+		ctx->factor = (float *) realloc(ctx->factor, sizeof(float) * smap_size);
 	else
 		ctx->factor = (float *) malloc(sizeof(float) * smap_size);
 

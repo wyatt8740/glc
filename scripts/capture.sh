@@ -65,6 +65,10 @@ export GLC_COLORSPACE=420jpeg
 # crop capture area to WxH+X+Y
 # export GLC_CROP=WxH+X+Y
 
+# record alsa devices
+# format is device,rate,channels;device2...
+# export GLC_AUDIO_RECORD=default,44100,1
+
 # use GL_PACK_ALIGNMENT 8
 export GLC_CAPTURE_DWORD_ALIGNED=1
 
