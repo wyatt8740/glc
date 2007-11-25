@@ -1,3 +1,13 @@
+0.4.0 (2007/11/25)
+   ALSA audio recording support (eg. record voice from mic).
+   Support for rescaling pictures to specified size (aspect ratio is
+     preserved) at playback/export.
+   Extend scale to support YCBCR_420JPEG.
+   Cleaned up source code layout.
+   Split libglc to libglc-core, libglc-capture, libglc-play, libglc-export
+     and libglc-hook.
+   Clean up glc-capture command line arguments and argument parsing.
+
 0.3.11 (2007/11/10)
    Color correction support; either use gamma values stored to stream
     at capture time (XF86VidModeSetGamma) or set custom gamma, brightness
