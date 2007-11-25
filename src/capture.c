@@ -16,170 +16,93 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <getopt.h>
 #include <string.h>
+#include <errno.h>
+
+struct glc_opt_s {
+	char short_name;
+	const char *name;
+	const char *env;
+	const char *val;
+};
+
+int env_append(const char *env, const char *val, char separator);
+int parse_arg(struct glc_opt_s *options, int argc, char *argv[], int *optind);
+int set_opt(struct glc_opt_s *option, const char *arg);
+struct glc_opt_s *find_opt_long(struct glc_opt_s *options, const char *name, size_t len);
+struct glc_opt_s *find_opt_short(struct glc_opt_s *options, const char short_name);
 
 int main(int argc, char *argv[])
 {
-	char opt;
+	int optind;
 	int ret = 0;
-	int option_index = 0;
-	int posixly_correct_was_set = 0;
+
 	char *program = NULL;
 	char **program_args = NULL;
-	const char *ld_preload_old = NULL;
 	const char *library = "libglc-hook.so";
-	char *ld_preload;
-	size_t ld_preload_len;
 
-	struct option long_options[] = {
-		{"out",			1, NULL, 'o'},
-		{"fps",			1, NULL, 'f'},
-		{"resize",		1, NULL, 'r'},
-		{"crop",		1, NULL, 'y'},
-		{"record-audio",	1, NULL, 't'},
-		{"start",		0, NULL, 's'},
-		{"colorspace",		1, NULL, 'e'},
-		{"hotkey",		1, NULL, 'k'},
-		{"lock-fps",		0, NULL, 'n'},
-		{"no-pbo",		0, NULL, 'p'},
-		{"compression",		1, NULL, 'z'},
-		{"byte-aligned",	0, NULL, 'm'},
-		{"draw-indicator",	0, NULL, 'i'},
-		{"log",			1, NULL, 'v'},
-		{"log-file",		1, NULL, 'l'},
-		{"no-audio-skip",	0, NULL, 'w'},
-		{"disable-audio",	0, NULL, 'a'},
-		{"sighandler",		0, NULL, 'q'},
-		{"glfinish",		0, NULL, 'g'},
-		{"force-sdl-alsa-drv",	1, NULL, 'j'},
-		{"capture",		1, NULL, 'b'},
-		{"compressed",		1, NULL, 'c'},
-		{"uncompressed",	1, NULL, 'u'},
-		{"unscaled",		1, NULL, 'd'},
-		{"help",		0, NULL, 'h'},
-		{0, 0, 0, 0}
+	struct glc_opt_s options[] = {
+		{'o', "out",			"GLC_FILE",			NULL},
+		{'f', "fps",			"GLC_FPS",			NULL},
+		{'r', "resize",			"GLC_SCALE",			NULL},
+		{'y', "crop",			"GLC_CROP",			NULL},
+		{'t', "record-audio",		"GLC_AUDIO_RECORD",		NULL},
+		{'s', "start",			"GLC_START",			 "1"},
+		{'e', "colorspace",		"GLC_COLORSPACE",		NULL},
+		{'k', "hotkey",			"GLC_HOTKEY",			NULL},
+		{'n', "lock-fps",		"GLC_LOCK_FPS",			 "1"},
+		{'p', "no-pbo",			"GLC_TRY_PBO",			 "0"},
+		{'z', "compression",		"GLC_COMPRESS",			NULL},
+		{'m', "byte-aligned",		"GLC_CAPTURE_DWORD_ALIGNED",	 "0"},
+		{'i', "draw-indicator",		"GLC_INDICATOR",		 "1"},
+		{'v', "log",			"GLC_LOG",			NULL},
+		{'l', "log-file",		"GLC_LOG_FILE",			NULL},
+		{'w', "no-audio-skip",		"GLC_AUDIO_SKIP",		 "0"},
+		{'a', "disable-audio",		"GLC_AUDIO",			 "0"},
+		{'q', "sighandler",		"GLC_SIGHANDLER",		 "1"},
+		{'g', "glfinish",		"GLC_CAPTURE_GLFINISH",		 "1"},
+		{'j', "force-sdl-alsa-drv",	"SDL_AUDIODRIVER",	      "alsa"},
+		{'b', "capture",		"GLC_CAPTURE",			NULL},
+		{ 0,  "compressed",		"GLC_COMPRESSED_BUFFER_SIZE",	NULL},
+		{ 0,  "uncompressed",		"GLC_UNCOMPRESSED_BUFFER_SIZE",	NULL},
+		{ 0,  "unscaled",		"GLC_UNSCALED_BUFFER_SIZE",	NULL},
+		{ 0,  NULL,			NULL,				NULL}
 	};
 
-	if (getenv("POSIXLY_CORRECT"))
-		posixly_correct_was_set = 1;
-
-	/* force getopt_long() to stop when non-option argument
-	   is encountered. */
-	setenv("POSIXLY_CORRECT", "1", 1);
-
-	while ((opt = getopt_long(argc, argv, "o:f:r:y:t:se:k:npz:miv:l:waqgjb:c:u:d:h", long_options, &option_index)) != -1) {
-		switch(opt) {
-		case 'o':
-			setenv("GLC_FILE", optarg, 1);
-			break;
-		case 'f':
-			setenv("GLC_FPS", optarg, 1);
-			break;
-		case 'r':
-			setenv("GLC_SCALE", optarg, 1);
-			break;
-		case 'y':
-			setenv("GLC_CROP", optarg, 1);
-			break;
-		case 't':
-			setenv("GLC_AUDIO_RECORD", optarg, 1);
-			break;
-		case 's':
-			setenv("GLC_START", "1", 1);
-			break;
-		case 'e':
-			setenv("GLC_COLORSPACE", optarg, 1);
-			break;
-		case 'k':
-			setenv("GLC_HOTKEY", optarg, 1);
-			break;
-		case 'n':
-			setenv("GLC_LOCK_FPS", "1", 1);
-			break;
-		case 'p':
-			setenv("GLC_TRY_PBO", "0", 1);
-			break;
-		case 'z':
-			setenv("GLC_COMPRESS", optarg, 1);
-			break;
-		case 'm':
-			setenv("GLC_CAPTURE_DWORD_ALIGNED", "0", 1);
-			break;
-		case 'i':
-			setenv("GLC_INDICATOR", "1", 1);
-			break;
-		case 'v':
-			setenv("GLC_LOG", optarg, 1);
-			break;
-		case 'l':
-			setenv("GLC_LOG_FILE", optarg, 1);
-			break;
-		case 'w':
-			setenv("GLC_AUDIO_SKIP", "0", 1);
-			break;
-		case 'a':
-			setenv("GLC_AUDIO", "0", 1);
-			break;
-		case 'q':
-			setenv("GLC_SIGHANDLER", "1", 1);
-			break;
-		case 'g':
-			setenv("GLC_CAPTURE_GLFINISH", "1", 1);
-			break;
-		case 'j':
-			setenv("SDL_AUDIODRIVER", "alsa", 1);
-			break;
-		case 'b':
-			setenv("GLC_CAPTURE", optarg, 1);
-			break;
-		case 'c':
-			setenv("GLC_COMPRESSED_BUFFER_SIZE", optarg, 1);
-			break;
-		case 'u':
-			setenv("GLC_UNCOMPRESSED_BUFFER_SIZE", optarg, 1);
-			break;
-		case 'd':
-			setenv("GLC_UNSCALED_BUFFER_SIZE", optarg, 1);
-			break;
-		case 'h':
-		default:
-			goto usage;
+	/* parse options until we encounter first invalid option or non-option argument */
+	for (optind = 1; optind < argc;) {
+		if ((ret = parse_arg(options, argc, argv, &optind))) {
+			if (ret == EINVAL)
+				goto usage;
+			else
+				break;
 		}
 	}
 
-	ld_preload_old = getenv("LD_PRELOAD");
-
-	if (ld_preload_old != NULL) {
-		ld_preload_len = strlen(ld_preload_old) + strlen(library) + 2;
-		ld_preload = malloc(ld_preload_len);
-		
-		memcpy(ld_preload, ld_preload_old, strlen(ld_preload_old));
-		memcpy(&ld_preload[strlen(ld_preload_old)+1], library, strlen(library));
-		
-		ld_preload[strlen(ld_preload_old)] = ':';
-		ld_preload[ld_preload_len-1] = '\0';
-	} else
-		ld_preload = (char *) library;
-	
-	setenv("LD_PRELOAD", ld_preload, 1);
+	/* add glc-hook.so library to the LD_PRELOAD environment variable */
+	env_append("LD_PRELOAD", library, ':');
 
 	if (optind >= argc)
 		goto usage;
 
 	program = argv[optind];
-	program_args = &argv[optind];
+	program_args = &argv[optind]; /* first argument is always program name */
 
-	if (!posixly_correct_was_set)
-		unsetenv("POSIXLY_CORRECT");
-	
+	/*
+	fprintf(stderr, "%s", program);
+	while (optind < argc)
+		fprintf(stderr, " %s", argv[optind++]);
+	fprintf(stderr, "\n");
+	*/
+
+	/* and finally: execute it... */
 	if ((ret = execvp(program, program_args))) {
 		fprintf(stderr, "can't execute \"%s", program);
 		optind++;
 		while (optind < argc)
 			fprintf(stderr, " %s", argv[optind++]);
 		fprintf(stderr, "\"\n");
-		fprintf(stderr, "%s (%d)\n", strerror(ret), ret);
+		/*fprintf(stderr, "%s (%d)\n", strerror(ret), ret);*/
 		return ret;
 	}
 
@@ -227,4 +150,164 @@ usage:
 	       "                               default is 25 MiB\n"
 	       "  -h, --help                 show this help\n");
 	return EXIT_FAILURE;
+}
+
+int env_append(const char *env, const char *val, char separator)
+{
+	size_t env_len;
+	const char *old_env;
+	char *new_env;
+
+	old_env = getenv(env);
+
+	if (old_env != NULL) {
+		env_len = strlen(old_env) + strlen(val) + 2;
+		new_env = malloc(env_len);
+		
+		memcpy(new_env, old_env, strlen(old_env));
+		memcpy(&new_env[strlen(old_env) + 1], val, strlen(val));
+		
+		new_env[strlen(old_env)] = separator;
+		new_env[env_len - 1] = '\0';
+	} else {
+		env_len = strlen(val) + 1;
+		new_env = malloc(env_len);
+
+		memcpy(new_env, val, env_len - 1);
+		new_env[env_len - 1] = '\0';
+	}
+
+	setenv(env, new_env, 1);
+	free(new_env);
+
+	return 0;
+}
+
+int parse_arg(struct glc_opt_s *options, int argc, char *argv[], int *optind)
+{
+	int ret;
+	const char *arg;
+	const char *argopt;
+	struct glc_opt_s *opt;
+	size_t arg_len;
+
+	if (*optind >= argc)
+		return EINVAL;
+
+	arg = argv[*optind];
+	arg_len = strlen(arg);
+
+	if (arg_len < 2)
+		return 1;
+
+	if (*arg != '-')
+		return 1;
+	arg++; /* skip - */
+
+	if (arg_len > 2) {
+		if (*arg == '-') {
+			arg++; /* skip - */
+
+			/* handle --arg=val */
+			if ((argopt = strstr(arg, "=")) != NULL) {
+				if (!(opt = find_opt_long(options, arg, argopt - arg)))
+					return EINVAL;
+				if (!(ret = set_opt(opt, ++argopt)))
+					(*optind)++;
+				return ret;
+			}
+
+			if (!(opt = find_opt_long(options, arg, strlen(arg))))
+				return EINVAL;
+
+			/* does argument expect value */
+			if (opt->val == NULL) {
+				(*optind)++;
+				if ((*optind) >= argc)
+					return EINVAL;
+				argopt = argv[*optind];
+			} else
+				argopt = NULL;
+
+			if (!(ret = set_opt(opt, argopt)))
+				(*optind)++;
+			return ret;
+		}
+	}
+
+	/* parse -flags [val]*/
+	while (*arg != '\0') {
+		if (!(opt = find_opt_short(options, *arg)))
+			return EINVAL;
+
+		if (opt->val == NULL) {
+			/* flag in the middle of some list can't have an argument */
+			if (arg[1] != '\0')
+				return EINVAL;
+
+			(*optind)++;
+			if ((*optind) >= argc)
+				return EINVAL;
+
+			argopt = argv[*optind];
+			if (!(ret = set_opt(opt, argopt)))
+				(*optind)++;
+			return ret;
+		}
+
+		/* doesn't expect an argument */
+		if ((ret = set_opt(opt, NULL)))
+			return ret;
+
+		arg++;
+	}
+	(*optind)++;
+
+	return 0;
+}
+
+int set_opt(struct glc_opt_s *option, const char *arg)
+{
+	/*
+	fprintf(stderr, "set_opt({%c, %s, %s, %s}, %s)\n", option->short_name,
+		option->name, option->env, option->val, arg);
+	*/
+
+	if (option->val == NULL) {
+		if (arg == NULL)
+			return EINVAL;
+		setenv(option->env, arg, 1);
+	} else {
+		if (arg != NULL)
+			return EINVAL;
+		setenv(option->env, option->val, 1);
+	}
+
+	return 0;
+}
+
+struct glc_opt_s *find_opt_long(struct glc_opt_s *options, const char *name, size_t len)
+{
+	int opt = 0;
+
+	while (options[opt].name != NULL) {
+		if (!strncmp(options[opt].name, name, len))
+			return &options[opt];
+		opt++;
+	}
+
+	return NULL;
+}
+
+struct glc_opt_s *find_opt_short(struct glc_opt_s *options, const char short_name)
+{
+	int opt = 0;
+
+	while (options[opt].name != NULL) {
+		if (options[opt].short_name == short_name)
+			return &options[opt];
+		opt++;
+	}
+
+	return NULL;
 }
