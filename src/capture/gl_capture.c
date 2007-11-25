@@ -323,7 +323,7 @@ int gl_capture_init_pbo(struct gl_capture_private_s *gl_capture)
 	if (!strstr(gl_extensions, "GL_ARB_pixel_buffer_object"))
 		return ENOTSUP;
 	
-	gl_capture->libGL_handle = dlopen("libGL.so", RTLD_LAZY);
+	gl_capture->libGL_handle = dlopen("libGL.so.1", RTLD_LAZY);
 	if (!gl_capture->libGL_handle)
 		return ENOTSUP;
 	gl_capture->glXGetProcAddress =

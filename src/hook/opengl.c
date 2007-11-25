@@ -215,7 +215,7 @@ void get_real_opengl()
 	if (!lib.dlopen)
 		get_real_dlsym();
 
-	opengl.libGL_handle = lib.dlopen("libGL.so", RTLD_LAZY);
+	opengl.libGL_handle = lib.dlopen("libGL.so.1", RTLD_LAZY);
 	if (!opengl.libGL_handle)
 		goto err;
 	opengl.glXSwapBuffers =
