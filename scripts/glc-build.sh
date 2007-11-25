@@ -44,6 +44,8 @@ echo "#include <stdio.h>
 	|| die "Can't compile (Ubuntu users: apt-get install build-essential)"
 [ -e "/usr/include/X11/X.h" -a -e "/usr/include/X11/Xlib.h" ] \
 	|| die "Missing X11 headers (Ubuntu users: apt-get install libx11-dev)"
+[ -e "/usr/include/X11/extensions/xf86vmode.h" ] \
+	|| die "Missing XF86VidMode headers (Ubuntu users: apt-get install libxxf86vm-dev)"
 [ -e "/usr/include/GL/gl.h" -a -e "/usr/include/GL/glx.h" ] \
 	|| die "Missing OpenGL headers (Ubuntu users: apt-get install libgl1-mesa-dev)"
 [ -e "/usr/include/alsa/asoundlib.h" ] \

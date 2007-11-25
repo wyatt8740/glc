@@ -185,17 +185,17 @@ int pack_lzo_write_callback(glc_thread_state_t *state)
 	glc_container_message_t *container = (glc_container_message_t *) state->write_data;
 	glc_lzo_header_t *lzo_header =
 		(glc_lzo_header_t *) &state->write_data[GLC_CONTAINER_MESSAGE_SIZE];
+	lzo_uint compressed_size;
 
 	__lzo_compress((unsigned char *) state->read_data, state->read_size,
 		       (unsigned char *) &state->write_data[GLC_LZO_HEADER_SIZE +
 		       					    GLC_CONTAINER_MESSAGE_SIZE],
-		       (lzo_uintp) &container->size,
-		       state->threadptr);
+		       &compressed_size, (lzo_voidp) state->threadptr);
 
 	lzo_header->size = (glc_size_t) state->read_size;
 	memcpy(&lzo_header->header, &state->header, GLC_MESSAGE_HEADER_SIZE);
 
-	container->size += GLC_LZO_HEADER_SIZE;
+	container->size = compressed_size + GLC_LZO_HEADER_SIZE;
 	container->header.type = GLC_MESSAGE_LZO;
 
 	state->header.type = GLC_MESSAGE_CONTAINER;
@@ -212,17 +212,18 @@ int pack_quicklz_write_callback(glc_thread_state_t *state)
 	glc_container_message_t *container = (glc_container_message_t *) state->write_data;
 	glc_quicklz_header_t *quicklz_header =
 		(glc_quicklz_header_t *) &state->write_data[GLC_CONTAINER_MESSAGE_SIZE];
+	size_t compressed_size;
 
 	quicklz_compress((const unsigned char *) state->read_data,
 			 (unsigned char *) &state->write_data[GLC_QUICKLZ_HEADER_SIZE +
 			 				      GLC_CONTAINER_MESSAGE_SIZE],
-			 state->read_size, &container->size,
+			 state->read_size, &compressed_size,
 			 (uintptr_t *) state->threadptr);
 
 	quicklz_header->size = (glc_size_t) state->read_size;
 	memcpy(&quicklz_header->header, &state->header, GLC_MESSAGE_HEADER_SIZE);
 
-	container->size += GLC_QUICKLZ_HEADER_SIZE;
+	container->size = compressed_size + GLC_QUICKLZ_HEADER_SIZE;
 	container->header.type = GLC_MESSAGE_QUICKLZ;
 
 	state->header.type = GLC_MESSAGE_CONTAINER;
