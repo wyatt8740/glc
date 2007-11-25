@@ -51,6 +51,7 @@ int main(int argc, char *argv[])
 		{"yuv4mpeg",		1, NULL, 'y'},
 		{"out",			1, NULL, 'o'},
 		{"fps",			1, NULL, 'f'},
+		{"resize",		1, NULL, 'r'},
 		{"adjust",		1, NULL, 'g'},
 		{"silence",		1, NULL, 'l'},
 		{"compressed",		1, NULL, 'c'},
@@ -70,6 +71,7 @@ int main(int argc, char *argv[])
 	img = info = show_stats = yuv4mpeg = 0;
 	glc_create(&glc);
 	glc->scale = 1;
+	glc->scale_width = glc->scale_height = 0;
 	glc->flags = 0;
 	glc->fps = 0;
 	glc->filename_format = NULL;
@@ -121,10 +123,16 @@ int main(int argc, char *argv[])
 				goto usage;
 			break;
 		case 'r':
-			/* TODO WxH */
-			glc->scale = atof(optarg);
-			if (glc->scale <= 0)
-				goto usage;
+			if (strstr(optarg, "x")) {
+				sscanf(optarg, "%ux%u", &glc->scale_width, &glc->scale_height);
+				if ((!glc->scale_width) | (!glc->scale_height))
+					goto usage;
+				glc->flags |= GLC_SCALE_SIZE;
+			} else {
+				glc->scale = atof(optarg);
+				if (glc->scale <= 0)
+					goto usage;
+			}
 			break;
 		case 'g':
 			glc->flags |= GLC_OVERRIDE_COLOR_CORRECTION;
@@ -317,7 +325,7 @@ usage:
 	       "  -y, --yuv4mpeg=NUM       save video stream NUM in yuv4mpeg format\n"
 	       "  -o, --out=FILE           write to FILE\n"
 	       "  -f, --fps=FPS            save images or video at FPS\n"
-	       "  -r, --resize=VAL         resize pictures with scale factor VAL\n"
+	       "  -r, --resize=VAL         resize pictures with scale factor VAL or WxH\n"
 	       "  -g, --color=ADJUST       adjust colors\n"
 	       "                             format is brightness;contrast;red;green;blue\n"
 	       "  -l, --silence=SECONDS    audio silence threshold in seconds\n"

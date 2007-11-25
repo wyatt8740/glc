@@ -48,6 +48,8 @@ struct scale_ctx_s {
 	unsigned int row;
 	double scale;
 
+	unsigned int rw, rh, rx, ry;
+
 	unsigned int *pos;
 	float *factor;
 
@@ -234,18 +236,18 @@ void scale_rgb_half(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 			op4 = (ox + ctx->bpp) + (oy + 1) * ctx->row;
 			ox += 2 * ctx->bpp;
 
-			to[tp + 0] = (from[op1 + 0]
-					+ from[op2 + 0]
-					+ from[op3 + 0]
-					+ from[op4 + 0]) >> 2;
-			to[tp + 1] = (from[op1 + 1]
-					+ from[op2 + 1]
-					+ from[op3 + 1]
-					+ from[op4 + 1]) >> 2;
-			to[tp + 2] = (from[op1 + 2]
-					+ from[op2 + 2]
-					+ from[op3 + 2]
-					+ from[op4 + 2]) >> 2;
+			to[tp + 0] = (from[op1 + 0] +
+				      from[op2 + 0] +
+				      from[op3 + 0] +
+				      from[op4 + 0]) >> 2;
+			to[tp + 1] = (from[op1 + 1] +
+				      from[op2 + 1] +
+				      from[op3 + 1] +
+				      from[op4 + 1]) >> 2;
+			to[tp + 2] = (from[op1 + 2] +
+				      from[op2 + 2] +
+				      from[op3 + 2] +
+				      from[op4 + 2]) >> 2;
 
 		}
 		oy += 2;
@@ -258,23 +260,26 @@ void scale_rgb_scale(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 {
 	unsigned int x, y, tp, sp;
 
+	if (scale->glc->flags & GLC_SCALE_SIZE)
+		memset(to, 0, ctx->size);
+
 	for (y = 0; y < ctx->sh; y++) {
 		for (x = 0; x < ctx->sw; x++) {
 			sp = (x + y * ctx->sw) * 4;
-			tp = (x + y * ctx->sw) * 3;
+			tp = ((x + ctx->rx) + (y + ctx->ry) * ctx->rw) * 3;
 
-			to[tp + 0] = from[ctx->pos[sp + 0] + 0] * ctx->factor[sp + 0]
-				   + from[ctx->pos[sp + 1] + 0] * ctx->factor[sp + 1]
-				   + from[ctx->pos[sp + 2] + 0] * ctx->factor[sp + 2]
-				   + from[ctx->pos[sp + 3] + 0] * ctx->factor[sp + 3];
-			to[tp + 1] = from[ctx->pos[sp + 0] + 1] * ctx->factor[sp + 0]
-				   + from[ctx->pos[sp + 1] + 1] * ctx->factor[sp + 1]
-				   + from[ctx->pos[sp + 2] + 1] * ctx->factor[sp + 2]
-				   + from[ctx->pos[sp + 3] + 1] * ctx->factor[sp + 3];
-			to[tp + 2] = from[ctx->pos[sp + 0] + 2] * ctx->factor[sp + 0]
-				   + from[ctx->pos[sp + 1] + 2] * ctx->factor[sp + 1]
-				   + from[ctx->pos[sp + 2] + 2] * ctx->factor[sp + 2]
-				   + from[ctx->pos[sp + 3] + 2] * ctx->factor[sp + 3];
+			to[tp + 0] = from[ctx->pos[sp + 0] + 0] * ctx->factor[sp + 0] +
+				     from[ctx->pos[sp + 1] + 0] * ctx->factor[sp + 1] +
+				     from[ctx->pos[sp + 2] + 0] * ctx->factor[sp + 2] +
+				     from[ctx->pos[sp + 3] + 0] * ctx->factor[sp + 3];
+			to[tp + 1] = from[ctx->pos[sp + 0] + 1] * ctx->factor[sp + 0] +
+				     from[ctx->pos[sp + 1] + 1] * ctx->factor[sp + 1] +
+				     from[ctx->pos[sp + 2] + 1] * ctx->factor[sp + 2] +
+				     from[ctx->pos[sp + 3] + 1] * ctx->factor[sp + 3];
+			to[tp + 2] = from[ctx->pos[sp + 0] + 2] * ctx->factor[sp + 0] +
+				     from[ctx->pos[sp + 1] + 2] * ctx->factor[sp + 1] +
+				     from[ctx->pos[sp + 2] + 2] * ctx->factor[sp + 2] +
+				     from[ctx->pos[sp + 3] + 2] * ctx->factor[sp + 3];
 		}
 	}
 }
@@ -355,17 +360,24 @@ void scale_ycbcr_scale(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 	cw = ctx->sw / 2;
 	ch = ctx->sh / 2;
 	Y_to = to;
-	Cb_to = &to[ctx->sw * ctx->sh];
-	Cr_to = &Cb_to[cw * ch];
+	Cb_to = &to[ctx->rw * ctx->rh];
+	Cr_to = &Cb_to[(ctx->rw / 2) * (ctx->rh / 2)];
+
+	if (scale->glc->flags & GLC_SCALE_SIZE) {
+		memset(Y_to, 0, ctx->rw * ctx->rh);
+		memset(Cb_to, 128, (ctx->rw / 2) * (ctx->rh / 2));
+		memset(Cr_to, 128, (ctx->rw / 2) * (ctx->rh / 2));
+	}
 
 	for (y = 0; y < ctx->sh; y++) {
 		for (x = 0; x < ctx->sw; x++) {
 			sp = (x + y * ctx->sw) * 4;
 
-			Y_to[x + y * ctx->sw] = Y_from[ctx->pos[sp + 0]] * ctx->factor[sp + 0]
-					      + Y_from[ctx->pos[sp + 1]] * ctx->factor[sp + 1]
-					      + Y_from[ctx->pos[sp + 2]] * ctx->factor[sp + 2]
-					      + Y_from[ctx->pos[sp + 3]] * ctx->factor[sp + 3];
+			Y_to[(x + ctx->rx) + (y + ctx->ry) * ctx->rw] =
+				Y_from[ctx->pos[sp + 0]] * ctx->factor[sp + 0] +
+				Y_from[ctx->pos[sp + 1]] * ctx->factor[sp + 1] +
+				Y_from[ctx->pos[sp + 2]] * ctx->factor[sp + 2] +
+				Y_from[ctx->pos[sp + 3]] * ctx->factor[sp + 3];
 		}
 	}
 
@@ -373,15 +385,17 @@ void scale_ycbcr_scale(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 		for (x = 0; x < cw; x++) {
 			sp = ctx->sw * ctx->sh * 4 + (x + y * cw) * 4;
 
-			Cb_to[x + y * cw] = Cb_from[ctx->pos[sp + 0]] * ctx->factor[sp + 0]
-					  + Cb_from[ctx->pos[sp + 1]] * ctx->factor[sp + 1]
-					  + Cb_from[ctx->pos[sp + 2]] * ctx->factor[sp + 2]
-					  + Cb_from[ctx->pos[sp + 3]] * ctx->factor[sp + 3];
+			Cb_to[(x + ctx->rx / 2) + (y + ctx->ry / 2) * (ctx->rw / 2)] =
+				Cb_from[ctx->pos[sp + 0]] * ctx->factor[sp + 0] +
+				Cb_from[ctx->pos[sp + 1]] * ctx->factor[sp + 1] +
+				Cb_from[ctx->pos[sp + 2]] * ctx->factor[sp + 2] +
+				Cb_from[ctx->pos[sp + 3]] * ctx->factor[sp + 3];
 
-			Cr_to[x + y * cw] = Cr_from[ctx->pos[sp + 0]] * ctx->factor[sp + 0]
-					  + Cr_from[ctx->pos[sp + 1]] * ctx->factor[sp + 1]
-					  + Cr_from[ctx->pos[sp + 2]] * ctx->factor[sp + 2]
-					  + Cr_from[ctx->pos[sp + 3]] * ctx->factor[sp + 3];
+			Cr_to[(x + ctx->rx / 2) + (y + ctx->ry / 2) * (ctx->rw / 2)] =
+				Cr_from[ctx->pos[sp + 0]] * ctx->factor[sp + 0] +
+				Cr_from[ctx->pos[sp + 1]] * ctx->factor[sp + 1] +
+				Cr_from[ctx->pos[sp + 2]] * ctx->factor[sp + 2] +
+				Cr_from[ctx->pos[sp + 3]] * ctx->factor[sp + 3];
 		}
 	}
 }
@@ -397,9 +411,31 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 	ctx->w = ctx_msg->w;
 	ctx->h = ctx_msg->h;
 
-	ctx->scale = scale->glc->scale;
-	ctx->sw = ctx->scale * ctx->w;
-	ctx->sh = ctx->scale * ctx->h;
+	if (scale->glc->flags & GLC_SCALE_SIZE) {
+		ctx->rw = scale->glc->scale_width;
+		ctx->rh = scale->glc->scale_height;
+
+		if ((float) ctx->rw / (float) ctx->w < (float) ctx->rh / (float) ctx->h)
+			ctx->scale = (float) ctx->rw / (float) ctx->w;
+		else
+			ctx->scale = (float) ctx->rh / (float) ctx->h;
+
+		ctx->sw = ctx->scale * ctx->w;
+		ctx->sh = ctx->scale * ctx->h;
+		ctx->rx = (ctx->rw - ctx->sw) / 2;
+		ctx->ry = (ctx->rh - ctx->sh) / 2;
+		util_log(scale->glc, GLC_DEBUG, "scale",
+			 "real size is %ux%u, scaled picture starts at %ux%u",
+			 ctx->rw, ctx->rh, ctx->rx, ctx->ry);
+	} else {
+		ctx->scale = scale->glc->scale;
+		ctx->sw = ctx->scale * ctx->w;
+		ctx->sh = ctx->scale * ctx->h;
+
+		ctx->rx = ctx->ry = 0;
+		ctx->rw = ctx->sw;
+		ctx->rh = ctx->sh;
+	}
 
 	if ((ctx_msg->flags & GLC_CTX_BGRA) | (ctx_msg->flags & GLC_CTX_BGR)) {
 		if (ctx_msg->flags & GLC_CTX_BGRA)
@@ -419,7 +455,7 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 	ctx->proc = NULL; /* do not try anything stupid... */
 
 	if ((ctx_msg->flags & GLC_CTX_BGR) | (ctx_msg->flags & GLC_CTX_BGRA)) {
-		if (ctx->scale == 0.5) {
+		if ((ctx->scale == 0.5) && !(scale->glc->flags & GLC_SCALE_SIZE)) {
 			util_log(scale->glc, GLC_DEBUG, "scale",
 				 "scaling RGB data to half-size (from %ux%u to %ux%u)",
 				 ctx->w, ctx->h, ctx->sw, ctx->sh);
@@ -437,13 +473,13 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 
 		ctx_msg->flags &= ~GLC_CTX_BGRA; /* conversion is always done */
 		ctx_msg->flags |= GLC_CTX_BGR;
-		ctx->size = ctx->sw * ctx->sh * 3;
+		ctx->size = ctx->rw * ctx->rh * 3;
 	} else if (ctx_msg->flags & GLC_CTX_YCBCR_420JPEG) {
 		ctx->sw -= ctx->sw % 2;
 		ctx->sh -= ctx->sh % 2;
-		ctx->size = ctx->sw * ctx->sh + 2 * ((ctx->sw / 2) * (ctx->sh / 2));
+		ctx->size = ctx->rw * ctx->rh + 2 * ((ctx->rw / 2) * (ctx->rh / 2));
 
-		if (ctx->scale == 0.5) {
+		if ((ctx->scale == 0.5) && !(scale->glc->flags & GLC_SCALE_SIZE)) {
 			util_log(scale->glc, GLC_DEBUG, "scale",
 				 "scaling Y'CbCr data to half-size (from %ux%u to %ux%u)",
 				 ctx->w, ctx->h, ctx->sw, ctx->sh);
@@ -457,8 +493,8 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg)
 		}
 	}
 
-	ctx_msg->w = ctx->sw;
-	ctx_msg->h = ctx->sh;
+	ctx_msg->w = ctx->rw;
+	ctx_msg->h = ctx->rh;
 
 	pthread_rwlock_unlock(&ctx->update);
 	return 0;
