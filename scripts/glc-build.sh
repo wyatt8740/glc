@@ -90,15 +90,38 @@ ask-prompt
 read LDFLAGS
 [ "${LDFLAGS}" == "" ] && LDFLAGS="-Wl,-O1"
 
-info "Fetching sources..."
-download "http://nullkey.ath.cx/elfhacks/elfhacks.tar.gz"
-download "http://nullkey.ath.cx/packetstream/packetstream.tar.gz"
-download "http://nullkey.ath.cx/glc/glc.tar.gz"
+USE_GIT="n"
+ask "Use git (y/n)"
+ask "  (git contains latest unstable development version)"
+ask-prompt
+read USE_GIT
 
-info "Unpacking sources..."
-unpack "elfhacks.tar.gz"
-unpack "packetstream.tar.gz"
-unpack "glc.tar.gz"
+if [ "${USE_GIT}" == "y" ]; then
+	GIT_CLONE=`which git-clone 2> /dev/null`
+	if [ -x "${GIT_CLONE}" ]; then
+		$GIT_CLONE "git://nullkey.ath.cx/~pyry/glc" \
+			|| die "Can't clone glc"
+		$GIT_CLONE "git://nullkey.ath.cx/~pyry/glc-support" \
+			|| die "Can't clone glc-support"
+		$GIT_CLONE "git://nullkey.ath.cx/~pyry/elfhacks" \
+			|| die "Can't clone elfhacks"
+		$GIT_CLONE "git://nullkey.ath.cx/~pyry/packetstream" \
+			|| die "Can't clone packetstream"
+		cd glc && ln -s ../glc-support ./support && cd ..
+	else
+		die "git-clone not found (Ubuntu users: apt-get install git-core)"
+	fi
+else
+	info "Fetching sources..."
+	download "http://nullkey.ath.cx/elfhacks/elfhacks.tar.gz"
+	download "http://nullkey.ath.cx/packetstream/packetstream.tar.gz"
+	download "http://nullkey.ath.cx/glc/glc.tar.gz"
+	
+	info "Unpacking sources..."
+	unpack "elfhacks.tar.gz"
+	unpack "packetstream.tar.gz"
+	unpack "glc.tar.gz"
+fi
 
 info "Building elfhacks..."
 cd elfhacks

@@ -217,7 +217,7 @@ int pack_quicklz_write_callback(glc_thread_state_t *state)
 			 (unsigned char *) &state->write_data[GLC_QUICKLZ_HEADER_SIZE +
 			 				      GLC_CONTAINER_MESSAGE_SIZE],
 			 state->read_size, &container->size,
-			 state->threadptr);
+			 (uintptr_t *) state->threadptr);
 
 	quicklz_header->size = (glc_size_t) state->read_size;
 	memcpy(&quicklz_header->header, &state->header, GLC_MESSAGE_HEADER_SIZE);
