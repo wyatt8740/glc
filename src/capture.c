@@ -45,28 +45,28 @@ int main(int argc, char *argv[])
 		{'o', "out",			"GLC_FILE",			NULL},
 		{'f', "fps",			"GLC_FPS",			NULL},
 		{'r', "resize",			"GLC_SCALE",			NULL},
-		{'y', "crop",			"GLC_CROP",			NULL},
-		{'t', "record-audio",		"GLC_AUDIO_RECORD",		NULL},
+		{'c', "crop",			"GLC_CROP",			NULL},
+		{'a', "record-audio",		"GLC_AUDIO_RECORD",		NULL},
 		{'s', "start",			"GLC_START",			 "1"},
 		{'e', "colorspace",		"GLC_COLORSPACE",		NULL},
 		{'k', "hotkey",			"GLC_HOTKEY",			NULL},
 		{'n', "lock-fps",		"GLC_LOCK_FPS",			 "1"},
-		{'p', "no-pbo",			"GLC_TRY_PBO",			 "0"},
+		{ 0 , "no-pbo",			"GLC_TRY_PBO",			 "0"},
 		{'z', "compression",		"GLC_COMPRESS",			NULL},
-		{'m', "byte-aligned",		"GLC_CAPTURE_DWORD_ALIGNED",	 "0"},
+		{ 0 , "byte-aligned",		"GLC_CAPTURE_DWORD_ALIGNED",	 "0"},
 		{'i', "draw-indicator",		"GLC_INDICATOR",		 "1"},
 		{'v', "log",			"GLC_LOG",			NULL},
 		{'l', "log-file",		"GLC_LOG_FILE",			NULL},
-		{'w', "no-audio-skip",		"GLC_AUDIO_SKIP",		 "0"},
-		{'a', "disable-audio",		"GLC_AUDIO",			 "0"},
-		{'q', "sighandler",		"GLC_SIGHANDLER",		 "1"},
+		{ 0 , "no-audio-skip",		"GLC_AUDIO_SKIP",		 "0"},
+		{ 0 , "disable-audio",		"GLC_AUDIO",			 "0"},
+		{ 0 , "sighandler",		"GLC_SIGHANDLER",		 "1"},
 		{'g', "glfinish",		"GLC_CAPTURE_GLFINISH",		 "1"},
 		{'j', "force-sdl-alsa-drv",	"SDL_AUDIODRIVER",	      "alsa"},
 		{'b', "capture",		"GLC_CAPTURE",			NULL},
-		{ 0,  "compressed",		"GLC_COMPRESSED_BUFFER_SIZE",	NULL},
-		{ 0,  "uncompressed",		"GLC_UNCOMPRESSED_BUFFER_SIZE",	NULL},
-		{ 0,  "unscaled",		"GLC_UNSCALED_BUFFER_SIZE",	NULL},
-		{ 0,  NULL,			NULL,				NULL}
+		{ 0 , "compressed",		"GLC_COMPRESSED_BUFFER_SIZE",	NULL},
+		{ 0 , "uncompressed",		"GLC_UNCOMPRESSED_BUFFER_SIZE",	NULL},
+		{ 0 , "unscaled",		"GLC_UNSCALED_BUFFER_SIZE",	NULL},
+		{ 0 , NULL,			NULL,				NULL}
 	};
 
 	/* parse options until we encounter first invalid option or non-option argument */
@@ -112,8 +112,8 @@ usage:
 	printf("  -o, --out=FILE             write to FILE, pid-%%d.glc by default\n"
 	       "  -f, --fps=FPS              capture at FPS, default value is 30\n"
 	       "  -r, --resize=FACTOR        resize pictures with scale factor FACTOR\n"
-	       "  -y, --crop=WxH+X+Y         capture only [width]x[height][+[x][+[y]]]\n"
-	       "  -t, --record-audio=CONFIG  record specified alsa devices\n"
+	       "  -c, --crop=WxH+X+Y         capture only [width]x[height][+[x][+[y]]]\n"
+	       "  -a, --record-audio=CONFIG  record specified alsa devices\n"
 	       "                               format is device,rate,channels;device2...\n"
 	       "  -s, --start                start capturing immediately\n"
 	       "  -e, --colorspace=CSP       keep as 'bgr' or convert to '420jpeg'\n"
@@ -121,11 +121,11 @@ usage:
 	       "  -k, --hotkey=HOTKEY        capture hotkey, <Ctrl> and <Shift> modifiers are\n"
 	       "                               supported, default hotkey is '<Shift>F8'\n"
 	       "  -n, --lock-fps             lock fps when capturing\n"
-	       "  -p, --no-pbo               don't try GL_ARB_pixel_buffer_object\n"
+	       "      --no-pbo               don't try GL_ARB_pixel_buffer_object\n"
 	       "  -z, --compression=METHOD   compress stream using METHOD\n"
 	       "                               'none', 'quicklz' and 'lzo' are supported\n"
 	       "                               'quicklz' is used by default\n"
-	       "  -m, --byte-aligned         use GL_PACK_ALIGNMENT 1 instead of 8\n"
+	       "      --byte-aligned         use GL_PACK_ALIGNMENT 1 instead of 8\n"
 	       "  -i, --draw-indicator       draw indicator when capturing\n"
 	       "                               indicator does not work with -b 'front'\n"
 	       "  -v, --log=LEVEL            log >=LEVEL messages\n"
@@ -135,18 +135,18 @@ usage:
 	       "                               3: information\n"
 	       "                               4: debug\n"
 	       "  -l, --log-file=FILE        write log to FILE, pid-%%d.log by default\n"
-	       "  -w, --no-audio-skip        always capture audio data\n"
-	       "  -a, --disable-audio        don't capture audio\n"
-	       "  -q, --sighandler           use custom signal handler\n"
+	       "      --no-audio-skip        always capture audio data\n"
+	       "      --disable-audio        don't capture audio\n"
+	       "      --sighandler           use custom signal handler\n"
 	       "  -g, --glfinish             capture at glFinish()\n"
 	       "  -j, --force-sdl-alsa-drv   force SDL to use ALSA audio driver\n"
 	       "  -b, --capture=BUFFER       capture 'front' or 'back' buffer\n"
 	       "                               default is 'front'\n"
-	       "  -c, --compressed=SIZE      compressed stream buffer size in MiB\n"
+	       "      --compressed=SIZE      compressed stream buffer size in MiB\n"
 	       "                               default is 50 MiB\n"
-	       "  -u, --uncompressed=SIZE    uncompressed stream buffer size in MiB\n"
+	       "      --uncompressed=SIZE    uncompressed stream buffer size in MiB\n"
 	       "                               default is 25 MiB\n"
-	       "  -d, --unscaled=SIZE        unscaled picture stream buffer size in MiB,\n"
+	       "      --unscaled=SIZE        unscaled picture stream buffer size in MiB,\n"
 	       "                               default is 25 MiB\n"
 	       "  -h, --help                 show this help\n");
 	return EXIT_FAILURE;
@@ -302,6 +302,9 @@ struct glc_opt_s *find_opt_long(struct glc_opt_s *options, const char *name, siz
 struct glc_opt_s *find_opt_short(struct glc_opt_s *options, const char short_name)
 {
 	int opt = 0;
+
+	if (short_name == '\0')
+		return NULL;
 
 	while (options[opt].name != NULL) {
 		if (options[opt].short_name == short_name)
