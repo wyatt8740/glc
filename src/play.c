@@ -330,10 +330,13 @@ usage:
 	       "                             format is brightness;contrast;red;green;blue\n"
 	       "  -l, --silence=SECONDS    audio silence threshold in seconds\n"
 	       "                             default threshold is 0.2\n"
-	       "  -c, --compressed=SIZE    compressed stream buffer size in MiB, default is 10\n"
-	       "  -u, --uncompressed=SIZE  uncompressed stream buffer size in MiB, default is 10\n"
+	       "  -c, --compressed=SIZE    compressed stream buffer size in MiB\n"
+	       "                             default is 10 MiB\n"
+	       "  -u, --uncompressed=SIZE  uncompressed stream buffer size in MiB\n"
+	       "                             default is 10 MiB\n"
 	       "  -s, --show=VAL           show stream summary value, possible values are:\n"
-	       "                             signature, version, flags, fps, pid, name, date\n"
+	       "                             all, signature, version, flags, fps,\n"
+	       "                             pid, name, date\n"
 	       "  -v, --verbosity=LEVEL    verbosity level\n"
 	       "  -t, --statistics         show stream statistics\n"
 	       "  -h, --help               show help\n");
@@ -343,7 +346,15 @@ usage:
 
 int show_info_value(glc_t *glc, const char *value)
 {
-	if (!strcmp("signature", value))
+	if (!strcmp("all", value)) {
+		printf("  signature   = 0x%08x\n", glc->info->signature);
+		printf("  version     = 0x%02x\n", glc->info->version);
+		printf("  flags       = %d\n", glc->info->flags);
+		printf("  fps         = %f\n", glc->info->fps);
+		printf("  pid         = %d\n", glc->info->pid);
+		printf("  name        = %s\n", glc->info_name);
+		printf("  date        = %s\n", glc->info_date);
+	} else if (!strcmp("signature", value))
 		printf("0x%08x\n", glc->info->signature);
 	else if (!strcmp("version", value))
 		printf("0x%02x\n", glc->info->version);
