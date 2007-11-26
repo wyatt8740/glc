@@ -45,7 +45,7 @@ struct util_private_s {
 int util_app_name(char **path, u_int32_t *path_size);
 int util_utc_date(char **date, u_int32_t *date_size);
 
-void util_write_time(glc_t *glc, FILE *stream);
+void util_write_log_prefix(glc_t *glc, FILE *stream, int level, const char *module);
 
 glc_utime_t util_real_time(glc_t *glc);
 
@@ -409,8 +409,7 @@ void util_log(glc_t *glc, int level, const char *module, const char *format, ...
 	    (!(glc->flags & GLC_NOERR))) {
 		va_start(ap, format);
 
-		util_write_time(glc, stderr);
-		fprintf(stderr, " (glc:%s) ", module);
+		util_write_log_prefix(glc, util->log_file, level, module);
 		vfprintf(stderr, format, ap);
 		fputc('\n', stderr);
 
@@ -425,9 +424,7 @@ void util_log(glc_t *glc, int level, const char *module, const char *format, ...
 	/* this is highly threaded application and we want
 	   non-corrupted logs */
 	pthread_mutex_lock(&util->log_mutex);
-
-	util_write_time(glc, util->log_file);
-	fprintf(util->log_file, " (%s) ", module);
+	util_write_log_prefix(glc, util->log_file, level, module);
 	vfprintf(util->log_file, format, ap);
 	fputc('\n', util->log_file);
 
@@ -466,12 +463,12 @@ void util_log_info(glc_t *glc)
 	if ((!(glc->flags & GLC_LOG)) | (glc->log_level < GLC_INFORMATION))
 		return;
 
-	util_write_time(glc, util->log_file);
-	fprintf(util->log_file, " (util) system information\n");
+	util_write_log_prefix(glc, util->log_file, GLC_INFORMATION, "util");
+	fprintf(util->log_file, "system information");
 	fprintf(util->log_file, "  processors  = %ld\n", util_cpus());
 
-	util_write_time(glc, util->log_file);
-	fprintf(util->log_file, " (util) stream information\n");
+	util_write_log_prefix(glc, util->log_file, GLC_INFORMATION, "util");
+	fprintf(util->log_file, "stream information\n");
 	fprintf(util->log_file, "  signature   = 0x%08x\n", glc->info->signature);
 	fprintf(util->log_file, "  version     = 0x%02x\n", glc->info->version);
 	fprintf(util->log_file, "  flags       = %d\n", glc->info->flags);
@@ -481,9 +478,34 @@ void util_log_info(glc_t *glc)
 	fprintf(util->log_file, "  date        = %s\n", glc->info_date);
 }
 
-void util_write_time(glc_t *glc, FILE *stream)
+void util_write_log_prefix(glc_t *glc, FILE *stream, int level, const char *module)
 {
-	fprintf(stream, "[%7.2fs]", (double) util_real_time(glc) / 1000000.0);
+	const char *level_str = NULL;
+
+	/* human-readable msg level */
+	switch (level) {
+		case GLC_ERROR:
+			level_str = "error";
+			break;
+		case GLC_WARNING:
+			level_str = "warning";
+			break;
+		case GLC_PERFORMANCE:
+			level_str = "perf";
+			break;
+		case GLC_INFORMATION:
+			level_str = "info";
+			break;
+		case GLC_DEBUG:
+			level_str = "dbg";
+			break;
+		default:
+			level_str = "unknown";
+			break;
+	}
+
+	fprintf(stream, "[%7.2fs %10s %5s ] ",
+		(double) util_real_time(glc) / 1000000.0, module, level_str);
 }
 
 /**  \} */
