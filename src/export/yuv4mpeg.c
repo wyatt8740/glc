@@ -126,7 +126,7 @@ int yuv4mpeg_handle_hdr(struct yuv4mpeg_private_s *yuv4mpeg, glc_ctx_message_t *
 	memset(&yuv4mpeg->prev_pic[ctx_msg->w * ctx_msg->h], 128, (ctx_msg->w * ctx_msg->h) / 2);
 
 	/* calculate fps in p/q */
-	/* TODO something more intelligent perhaps... */
+	/** \todo something more intelligent perhaps... */
 	p = yuv4mpeg->glc->fps;
 	q = 1;
 	while ((p != q * yuv4mpeg->glc->fps) && (q < 1000)) {

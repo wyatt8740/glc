@@ -13,8 +13,10 @@
  *  \{
  */
 
-/* NOTE this has some threading bugs, but async alsa uses signals,
-        so some tradeoffs are required */
+/**
+ * \note this has some threading bugs, but async alsa uses signals,
+ *       so some tradeoffs are required
+ */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -186,8 +188,10 @@ void *audio_hook_thread(void *argptr)
 
 int audio_hook_wait_for_thread(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream)
 {
-	/* NOTE this is ugly, but snd_pcm_...() functions can be called from
-	        signal handler (f.ex. async mode) */
+	/**
+	 * \note this is ugly, but snd_pcm_...() functions can be called from
+	 *       signal handler (f.ex. async mode)
+	 */
 	while (!stream->capture_ready) {
 		if (audio_hook->glc->flags & GLC_AUDIO_ALLOW_SKIP)
 			goto busy;
@@ -223,7 +227,7 @@ int audio_hook_alsa_i(void *audiopriv, snd_pcm_t *pcm, const void *buffer, snd_p
 
 	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
 
-	if (!stream->fmt) { /* TODO update this? */
+	if (!stream->fmt) { /** \todo update this? */
 		if ((ret = audio_hook_alsa_fmt(audio_hook, stream)))
 			return ret;
 	}
@@ -343,7 +347,7 @@ int audio_hook_alsa_mmap_commit(void *audiopriv, snd_pcm_t *pcm, snd_pcm_uframes
 
 void *audio_hook_alsa_mmap_pos(const snd_pcm_channel_area_t *area, snd_pcm_uframes_t offset)
 {
-	/* FIXME first or step not divisible by 8 */
+	/** \todo FIX: first or step not divisible by 8 */
 	void *addr = &((unsigned char *) area->addr)[area->first / 8];
 	addr = &((unsigned char *) addr)[offset * (area->step / 8)];
 	return addr;
@@ -351,8 +355,8 @@ void *audio_hook_alsa_mmap_pos(const snd_pcm_channel_area_t *area, snd_pcm_ufram
 
 int audio_hook_complex_to_interleaved(struct audio_hook_stream_s *stream, const snd_pcm_channel_area_t *areas, snd_pcm_uframes_t offset, snd_pcm_uframes_t frames, char *to)
 {
-	/* TODO test this... :D */
-	/* FIXME this is quite expensive operation */
+	/** \todo test this... :D */
+	/** \note this is quite expensive operation */
 	unsigned int c;
 	size_t s, off, add, ssize;
 	

@@ -209,7 +209,7 @@ int gl_capture_get_geometry(struct gl_capture_private_s *gl_capture, Display *dp
 
 int gl_capture_update_screen(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
 {
-	/* TODO fix this! */
+	/** \todo figure out real screen */
 	ctx->screen = DefaultScreen(ctx->dpy);
 	return 0;
 }
@@ -693,7 +693,7 @@ int gl_capture_update_color(struct gl_capture_private_s *gl_capture, struct gl_c
 	msg.green = gamma.green;
 	msg.blue = gamma.blue;
 
-	/** \TODO figure out brightness and contrast */
+	/** \todo figure out brightness and contrast */
 	msg.brightness = msg.contrast = 0;
 
 	util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",

@@ -109,4 +109,3 @@ __PUBLIC int glc_thread_create(glc_t *glc, glc_thread_t *thread, ps_buffer_t *fr
 #endif
 
 /**  \} */
-/**  \} */

@@ -98,7 +98,7 @@ int audio_capture_close(void *audiopriv)
 	if (audio_capture == NULL)
 		return EINVAL;
 
-	/* TODO snd_pcm_drain() ? */
+	/** \todo snd_pcm_drain() ? */
 	if (audio_capture->pcm)
 		snd_pcm_close(audio_capture->pcm);
 

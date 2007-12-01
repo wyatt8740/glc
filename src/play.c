@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
 			glc->silence_threshold = atof(optarg) * 1000000;
 			break;
 		case 'o':
-			if (!strcmp(optarg, "-")) /* TODO fopen(1) */
+			if (!strcmp(optarg, "-")) /** \todo fopen(1) ? */
 				glc->filename_format = "/dev/stdout";
 			else
 				glc->filename_format = optarg;

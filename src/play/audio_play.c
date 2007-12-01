@@ -72,7 +72,7 @@ int audio_play_init(glc_t *glc, ps_buffer_t *from, glc_audio_i audio, sem_t *fin
 	memset(audio_play, 0, sizeof(struct audio_play_private_s));
 
 	audio_play->glc = glc;
-	audio_play->device = "default"; /* TODO configurable */
+	audio_play->device = "default"; /** \todo make this configurable */
 	audio_play->audio_i = audio;
 	audio_play->finished = finished;
 

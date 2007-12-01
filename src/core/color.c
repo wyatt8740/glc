@@ -381,7 +381,6 @@ void color_bgr(struct color_private_s *color,
 	}
 }
 
-/* TODO something more sane... */
 #define CLAMP_256(val) \
 	(val) < 0 ? 0 : ((val) > 255 ? 255 : (val))
 

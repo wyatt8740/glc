@@ -55,7 +55,7 @@ B'd = Y' + (Cb - 128) * (2 - 2 * Kb)
 	  (((Gd) >> (8 - LOOKUP_BITS)) << LOOKUP_BITS) + \
 	  ( (Bd) >> (8 - LOOKUP_BITS))) * 3)
 
-/* FIXME why do overflows occur? */
+/** \note unfortunately overflows will occur */
 #define CLAMP_256(val) \
 	(val) < 0 ? 0 : ((val) > 255 ? 255 : (val))
 

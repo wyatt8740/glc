@@ -293,7 +293,7 @@ int util_app_name(char **path, u_int32_t *path_size)
 /**
  * \brief acquire current date as UTC string
  * \param date returned date
- * \param date_size size of date string, including \0
+ * \param date_size size of date string, including 0
  * \return 0 on success otherwise an error code
  */
 int util_utc_date(char **date, u_int32_t *date_size)
@@ -391,6 +391,7 @@ int util_log_init(glc_t *glc)
  * Errors are always written to stderr also.
  * \param glc glc
  * \param level message level
+ * \param module module
  * \param format passed to fprintf()
  * \param ... passed to fprintf()
  */
@@ -476,6 +477,13 @@ void util_log_info(glc_t *glc)
 	fprintf(util->log_file, "  date        = %s\n", glc->info_date);
 }
 
+/**
+ * \brief write standard log prefix to stream
+ * \param glc glc
+ * \param stream stream
+ * \param level message level
+ * \param module module
+ */
 void util_write_log_prefix(glc_t *glc, FILE *stream, int level, const char *module)
 {
 	const char *level_str = NULL;
@@ -506,4 +514,5 @@ void util_write_log_prefix(glc_t *glc, FILE *stream, int level, const char *modu
 		(double) util_real_time(glc) / 1000000.0, module, level_str);
 }
 
+/**  \} */
 /**  \} */

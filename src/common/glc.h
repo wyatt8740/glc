@@ -53,7 +53,7 @@
 /** always hide this object */
 #define __PRIVATE __attribute__ ((visibility ("hidden")))
 
-/** we need LARGE files */
+/* we need LARGE files */
 #define _FILE_OFFSET_BITS 64
 
 /** stream version */
@@ -61,7 +61,7 @@
 /** file signature = "GLC" */
 #define GLC_SIGNATURE            0x00434c47
 
-/* TODO better signal framework */
+/** \todo better signal framework */
 /** gl capture has finished */
 #define GLC_SIGNAL_GL_CAPTURE_FINISHED    0
 /** pack/unpack has finished */

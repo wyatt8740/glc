@@ -48,4 +48,3 @@ __PUBLIC int util_write_end_of_stream(glc_t *glc, ps_buffer_t *to);
 #endif
 
 /**  \} */
-/**  \} */

@@ -103,7 +103,7 @@ void init_glc()
 
 	atexit(lib_close);
 
-	/* TODO hook sigaction() ? */
+	/** \todo hook sigaction() ? */
 	if (mpriv.sighandler) {
 		util_log(mpriv.glc, GLC_INFORMATION, "main",
 			 "setting signal handler");

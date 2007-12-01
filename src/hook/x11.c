@@ -86,7 +86,7 @@ int x11_init(glc_t *glc)
 
 int x11_parse_hotkey(const char *hotkey)
 {
-	/* FIXME this is ugly... */
+	/** \todo better parsing */
 	int c, s;
 	x11.key_mask = 0;
 	c = s = 0;
