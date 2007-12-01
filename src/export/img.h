@@ -3,11 +3,6 @@
  * \brief export to images
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
- */
-
-
-/* img.h -- export to images
- * Copyright (C) 2007 Pyry Haulos
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 

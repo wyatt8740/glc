@@ -3,11 +3,14 @@
  * \brief OpenGL capture
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* gl_capture.c -- OpenGL capture
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup capture
+ *  \{
+ * \defgroup gl_capture OpenGL capture
+ *  \{
  */
 
 #include <stdio.h>
@@ -28,16 +31,6 @@
 #include "../common/glc.h"
 #include "../common/util.h"
 #include "gl_capture.h"
-
-/**
- * \addtogroup capture
- *  \{
- */
-
-/**
- * \defgroup gl_capture OpenGL capture
- *  \{
- */
 
 typedef void (*FuncPtr)(void);
 typedef FuncPtr (*GLXGetProcAddressProc)(const GLubyte *procName);

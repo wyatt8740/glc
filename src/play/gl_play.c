@@ -3,11 +3,14 @@
  * \brief OpenGL playback
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* gl_play.c -- OpenGL stuff
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup play
+ *  \{
+ * \defgroup gl_play OpenGL playback
+ *  \{
  */
 
 #include <stdio.h>
@@ -28,16 +31,6 @@
 #include "../common/util.h"
 #include "../common/thread.h"
 #include "gl_play.h"
-
-/**
- * \addtogroup play
- *  \{
- */
-
-/**
- * \defgroup gl_play OpenGL playback
- *  \{
- */
 
 struct gl_play_private_s {
 	glc_t *glc;

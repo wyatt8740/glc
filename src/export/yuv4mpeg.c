@@ -3,11 +3,14 @@
  * \brief yuv4mpeg output
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* yuv4mpeg.h -- yuv4mpeg output
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup export
+ *  \{
+ * \defgroup yuv4mpeg yuv4mpeg output
+ *  \{
  */
 
 #include <stdlib.h>
@@ -22,16 +25,6 @@
 #include "../common/thread.h"
 #include "../common/util.h"
 #include "yuv4mpeg.h"
-
-/**
- * \addtogroup export
- *  \{
- */
-
-/**
- * \defgroup yuv4mpeg yuv4mpeg output
- *  \{
- */
 
 struct yuv4mpeg_private_s {
 	glc_t *glc;
@@ -170,7 +163,6 @@ int yuv4mpeg_write_pic(struct yuv4mpeg_private_s *yuv4mpeg, char *pic)
 	fwrite(pic, 1, yuv4mpeg->size, yuv4mpeg->to);
 	return 0;
 }
-
 
 /**  \} */
 /**  \} */

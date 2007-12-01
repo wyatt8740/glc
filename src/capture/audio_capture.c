@@ -3,11 +3,14 @@
  * \brief audio capture
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* audio_capture.c -- audio capture
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup capture
+ *  \{
+ * \defgroup audio_capture audio capture
+ *  \{
  */
 
 #include <stdlib.h>
@@ -23,16 +26,6 @@
 #include "../common/glc.h"
 #include "../common/util.h"
 #include "audio_capture.h"
-
-/**
- * \addtogroup capture
- *  \{
- */
-
-/**
- * \defgroup audio_capture audio capture
- *  \{
- */
 
 struct audio_capture_private_s {
 	glc_t *glc;

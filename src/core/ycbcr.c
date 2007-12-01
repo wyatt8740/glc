@@ -3,11 +3,14 @@
  * \brief convert BGR to Y'CbCr and scale
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
- /* yuv.c -- convert BGR to Y'CbCr and scale
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup core
+ *  \{
+ * \defgroup ycbcr convert BGR to Y'CbCr and scale
+ *  \{
  */
 
 #include <stdlib.h>
@@ -21,16 +24,6 @@
 #include "../common/thread.h"
 #include "../common/util.h"
 #include "ycbcr.h"
-
-/**
- * \addtogroup core
- *  \{
- */
-
-/**
- * \defgroup ycbcr convert BGR to Y'CbCr and scale
- *  \{
- */
 
 /*
 http://en.wikipedia.org/wiki/YCbCr:

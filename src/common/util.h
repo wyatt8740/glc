@@ -3,11 +3,12 @@
  * \brief utility functions interface
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* util.h -- utility functions
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup util
+ *  \{
  */
 
 #ifndef _UTIL_H
@@ -16,16 +17,6 @@
 #include <packetstream.h>
 #include <stdarg.h>
 #include "glc.h"
-
-/**
- * \addtogroup common
- *  \{
- */
-
-/**
- * \defgroup util utility functions
- *  \{
- */
 
 __PUBLIC int glc_create(glc_t **glc);
 __PUBLIC int glc_destroy(glc_t *glc);
@@ -54,7 +45,7 @@ __PUBLIC glc_audio_i util_audio_stream_id(glc_t *glc);
 
 __PUBLIC int util_write_end_of_stream(glc_t *glc, ps_buffer_t *to);
 
-/**  \} */
-/**  \} */
-
 #endif
+
+/**  \} */
+/**  \} */

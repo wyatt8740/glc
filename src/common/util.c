@@ -3,11 +3,14 @@
  * \brief utility functions
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* util.c -- utility functions
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup common
+ *  \{
+ * \defgroup util utility functions
+ *  \{
  */
 
 #include <stdlib.h>
@@ -22,11 +25,6 @@
 
 #include "glc.h"
 #include "util.h"
-
-/**
- * \addtogroup util
- *  \{
- */
 
 /**
  * \brief util private structure

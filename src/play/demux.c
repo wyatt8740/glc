@@ -3,11 +3,14 @@
  * \brief audio/picture stream demuxer
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* demux.c -- audio/picture stream demuxer
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup play
+ *  \{
+ * \defgroup demux audio/picture stream demuxer
+ *  \{
  */
 
 #include <stdlib.h>
@@ -24,16 +27,6 @@
 #include "demux.h"
 #include "gl_play.h"
 #include "audio_play.h"
-
-/**
- * \addtogroup play
- *  \{
- */
-
-/**
- * \defgroup demux audio/picture stream demuxer
- *  \{
- */
 
 struct demux_ctx_s {
 	glc_ctx_i ctx_i;

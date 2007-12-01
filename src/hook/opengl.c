@@ -3,11 +3,14 @@
  * \brief opengl wrapper
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* opengl.c -- opengl wrapper
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup hook
+ *  \{
+ * \defgroup opengl OpenGL wrapper
+ *  \{
  */
 
 #include <stdlib.h>
@@ -20,16 +23,6 @@
 #include "../core/scale.h"
 #include "../core/ycbcr.h"
 #include "lib.h"
-
-/**
- * \addtogroup hook
- *  \{
- */
-
-/**
- * \defgroup opengl OpenGL wrapper
- *  \{
- */
 
 struct opengl_private_s {
 	glc_t *glc;

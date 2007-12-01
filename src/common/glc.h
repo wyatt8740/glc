@@ -27,12 +27,6 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
-#ifndef _GLC_H
-#define _GLC_H
-
-#include <sys/types.h>
-#include <semaphore.h>
-
 /**
  * \defgroup hook wrapper library
  * \defgroup capture capture
@@ -47,6 +41,12 @@
  * \addtogroup common
  *  \{
  */
+
+#ifndef _GLC_H
+#define _GLC_H
+
+#include <sys/types.h>
+#include <semaphore.h>
 
 /** always export this object  */
 #define __PUBLIC __attribute__ ((visibility ("default")))
@@ -430,6 +430,6 @@ typedef struct {
 /** sizeof(glc_container_message_t) */
 #define GLC_CONTAINER_MESSAGE_SIZE        9
 
-/**  \} */
-
 #endif
+
+/**  \} */

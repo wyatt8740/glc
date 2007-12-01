@@ -3,11 +3,12 @@
  * \brief audio capture hooks
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* audio_hook.h -- audio capture
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup audio_hook
+ *  \{
  */
 
 #ifndef _AUDIO_HOOK_H
@@ -16,11 +17,6 @@
 #include <packetstream.h>
 #include <alsa/asoundlib.h>
 #include "../common/glc.h"
-
-/**
- * \addtogroup audio_hook
- *  \{
- */
 
 __PUBLIC void *audio_hook_init(glc_t *glc, ps_buffer_t *to);
 __PUBLIC int audio_hook_close(void *audiopriv);

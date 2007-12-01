@@ -3,11 +3,14 @@
  * \brief alsa wrapper
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* alsa.c -- alsa wrapper
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup hook
+ *  \{
+ * \defgroup alsa alsa wrapper
+ *  \{
  */
 
 #include <dlfcn.h>
@@ -18,17 +21,6 @@
 #include "lib.h"
 #include "../capture/audio_hook.h"
 #include "../capture/audio_capture.h"
-
-/**
- * \addtogroup hook
- *  \{
- */
-
-/**
- * \defgroup alsa alsa wrapper
- *  \{
- */
-
 
 struct alsa_capture_stream_s {
 	void *capture;

@@ -3,11 +3,12 @@
  * \brief wrapper library
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* lib.h -- wrapper library
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup hook
+ *  \{
  */
 
 #ifndef _LIB_H
@@ -22,11 +23,6 @@
 #include <alsa/asoundlib.h>
 #include <packetstream.h>
 #include <pthread.h>
-
-/**
- * \addtogroup hook
- *  \{
- */
 
 typedef struct {
 	void *(*dlopen)(const char *filename, int flag);
@@ -119,6 +115,5 @@ __PRIVATE snd_pcm_sframes_t __alsa_snd_pcm_mmap_commit(snd_pcm_t *pcm, snd_pcm_u
 /**  \} */
 
 #endif
-
 
 /**  \} */

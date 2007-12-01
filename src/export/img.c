@@ -3,11 +3,14 @@
  * \brief export to images
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* img.c -- export to images
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup export
+ *  \{
+ * \defgroup img export to images
+ *  \{
  */
 
 #include <stdio.h>
@@ -20,16 +23,6 @@
 #include "../common/thread.h"
 #include "../common/util.h"
 #include "img.h"
-
-/**
- * \addtogroup export
- *  \{
- */
-
-/**
- * \defgroup img export to images
- *  \{
- */
 
 struct img_private_s {
 	glc_t *glc;

@@ -3,13 +3,15 @@
  * \brief generic stream processor thread
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
- */
-
-/* thread.c -- generic stream processor thread
- * Copyright (C) 2007 Pyry Haulos
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
+/**
+ * \addtogroup common
+ *  \{
+ * \defgroup thread generic thread
+ *  \{
+ */
 
 #include <stdlib.h>
 #include <string.h>
@@ -21,11 +23,6 @@
 #include "glc.h"
 #include "thread.h"
 #include "util.h"
-
-/**
- * \addtogroup thread
- *  \{
- */
 
 /**
  * \brief thread private variables

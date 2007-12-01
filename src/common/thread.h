@@ -3,11 +3,12 @@
  * \brief thread interface
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* thread.h -- generic stream processor thread
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup thread
+ *  \{
  */
 
 #ifndef _THREAD_H
@@ -15,16 +16,6 @@
 
 #include <packetstream.h>
 #include "glc.h"
-
-/**
- * \addtogroup common
- *  \{
- */
-
-/**
- * \defgroup thread generic thread
- *  \{
- */
 
 /** currently unused legacy */
 #define GLC_THREAD_UNUSED1                    1
@@ -115,7 +106,7 @@ typedef struct {
 
 __PUBLIC int glc_thread_create(glc_t *glc, glc_thread_t *thread, ps_buffer_t *from, ps_buffer_t *to);
 
-/**  \} */
-/**  \} */
-
 #endif
+
+/**  \} */
+/**  \} */

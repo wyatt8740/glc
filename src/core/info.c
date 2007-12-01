@@ -3,11 +3,14 @@
  * \brief stream information
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* info.c -- stream information
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup core
+ *  \{
+ * \defgroup info stream information
+ *  \{
  */
 
 #include <stdio.h>
@@ -18,16 +21,6 @@
 #include "../common/glc.h"
 #include "../common/thread.h"
 #include "info.h"
-
-/**
- * \addtogroup core
- *  \{
- */
-
-/**
- * \defgroup info stream information
- *  \{
- */
 
 #define INFO_DETAILED_CTX           2
 #define INFO_DETAILED_AUDIO_FORMAT  2

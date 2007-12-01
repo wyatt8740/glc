@@ -3,11 +3,14 @@
  * \brief audio capture hooks
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* audio_hook.c -- audio capture
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup capture
+ *  \{
+ * \defgroup audio_hook audio capture hooks
+ *  \{
  */
 
 /* NOTE this has some threading bugs, but async alsa uses signals,
@@ -26,16 +29,6 @@
 #include "../common/glc.h"
 #include "../common/util.h"
 #include "audio_hook.h"
-
-/**
- * \addtogroup capture
- *  \{
- */
-
-/**
- * \defgroup audio_hook audio capture hooks
- *  \{
- */
 
 struct audio_hook_stream_s {
 	glc_audio_i audio_i;

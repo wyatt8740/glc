@@ -3,11 +3,12 @@
  * \brief OpenGL capture
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* gl_capture.h -- OpenGL stuff
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup gl_capture
+ *  \{
  */
 
 #ifndef _GL_CAPTURE_H
@@ -17,11 +18,6 @@
 #include <GL/glx.h>
 #include <packetstream.h>
 #include "../common/glc.h"
-
-/**
- * \addtogroup gl_capture
- *  \{
- */
 
 __PUBLIC void *gl_capture_init(glc_t *glc, ps_buffer_t *to);
 __PUBLIC void gl_capture_close(void *glpriv);

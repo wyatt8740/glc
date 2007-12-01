@@ -3,11 +3,14 @@
  * \brief software scaler
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* scale.c -- bilinear filtering
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup core
+ *  \{
+ * \defgroup scale software scaler
+ *  \{
  */
 
 #include <stdlib.h>
@@ -21,16 +24,6 @@
 #include "../common/thread.h"
 #include "../common/util.h"
 #include "scale.h"
-
-/**
- * \addtogroup core
- *  \{
- */
-
-/**
- * \defgroup scale software scaler
- *  \{
- */
 
 struct scale_ctx_s;
 struct scale_private_s;

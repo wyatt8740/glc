@@ -3,10 +3,6 @@
  * \brief capture utility
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
- */
-
-/* capture.c -- capture utility
- * Copyright (C) 2007 Pyry Haulos
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 

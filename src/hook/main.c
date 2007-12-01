@@ -3,11 +3,14 @@
  * \brief main wrapper library
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* main.c -- main wrapper library
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup hook
+ *  \{
+ * \defgroup main main wrapper library
+ *  \{
  */
 
 #include <stdlib.h>
@@ -25,16 +28,6 @@
 #include "../core/pack.h"
 #include "../core/file.h"
 #include "lib.h"
-
-/**
- * \addtogroup hook
- *  \{
- */
-
-/**
- * \defgroup main main wrapper library
- *  \{
- */
 
 struct main_private_s {
 	glc_t *glc;

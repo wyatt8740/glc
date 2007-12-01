@@ -3,11 +3,14 @@
  * \brief export audio to wav
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* wav.c -- export audio to wav
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup export
+ *  \{
+ * \defgroup wav export audio to wav
+ *  \{
  */
 
 #include <stdlib.h>
@@ -22,16 +25,6 @@
 #include "../common/thread.h"
 #include "../common/util.h"
 #include "wav.h"
-
-/**
- * \addtogroup export
- *  \{
- */
-
-/**
- * \defgroup wav export audio to wav
- *  \{
- */
 
 struct wav_hdr {
 	u_int32_t id;

@@ -3,10 +3,6 @@
  * \brief stream player
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
- */
-
-/* play.c -- stream player
- * Copyright (C) 2007 Pyry Haulos
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 

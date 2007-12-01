@@ -3,12 +3,14 @@
  * \brief audio playback
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-
-/* audio_play.c -- audio playback
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup play
+ *  \{
+ * \defgroup audio_play audio playback
+ *  \{
  */
 
 #include <stdlib.h>
@@ -24,16 +26,6 @@
 #include "../common/util.h"
 #include "../common/thread.h"
 #include "audio_play.h"
-
-/**
- * \addtogroup play
- *  \{
- */
-
-/**
- * \defgroup audio_play audio playback
- *  \{
- */
 
 struct audio_play_private_s {
 	glc_t *glc;

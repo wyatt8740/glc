@@ -3,11 +3,14 @@
  * \brief stream compression
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007
+ * For conditions of distribution and use, see copyright notice in glc.h
  */
 
-/* pack.c -- stream compression
- * Copyright (C) 2007 Pyry Haulos
- * For conditions of distribution and use, see copyright notice in glc.h
+/**
+ * \addtogroup core
+ *  \{
+ * \defgroup pack stream compression
+ *  \{
  */
 
 #include <stdlib.h>
@@ -21,16 +24,6 @@
 #include "../common/thread.h"
 #include "../common/util.h"
 #include "pack.h"
-
-/**
- * \addtogroup core
- *  \{
- */
-
-/**
- * \defgroup pack stream compression
- *  \{
- */
 
 #ifdef __MINILZO
 # include <minilzo.h>
