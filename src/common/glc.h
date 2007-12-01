@@ -5,10 +5,10 @@
  * \date 2007
  */
 
-/* glc.h -- OpenGL video capture tool
+/* glc.h -- ALSA & OpenGL video capture tool
   version 0.4.0, November 25th, 2007
 
-  Copyright (C) 2007 Pyry Haulos
+  Copyright (C) 2007 Pyry Haulos <pyry.haulos@gmail.com>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -25,8 +25,6 @@
   2. Altered source versions must be plainly marked as such, and must not be
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
-
-  Pyry Haulos <pyry.haulos@gmail.com>
 */
 
 #ifndef _GLC_H
@@ -54,6 +52,9 @@
 #define __PUBLIC __attribute__ ((visibility ("default")))
 /** always hide this object */
 #define __PRIVATE __attribute__ ((visibility ("hidden")))
+
+/** we need LARGE files */
+#define _FILE_OFFSET_BITS 64
 
 /** stream version */
 #define GLC_STREAM_VERSION              0x2
