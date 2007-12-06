@@ -1,3 +1,12 @@
+0.4.1 (2007/12/6)
+   Reimplemented elfhacks symbol handling, finding symbols should be
+     faster and binaries with DT_GNU_HASH are supported.
+     This fixes potential audio stream duplication issue and crashes
+     when ALSA/glibc is compiled with --hash-style=gnu.
+   Clean up log format and include message level information in log.
+   Added -s all (show complete file information) option to glc-play.
+   Some bugfixes (large file handling, alsa crashes).
+
 0.4.0 (2007/11/25)
    ALSA audio recording support (eg. record voice from mic).
    Support for rescaling pictures to specified size (aspect ratio is
