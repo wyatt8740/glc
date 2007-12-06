@@ -364,8 +364,11 @@ int gl_capture_init_pbo(struct gl_capture_private_s *gl_capture)
 
 int gl_capture_create_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
 {
+	GLint binding;
+
 	util_log(gl_capture->glc, GLC_DEBUG, "gl_capture", "creating PBO");
 
+	glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING_ARB, &binding);
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 
 	gl_capture->glGenBuffers(1, &ctx->pbo);
@@ -374,6 +377,7 @@ int gl_capture_create_pbo(struct gl_capture_private_s *gl_capture, struct gl_cap
 		         NULL, GL_STREAM_READ);
 
 	glPopAttrib();
+	gl_capture->glBindBuffer(GL_PIXEL_PACK_BUFFER_ARB, binding);
 	return 0;
 }
 

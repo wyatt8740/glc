@@ -463,7 +463,7 @@ void util_log_info(glc_t *glc)
 		return;
 
 	util_write_log_prefix(glc, util->log_file, GLC_INFORMATION, "util");
-	fprintf(util->log_file, "system information");
+	fprintf(util->log_file, "system information\n");
 	fprintf(util->log_file, "  processors  = %ld\n", util_cpus());
 
 	util_write_log_prefix(glc, util->log_file, GLC_INFORMATION, "util");
