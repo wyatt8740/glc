@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
 		{'i', "draw-indicator",		"GLC_INDICATOR",		 "1"},
 		{'v', "log",			"GLC_LOG",			NULL},
 		{'l', "log-file",		"GLC_LOG_FILE",			NULL},
-		{ 0 , "no-audio-skip",		"GLC_AUDIO_SKIP",		 "0"},
+		{ 0 , "audio-skip",		"GLC_AUDIO_SKIP",		 "1"},
 		{ 0 , "disable-audio",		"GLC_AUDIO",			 "0"},
 		{ 0 , "sighandler",		"GLC_SIGHANDLER",		 "1"},
 		{'g', "glfinish",		"GLC_CAPTURE_GLFINISH",		 "1"},
@@ -131,7 +131,8 @@ usage:
 	       "                               3: information\n"
 	       "                               4: debug\n"
 	       "  -l, --log-file=FILE        write log to FILE, pid-%%d.log by default\n"
-	       "      --no-audio-skip        always capture audio data\n"
+	       "      --audio-skip           skip audio packets if buffer is full\n"
+	       "                               or capture thread is busy\n"
 	       "      --disable-audio        don't capture audio\n"
 	       "      --sighandler           use custom signal handler\n"
 	       "  -g, --glfinish             capture at glFinish()\n"

@@ -73,8 +73,7 @@ int alsa_init(glc_t *glc)
 	if (getenv("GLC_AUDIO_SKIP")) {
 		if (atoi(getenv("GLC_AUDIO_SKIP")))
 			alsa.glc->flags |= GLC_AUDIO_ALLOW_SKIP;
-	} else
-		alsa.glc->flags |= GLC_AUDIO_ALLOW_SKIP;
+	}
 
 	if (getenv("GLC_AUDIO_RECORD"))
 		alsa_parse_capture_cfg(getenv("GLC_AUDIO_RECORD"));

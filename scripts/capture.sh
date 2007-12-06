@@ -42,7 +42,7 @@ export GLC_TRY_PBO=1
 
 # Skip audio packets. Not skipping requires some busy
 # waiting and can slow program down a quite bit.
-export GLC_AUDIO_SKIP=1
+export GLC_AUDIO_SKIP=0
 
 # show indicator when capturing
 # NOTE this doesn't work properly when capturing front buffer
