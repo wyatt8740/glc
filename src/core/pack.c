@@ -255,7 +255,7 @@ void unpack_finish_callback(void *ptr, int err)
 	if (err)
 		util_log(pack->glc, GLC_ERROR, "unpack", "%s (%d)", strerror(err), err);
 
-	sem_post(&pack->glc->signal[GLC_SIGNAL_PACK_FINISHED]);
+	sem_post(&pack->glc->signal[GLC_SIGNAL_UNPACK_FINISHED]);
 	free(pack);
 }
 

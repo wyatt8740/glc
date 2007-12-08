@@ -11,6 +11,7 @@
 #include <semaphore.h>
 #include <getopt.h>
 #include <string.h>
+#include <errno.h>
 
 #include "common/glc.h"
 #include "common/util.h"
@@ -29,16 +30,22 @@
 
 #include "play/demux.h"
 
+enum glc_play_action_t {play, info, img, yuv4mpeg, wav, val};
+
 int show_info_value(glc_t *glc, const char *value);
+
+int play_stream(glc_t *glc);
+int stream_info(glc_t *glc);
+int export_img(glc_t *glc);
+int export_yuv4mpeg(glc_t *glc);
+int export_wav(glc_t *glc);
 
 int main(int argc, char *argv[])
 {
 	glc_t *glc;
-	ps_stats_t stats;
-	ps_bufferattr_t attr;
-	const char *summary_val = NULL;
-	int play, opt, option_index, img, info, show_stats, wav, yuv4mpeg;
-	ps_buffer_t *uncompressed, *compressed, *ycbcr, *rgb, *color, *scale;
+	const char *val_str = NULL;
+	int opt, option_index;
+	enum glc_play_action_t action = play;
 
 	struct option long_options[] = {
 		{"info",		1, NULL, 'i'},
@@ -54,64 +61,64 @@ int main(int argc, char *argv[])
 		{"uncompressed",	1, NULL, 'u'},
 		{"show",		1, NULL, 's'},
 		{"verbosity",		1, NULL, 'v'},
-		{"statistics",		0, NULL, 't'},
 		{"help",		0, NULL, 'h'},
 		{0, 0, 0, 0}
 	};
 	option_index = 0;
 
-	img = info = wav = 0;
-	ycbcr = rgb = color = scale = NULL;
-	play = 1;
+	if (glc_create(&glc))
+		return EXIT_FAILURE;
 
-	img = info = show_stats = yuv4mpeg = 0;
-	glc_create(&glc);
-	glc->scale = 1;
-	glc->scale_width = glc->scale_height = 0;
+	/* initialize glc with some sane values */
 	glc->flags = 0;
 	glc->fps = 0;
-	glc->filename_format = NULL;
-	glc->silence_threshold = 200000;
+	glc->filename_format = NULL; /* user has to specify */
+	glc->silence_threshold = 200000; /* 0.2 sec accuracy */
+
+	/* don't scale by default */
+	glc->scale = 1;
+	glc->scale_width = glc->scale_height = 0;
+
+	/* default buffer size is 10MiB */
 	glc->compressed_size = 10 * 1024 * 1024;
 	glc->uncompressed_size = 10 * 1024 * 1024;
+
+	/* log to stderr */
 	glc->log_file = "/dev/stderr";
 	glc->log_level = 0;
 
+	/* global color correction */
 	glc->brightness = glc->contrast = 0;
 	glc->red_gamma = 1.0;
 	glc->green_gamma = 1.0;
 	glc->blue_gamma = 1.0;
 
-	while ((opt = getopt_long(argc, argv, "i:a:p:y:o:f:r:g:l:c:u:s:v:th",
+	while ((opt = getopt_long(argc, argv, "i:a:p:y:o:f:r:g:l:c:u:s:v:h",
 				  long_options, &optind)) != -1) {
 		switch (opt) {
 		case 'i':
 			glc->info_level = atoi(optarg);
 			if (glc->info_level < 1)
 				goto usage;
-			info = 1;
-			play = 0;
+			action = info;
 			break;
 		case 'a':
 			glc->export_audio = atoi(optarg);
 			if (glc->export_audio < 1)
 				goto usage;
-			wav = 1;
-			play = 0;
+			action = wav;
 			break;
 		case 'p':
 			glc->export_ctx = atoi(optarg);
 			if (glc->export_ctx < 1)
 				goto usage;
-			img = 1;
-			play = 0;
+			action = img;
 			break;
 		case 'y':
 			glc->export_ctx = atoi(optarg);
 			if (glc->export_ctx < 1)
 				goto usage;
-			yuv4mpeg = 1;
-			play = 0;
+			action = yuv4mpeg;
 			break;
 		case 'f':
 			glc->fps = atof(optarg);
@@ -156,7 +163,8 @@ int main(int argc, char *argv[])
 				goto usage;
 			break;
 		case 's':
-			summary_val = optarg;
+			val_str = optarg;
+			action = val;
 			break;
 		case 'v':
 			glc->log_level = atoi(optarg);
@@ -164,147 +172,68 @@ int main(int argc, char *argv[])
 				goto usage;
 			glc->flags |= GLC_LOG | GLC_NOERR;
 			break;
-		case 't':
-			show_stats = 1;
-			break;
 		case 'h':
 		default:
 			goto usage;
 		}
 	}
 
+	/* stream file is mandatory */
 	if (optind >= argc)
 		goto usage;
 	glc->stream_file = argv[optind];
 
+	/* same goes to output file */
+	if (((action == img) |
+	     (action == wav) |
+	     (action == yuv4mpeg)) &&
+	    (glc->filename_format == NULL))
+		goto usage;
+
+	/* we do global initialization */
 	util_init(glc);
 	if (glc->flags & GLC_LOG)
 		util_log_init(glc);
 
-	if ((img | wav | yuv4mpeg) && (glc->filename_format == NULL))
-		goto usage;
-
+	/* load information and check that the file is valid */
 	if (util_load_info(glc, glc->stream_file))
 		return EXIT_FAILURE;
 
-	if (summary_val)
-		return show_info_value(glc, summary_val);
-
+	/*
+	 If the fps hasn't been specified read it from the
+	 stream information.
+	*/
 	if (glc->fps == 0)
 		glc->fps = glc->info->fps;
 
-	ps_bufferattr_init(&attr);
-	if (show_stats)
-		ps_bufferattr_setflags(&attr, PS_BUFFER_STATS);
-
-	ps_bufferattr_setsize(&attr, glc->uncompressed_size);
-
-	uncompressed = malloc(sizeof(ps_buffer_t));
-	ps_buffer_init(uncompressed, &attr);
-
-	if ((yuv4mpeg) | (img) | (play)) {
-		color = malloc(sizeof(ps_buffer_t));
-		ps_buffer_init(color, &attr);
-
-		scale = malloc(sizeof(ps_buffer_t));
-		ps_buffer_init(scale, &attr);
+	switch (action) {
+	case play:
+		if (play_stream(glc))
+			return EXIT_FAILURE;
+		break;
+	case wav:
+		if (export_wav(glc))
+			return EXIT_FAILURE;
+		break;
+	case yuv4mpeg:
+		if (export_yuv4mpeg(glc))
+			return EXIT_FAILURE;
+		break;
+	case img:
+		if (export_img(glc))
+			return EXIT_FAILURE;
+		break;
+	case info:
+		if (stream_info(glc))
+			return EXIT_FAILURE;
+		break;
+	case val:
+		if (show_info_value(glc, val_str))
+			return EXIT_FAILURE;
+		break;
 	}
 
-	if (yuv4mpeg) {
-		ycbcr = malloc(sizeof(ps_buffer_t));
-		ps_buffer_init(ycbcr, &attr);
-	} else if ((img) | (play)) {
-		rgb = malloc(sizeof(ps_buffer_t));
-		ps_buffer_init(rgb, &attr);
-	}
-
-	ps_bufferattr_setsize(&attr, glc->compressed_size);
-	compressed = malloc(sizeof(ps_buffer_t));
-	ps_buffer_init(compressed, &attr);
-
-	ps_bufferattr_destroy(&attr);
-
-	if (img) {
-		rgb_init(glc, uncompressed, rgb);
-		color_init(glc, rgb, color);
-		scale_init(glc, color, scale);
-		img_init(glc, color);
-	} else if (info)
-		info_init(glc, uncompressed);
-	else if (wav)
-		wav_init(glc, uncompressed);
-	else if (yuv4mpeg) {
-		color_init(glc, uncompressed, color);
-		scale_init(glc, color, scale);
-		ycbcr_init(glc, scale, ycbcr);
-		yuv4mpeg_init(glc, ycbcr);
-	} else { /* play */
-		rgb_init(glc, uncompressed, rgb);
-		color_init(glc, rgb, color);
-		scale_init(glc, color, scale);
-		demux_init(glc, scale);
-	}
-
-	unpack_init(glc, compressed, uncompressed);
-	if (file_read(glc, compressed)) {
-		ps_buffer_cancel(compressed);
-		ps_buffer_cancel(uncompressed);
-	}
-
-	if ((yuv4mpeg) | (img) | (play)) {
-		sem_wait(&glc->signal[GLC_SIGNAL_COLOR_FINISHED]);
-		sem_wait(&glc->signal[GLC_SIGNAL_SCALE_FINISHED]);
-	}
-
-	if (img) {
-		sem_wait(&glc->signal[GLC_SIGNAL_IMG_FINISHED]);
-		sem_wait(&glc->signal[GLC_SIGNAL_RGB_FINISHED]);
-	} else if (info)
-		sem_wait(&glc->signal[GLC_SIGNAL_INFO_FINISHED]);
-	else if (wav)
-		sem_wait(&glc->signal[GLC_SIGNAL_WAV_FINISHED]);
-	else if (yuv4mpeg) {
-		sem_wait(&glc->signal[GLC_SIGNAL_YCBCR_FINISHED]);
-		sem_wait(&glc->signal[GLC_SIGNAL_YUV4MPEG_FINISHED]);
-	} else {
-		sem_wait(&glc->signal[GLC_SIGNAL_RGB_FINISHED]);
-		sem_wait(&glc->signal[GLC_SIGNAL_DEMUX_FINISHED]);
-	}
-	sem_wait(&glc->signal[GLC_SIGNAL_PACK_FINISHED]);
-
-	if (show_stats) {
-		if (!ps_buffer_stats(uncompressed, &stats)) {
-			printf("uncompressed stream:\n");
-			ps_stats_text(&stats, stdout);
-		}
-
-		if (!ps_buffer_stats(compressed, &stats)) {
-			printf("compressed stream:\n");
-			ps_stats_text(&stats, stdout);
-		}
-	}
-
-	ps_buffer_destroy(compressed);
-	ps_buffer_destroy(uncompressed);
-	free(compressed);
-	free(uncompressed);
-	if ((play) | (img) | (yuv4mpeg)) {
-		ps_buffer_destroy(color);
-		free(color);
-
-		ps_buffer_destroy(scale);
-		free(scale);
-	}
-	if (play) {
-		ps_buffer_destroy(rgb);
-		free(rgb);
-	} else if (yuv4mpeg) {
-		ps_buffer_destroy(ycbcr);
-		free(ycbcr);
-	} else if (img) {
-		ps_buffer_destroy(rgb);
-		free(rgb);
-	}
+	/* our cleanup */
 	util_free_info(glc);
 	util_free(glc);
 	glc_destroy(glc);
@@ -334,7 +263,6 @@ usage:
 	       "                             all, signature, version, flags, fps,\n"
 	       "                             pid, name, date\n"
 	       "  -v, --verbosity=LEVEL    verbosity level\n"
-	       "  -t, --statistics         show stream statistics\n"
 	       "  -h, --help               show help\n");
 
 	return EXIT_FAILURE;
@@ -365,6 +293,364 @@ int show_info_value(glc_t *glc, const char *value)
 	else if (!strcmp("date", value))
 		printf("%s\n", glc->info_date);
 	else
-		return EXIT_FAILURE;
-	return EXIT_SUCCESS;
+		return ENOTSUP;
+	return 0;
+}
+
+int play_stream(glc_t *glc)
+{
+	/*
+	 Playback uses following pipeline:
+
+	 file -(uncompressed)->     reads data from stream file
+	 unpack -(uncompressed)->   decompresses lzo/quicklz packets
+	 rgb -(rgb)->               does conversion to BGR
+	 scale -(scale)->           does rescaling
+	 color -(color)->           applies color correction
+	 demux -(...)-> gl_play, audio_play
+
+	 Each filter, except demux and file, has util_cpus() worker
+	 threads. Packet order in stream is preserved. Demux creates
+	 separate buffer and _play handler for each video/audio stream.
+	*/
+
+	ps_bufferattr_t attr;
+	ps_buffer_t uncompressed, compressed, rgb, color, scale;
+	int ret = 0;
+
+	if ((ret = ps_bufferattr_init(&attr)))
+		goto err;
+
+	/*
+	 'compressed' buffer holds raw data from file and
+	 has its own size.
+	*/
+	if ((ret = ps_bufferattr_setsize(&attr, glc->compressed_size)))
+		goto err;
+	if ((ret = ps_buffer_init(&compressed, &attr)))
+		goto err;
+
+	/* rest use 'uncompressed' size */
+	if ((ret = ps_bufferattr_setsize(&attr, glc->uncompressed_size)))
+		goto err;
+	if ((ret = ps_buffer_init(&uncompressed, &attr)))
+		goto err;
+	if ((ret = ps_buffer_init(&color, &attr)))
+		goto err;
+	if ((ret = ps_buffer_init(&rgb, &attr)))
+		goto err;
+	if ((ret = ps_buffer_init(&scale, &attr)))
+		goto err;
+
+	/* no longer necessary */
+	if ((ret = ps_bufferattr_destroy(&attr)))
+		goto err;
+
+	/* lets construct our pipeline */
+	if ((ret = unpack_init(glc, &compressed, &uncompressed)))
+		goto err;
+	if ((ret = rgb_init(glc, &uncompressed, &rgb)))
+		goto err;
+	if ((ret = scale_init(glc, &rgb, &scale)))
+		goto err;
+	if ((ret = color_init(glc, &scale, &color)))
+		goto err;
+	if ((ret = demux_init(glc, &color)))
+		goto err;
+
+	/* pipeline is ready - lets give it some data */
+	if ((ret = file_read(glc, &compressed)))
+		goto err;
+
+	/* we've done our part - just wait for the threads */
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_DEMUX_FINISHED])))
+		goto err; /* wait for demux, since when it quits, others should also */
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_COLOR_FINISHED])))
+		goto err;
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_SCALE_FINISHED])))
+		goto err;
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_RGB_FINISHED])))
+		goto err;
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_UNPACK_FINISHED])))
+		goto err;
+
+	/* stream processed - clean up time */
+	ps_buffer_destroy(&compressed);
+	ps_buffer_destroy(&uncompressed);
+	ps_buffer_destroy(&color);
+	ps_buffer_destroy(&scale);
+	ps_buffer_destroy(&rgb);
+
+	return 0;
+err:
+	fprintf(stderr, "playing stream failed: %s (%d)\n", strerror(ret), ret);
+	return ret;
+}
+
+int stream_info(glc_t *glc)
+{
+	/*
+	 Info uses following pipeline:
+
+	 file -(uncompressed)->     reads data from stream file
+	 unpack -(uncompressed)->   decompresses lzo/quicklz packets
+	 info -(rgb)->              shows stream information
+	*/
+
+	ps_bufferattr_t attr;
+	ps_buffer_t uncompressed, compressed;
+	int ret = 0;
+
+	if ((ret = ps_bufferattr_init(&attr)))
+		goto err;
+
+	/* initialize buffers */
+	if ((ret = ps_bufferattr_setsize(&attr, glc->compressed_size)))
+		goto err;
+	if ((ret = ps_buffer_init(&compressed, &attr)))
+		goto err;
+
+	if ((ret = ps_bufferattr_setsize(&attr, glc->uncompressed_size)))
+		goto err;
+	if ((ret = ps_buffer_init(&uncompressed, &attr)))
+		goto err;
+
+	if ((ret = ps_bufferattr_destroy(&attr)))
+		goto err;
+
+	/* run it */
+	if ((ret = unpack_init(glc, &compressed, &uncompressed)))
+		goto err;
+	if ((ret = info_init(glc, &uncompressed)))
+		goto err;
+	if ((ret = file_read(glc, &compressed)))
+		goto err;
+
+	/* wait for threads and do cleanup */
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_INFO_FINISHED])))
+		goto err;
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_UNPACK_FINISHED])))
+		goto err;
+
+	ps_buffer_destroy(&compressed);
+	ps_buffer_destroy(&uncompressed);
+
+	return 0;
+err:
+	fprintf(stderr, "extracting stream information failed: %s (%d)\n", strerror(ret), ret);
+	return ret;
+}
+
+int export_img(glc_t *glc)
+{
+	/*
+	 Export img uses following pipeline:
+
+	 file -(uncompressed)->     reads data from stream file
+	 unpack -(uncompressed)->   decompresses lzo/quicklz packets
+	 rgb -(rgb)->               does conversion to BGR
+	 scale -(scale)->           does rescaling
+	 color -(color)->           applies color correction
+	 img                        writes separate image files for each frame
+	*/
+
+	ps_bufferattr_t attr;
+	ps_buffer_t uncompressed, compressed, rgb, color, scale;
+	int ret = 0;
+
+	if ((ret = ps_bufferattr_init(&attr)))
+		goto err;
+
+	/* buffers */
+	if ((ret = ps_bufferattr_setsize(&attr, glc->compressed_size)))
+		goto err;
+	if ((ret = ps_buffer_init(&compressed, &attr)))
+		goto err;
+
+	if ((ret = ps_bufferattr_setsize(&attr, glc->uncompressed_size)))
+		goto err;
+	if ((ret = ps_buffer_init(&uncompressed, &attr)))
+		goto err;
+	if ((ret = ps_buffer_init(&color, &attr)))
+		goto err;
+	if ((ret = ps_buffer_init(&rgb, &attr)))
+		goto err;
+	if ((ret = ps_buffer_init(&scale, &attr)))
+		goto err;
+
+	if ((ret = ps_bufferattr_destroy(&attr)))
+		goto err;
+
+	/* pipeline... */
+	if ((ret = unpack_init(glc, &compressed, &uncompressed)))
+		goto err;
+	if ((ret = rgb_init(glc, &uncompressed, &rgb)))
+		goto err;
+	if ((ret = scale_init(glc, &rgb, &scale)))
+		goto err;
+	if ((ret = color_init(glc, &scale, &color)))
+		goto err;
+	if ((ret = img_init(glc, &color)))
+		goto err;
+
+	/* ok, read the file */
+	if ((ret = file_read(glc, &compressed)))
+		goto err;
+
+	/* wait 'till its done and clean up the mess... */
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_IMG_FINISHED])))
+		goto err;
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_COLOR_FINISHED])))
+		goto err;
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_SCALE_FINISHED])))
+		goto err;
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_RGB_FINISHED])))
+		goto err;
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_UNPACK_FINISHED])))
+		goto err;
+
+	ps_buffer_destroy(&compressed);
+	ps_buffer_destroy(&uncompressed);
+	ps_buffer_destroy(&color);
+	ps_buffer_destroy(&scale);
+	ps_buffer_destroy(&rgb);
+
+	return 0;
+err:
+	fprintf(stderr, "exporting images failed: %s (%d)\n", strerror(ret), ret);
+	return ret;
+}
+
+int export_yuv4mpeg(glc_t *glc)
+{
+	/*
+	 Export yuv4mpeg uses following pipeline:
+
+	 file -(uncompressed)->     reads data from stream file
+	 unpack -(uncompressed)->   decompresses lzo/quicklz packets
+	 scale -(scale)->           does rescaling
+	 color -(color)->           applies color correction
+	 ycbcr -(ycbcr)->           does conversion to Y'CbCr (if necessary)
+	 yuv4mpeg                   writes yuv4mpeg stream
+	*/
+
+	ps_bufferattr_t attr;
+	ps_buffer_t uncompressed, compressed, ycbcr, color, scale;
+	int ret = 0;
+
+	if ((ret = ps_bufferattr_init(&attr)))
+		goto err;
+
+	/* buffers */
+	if ((ret = ps_bufferattr_setsize(&attr, glc->compressed_size)))
+		goto err;
+	if ((ret = ps_buffer_init(&compressed, &attr)))
+		goto err;
+
+	if ((ret = ps_bufferattr_setsize(&attr, glc->uncompressed_size)))
+		goto err;
+	if ((ret = ps_buffer_init(&uncompressed, &attr)))
+		goto err;
+	if ((ret = ps_buffer_init(&color, &attr)))
+		goto err;
+	if ((ret = ps_buffer_init(&ycbcr, &attr)))
+		goto err;
+	if ((ret = ps_buffer_init(&scale, &attr)))
+		goto err;
+
+	if ((ret = ps_bufferattr_destroy(&attr)))
+		goto err;
+
+	/* construct the pipeline */
+	if ((ret = unpack_init(glc, &compressed, &uncompressed)))
+		goto err;
+	if ((ret = scale_init(glc, &uncompressed, &scale)))
+		goto err;
+	if ((ret = color_init(glc, &scale, &color)))
+		goto err;
+	if ((ret = ycbcr_init(glc, &color, &ycbcr)))
+		goto err;
+	if ((ret = yuv4mpeg_init(glc, &ycbcr)))
+		goto err;
+
+	/* feed it with data */
+	if ((ret = file_read(glc, &compressed)))
+		goto err;
+
+	/* threads will do the dirty work... */
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_YUV4MPEG_FINISHED])))
+		goto err;
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_COLOR_FINISHED])))
+		goto err;
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_SCALE_FINISHED])))
+		goto err;
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_YCBCR_FINISHED])))
+		goto err;
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_UNPACK_FINISHED])))
+		goto err;
+
+	ps_buffer_destroy(&compressed);
+	ps_buffer_destroy(&uncompressed);
+	ps_buffer_destroy(&color);
+	ps_buffer_destroy(&scale);
+	ps_buffer_destroy(&ycbcr);
+
+	return 0;
+err:
+	fprintf(stderr, "exporting yuv4mpeg failed: %s (%d)\n", strerror(ret), ret);
+	return ret;
+}
+
+int export_wav(glc_t *glc)
+{
+	/*
+	 Export wav uses following pipeline:
+
+	 file -(uncompressed)->     reads data from stream file
+	 unpack -(uncompressed)->   decompresses lzo/quicklz packets
+	 wav -(rgb)->               write audio to file in wav format
+	*/
+
+	ps_bufferattr_t attr;
+	ps_buffer_t uncompressed, compressed;
+	int ret = 0;
+
+	if ((ret = ps_bufferattr_init(&attr)))
+		goto err;
+
+	/* buffers */
+	if ((ret = ps_bufferattr_setsize(&attr, glc->compressed_size)))
+		goto err;
+	if ((ret = ps_buffer_init(&compressed, &attr)))
+		goto err;
+
+	if ((ret = ps_bufferattr_setsize(&attr, glc->uncompressed_size)))
+		goto err;
+	if ((ret = ps_buffer_init(&uncompressed, &attr)))
+		goto err;
+
+	if ((ret = ps_bufferattr_destroy(&attr)))
+		goto err;
+
+	/* start the threads */
+	if ((ret = unpack_init(glc, &compressed, &uncompressed)))
+		goto err;
+	if ((ret = wav_init(glc, &uncompressed)))
+		goto err;
+	if ((ret = file_read(glc, &compressed)))
+		goto err;
+
+	/* wait and clean up */
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_WAV_FINISHED])))
+		goto err;
+	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_UNPACK_FINISHED])))
+		goto err;
+
+	ps_buffer_destroy(&compressed);
+	ps_buffer_destroy(&uncompressed);
+
+	return 0;
+err:
+	fprintf(stderr, "exporting wav failed: %s (%d)\n", strerror(ret), ret);
+	return ret;
 }

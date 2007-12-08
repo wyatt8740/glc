@@ -90,8 +90,10 @@
 #define GLC_SIGNAL_GL_PLAY_FINISHED      12
 /** color correction filter has finished */
 #define GLC_SIGNAL_COLOR_FINISHED        13
+/** decompression threads have finished */
+#define GLC_SIGNAL_UNPACK_FINISHED       14
 /** number of signals */
-#define GLC_SIGNALS                      14
+#define GLC_SIGNALS                      15
 
 /** unsigned time in microseconds */
 typedef u_int64_t glc_utime_t;
