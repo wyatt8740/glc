@@ -239,7 +239,7 @@ $(QUICKLZ_OBJ): $(QUICKLZ)quicklz.c $(QUICKLZ)quicklz.h
 	$(CC) $(SO_CFLAGS) -o $(QUICKLZ_OBJ) -c $(QUICKLZ)quicklz.c
 
 
-install-scripts: $(SCRIPTS)/glc-encode $(SCRIPTS)/glc-capture
+install-scripts: $(SCRIPTS)/encode.sh $(SCRIPTS)/capture.sh $(SCRIPTS)/play.sh
 	install -Dm 0644 $(SCRIPTS)/encode.sh $(DESTDIR)/usr/share/glc/encode.sh
 	install -Dm 0644 $(SCRIPTS)/capture.sh $(DESTDIR)/usr/share/glc/capture.sh
 	install -Dm 0644 $(SCRIPTS)/play.sh $(DESTDIR)/usr/share/glc/play.sh
