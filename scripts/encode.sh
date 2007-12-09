@@ -70,6 +70,7 @@ if [ "${MULTIPASS}" == "no" ]; then
 	glc-play "${FILE}" -o - -y "${CTX}" | \
 		mencoder - \
 			-audiofile "${AUDIOTMP}"\
+			-demuxer y4m \
 			-ovc x264 \
 			-x264encopts "${X264_OPTS}" \
 			-oac copy \
@@ -80,6 +81,7 @@ else
 	glc-play "${FILE}" -o - -y "${CTX}" | \
 		mencoder - \
 			-nosound \
+			-demuxer y4m \
 			-ovc x264 \
 			-x264encopts "${X264_OPTS}:pass=1" \
 			-passlogfile "${PASSLOG}" \
@@ -89,6 +91,7 @@ else
 	glc-play "${FILE}" -o - -y "${CTX}" | \
 		mencoder - \
 			-audiofile "${AUDIOTMP}" \
+			-demuxer y4m \
 			-ovc x264 \
 			-x264encopts "${X264_OPTS}:pass=2" \
 			-passlogfile "${PASSLOG}" \

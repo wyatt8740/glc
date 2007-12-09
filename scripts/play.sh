@@ -24,6 +24,6 @@ mkfifo "${VIDEOFIFO}"
 glc-play "$1" -o "${AUDIOFIFO}" -a "${AUDIO}" &
 glc-play "$1" -o "${VIDEOFIFO}" -y "${CTX}" &
 
-mplayer -audio-demuxer 35 -audiofile "${AUDIOFIFO}" "${VIDEOFIFO}"
+mplayer -audio-demuxer lavf -demuxer y4m -audiofile "${AUDIOFIFO}" "${VIDEOFIFO}"
 
 rm -f "${AUDIOFIFO}" "${VIDEOFIFO}"

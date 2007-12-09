@@ -346,7 +346,7 @@ int play_stream(glc_t *glc)
 	if ((ret = ps_bufferattr_destroy(&attr)))
 		goto err;
 
-	/* lets construct our pipeline */
+	/* construct a pipeline for playback */
 	if ((ret = unpack_init(glc, &compressed, &uncompressed)))
 		goto err;
 	if ((ret = rgb_init(glc, &uncompressed, &rgb)))
@@ -358,7 +358,7 @@ int play_stream(glc_t *glc)
 	if ((ret = demux_init(glc, &color)))
 		goto err;
 
-	/* pipeline is ready - lets give it some data */
+	/* the pipeline is ready - lets give it some data */
 	if ((ret = file_read(glc, &compressed)))
 		goto err;
 
