@@ -53,10 +53,6 @@
 /** always hide this object */
 #define __PRIVATE __attribute__ ((visibility ("hidden")))
 
-/* we need LARGE files */
-#define _FILE_OFFSET_BITS 64
-#define _LARGEFILE_SOURCE
-
 /** stream version */
 #define GLC_STREAM_VERSION              0x2
 /** file signature = "GLC" */
