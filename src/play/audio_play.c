@@ -192,8 +192,10 @@ int audio_play_play(struct audio_play_private_s *audio_play, glc_audio_header_t 
 	
 	if (time + audio_play->glc->silence_threshold + duration < audio_hdr->timestamp)
 		usleep(audio_hdr->timestamp - time - duration);
-	else if (time > audio_hdr->timestamp)
+	else if (time > audio_hdr->timestamp) {
+		util_log(audio_play->glc, GLC_WARNING, "audio", "dropped packet");
 		return 0;
+	}
 
 	rem = frames;
 
