@@ -99,13 +99,33 @@ int demux_init(glc_t *glc, ps_buffer_t *from)
 int demux_close(struct demux_private_s *demux)
 {
 	ps_bufferattr_destroy(&demux->bufferattr);
+	int ret = 0;
 
-	if (demux->ctx != NULL)
-		demux_video_close(demux);
-	if (demux->stream != NULL)
-		demux_audio_close(demux);
+	if (demux->ctx != NULL) {
+		if ((ret = demux_video_close(demux)))
+			util_log(demux->glc, GLC_ERROR, "demux", "can't close video streams: %s (%d)",
+				 strerror(ret), ret);
+	}
 
-	sem_post(&demux->glc->signal[GLC_SIGNAL_DEMUX_FINISHED]);
+	if (demux->stream != NULL) {
+		if ((ret = demux_audio_close(demux)))
+			util_log(demux->glc, GLC_ERROR, "demux", "can't close audio streams: %s (%d)",
+				 strerror(ret), ret);
+	}
+
+	util_log(demux->glc, GLC_DEBUG, "demux",
+		"&demux->glc->signal[GLC_SIGNAL_DEMUX_FINISHED]=%p",
+		&demux->glc->signal[GLC_SIGNAL_DEMUX_FINISHED]);
+
+	if ((ret = sem_post(&demux->glc->signal[GLC_SIGNAL_DEMUX_FINISHED]))) {
+		util_log(demux->glc, GLC_ERROR, "demux", "sem_post(): %s (%d)", strerror(ret), ret);
+		return ret;
+	}
+	
+	int val;
+	sem_getvalue(&demux->glc->signal[GLC_SIGNAL_DEMUX_FINISHED], &val);
+	util_log(demux->glc, GLC_DEBUG, "demux", "semaphore value is %d", val);
+
 	free(demux);
 	return 0;
 }
@@ -223,6 +243,7 @@ err:
 		return ret;
 
 	/* since it is EINTR, _cancel() is already done */
+	util_log(demux->glc, GLC_DEBUG, "demux", "video stream %d has quit", ctx->ctx_i);
 	demux_video_ctx_clean(demux, ctx);
 	return 0;
 }
@@ -397,6 +418,7 @@ err:
 	if (ret != EINTR)
 		return ret;
 
+	util_log(demux->glc, GLC_DEBUG, "demux", "audio stream %d has quit", stream->audio_i);
 	demux_audio_stream_clean(demux, stream);
 	return 0;
 }

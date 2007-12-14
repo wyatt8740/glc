@@ -363,8 +363,17 @@ int play_stream(glc_t *glc)
 		goto err;
 
 	/* we've done our part - just wait for the threads */
+	util_log(glc, GLC_DEBUG, "play", "&glc->signal[GLC_SIGNAL_DEMUX_FINISHED]=%p",
+		&glc->signal[GLC_SIGNAL_DEMUX_FINISHED]);
+	int val;
+	sem_getvalue(&glc->signal[GLC_SIGNAL_DEMUX_FINISHED], &val);
+	util_log(glc, GLC_DEBUG, "play", "semaphore value is %d", val);
+
 	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_DEMUX_FINISHED])))
 		goto err; /* wait for demux, since when it quits, others should also */
+
+	util_log(glc, GLC_DEBUG, "play", "demux finished");
+
 	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_COLOR_FINISHED])))
 		goto err;
 	if ((ret = sem_wait(&glc->signal[GLC_SIGNAL_SCALE_FINISHED])))

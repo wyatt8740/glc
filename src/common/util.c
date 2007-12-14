@@ -58,10 +58,13 @@ glc_utime_t util_real_time(glc_t *glc);
  */
 int glc_create(glc_t **glc)
 {
-	int i;
+	int i, ret;
 	*glc = (glc_t *) malloc(sizeof(glc_t));
-	for (i = 0; i < GLC_SIGNALS; i++)
-		sem_init(&(*glc)->signal[i], 0, 0);
+	memset(*glc, 0, sizeof(glc_t));
+	for (i = 0; i < GLC_SIGNALS; i++) {
+		if ((ret = sem_init(&(*glc)->signal[i], 0, 0)))
+			return ret;
+	}
 	return 0;
 }
 
