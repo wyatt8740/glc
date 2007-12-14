@@ -24,8 +24,11 @@ __PUBLIC int audio_hook_close(void *audiopriv);
 __PUBLIC int audio_hook_alsa_i(void *audiopriv, snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size);
 __PUBLIC int audio_hook_alsa_n(void *audiopriv, snd_pcm_t *pcm, void **bufs, snd_pcm_uframes_t size);
 
-__PUBLIC int audio_hook_alsa_mmap_begin(void *audiopriv, snd_pcm_t *pcm, const snd_pcm_channel_area_t *areas);
-__PUBLIC int audio_hook_alsa_mmap_commit(void *audiopriv, snd_pcm_t *pcm, snd_pcm_uframes_t offset, snd_pcm_uframes_t frames);
+__PUBLIC int audio_hook_alsa_mmap_begin(void *audiopriv, snd_pcm_t *pcm,
+					const snd_pcm_channel_area_t *areas,
+					snd_pcm_uframes_t offset, snd_pcm_uframes_t frames);
+__PUBLIC int audio_hook_alsa_mmap_commit(void *audiopriv, snd_pcm_t *pcm,
+					 snd_pcm_uframes_t offset, snd_pcm_uframes_t frames);
 
 #endif
 

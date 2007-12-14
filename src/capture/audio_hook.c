@@ -36,6 +36,7 @@ struct audio_hook_stream_s {
 	glc_audio_i audio_i;
 	snd_pcm_t *pcm;
 	const snd_pcm_channel_area_t *mmap_areas;
+	snd_pcm_uframes_t frames, offset;
 	
 	unsigned int channels;
 	unsigned int rate;
@@ -284,7 +285,9 @@ int audio_hook_alsa_n(void *audiopriv, snd_pcm_t *pcm, void **bufs, snd_pcm_ufra
 	return 0;
 }
 
-int audio_hook_alsa_mmap_begin(void *audiopriv, snd_pcm_t *pcm, const snd_pcm_channel_area_t *areas)
+int audio_hook_alsa_mmap_begin(void *audiopriv, snd_pcm_t *pcm,
+			       const snd_pcm_channel_area_t *areas,
+			       snd_pcm_uframes_t offset, snd_pcm_uframes_t frames)
 {
 	struct audio_hook_private_s *audio_hook = (struct audio_hook_private_s *) audiopriv;
 	struct audio_hook_stream_s *stream;
@@ -298,10 +301,13 @@ int audio_hook_alsa_mmap_begin(void *audiopriv, snd_pcm_t *pcm, const snd_pcm_ch
 	}
 
 	stream->mmap_areas = areas;
+	stream->frames = frames;
+	stream->offset = offset;
 	return 0;
 }
 
-int audio_hook_alsa_mmap_commit(void *audiopriv, snd_pcm_t *pcm, snd_pcm_uframes_t offset, snd_pcm_uframes_t frames)
+int audio_hook_alsa_mmap_commit(void *audiopriv, snd_pcm_t *pcm,
+				snd_pcm_uframes_t offset, snd_pcm_uframes_t frames)
 {
 	struct audio_hook_private_s *audio_hook = (struct audio_hook_private_s *) audiopriv;
 	struct audio_hook_stream_s *stream;
@@ -319,22 +325,26 @@ int audio_hook_alsa_mmap_commit(void *audiopriv, snd_pcm_t *pcm, snd_pcm_uframes
 			 "snd_pcm_mmap_commit() before snd_pcm_mmap_begin()");
 		return EINVAL;
 	}
-	
+
+	if (offset != stream->offset)
+		util_log(audio_hook->glc, GLC_WARNING, "audio_hook",
+			 "offset=%lu != stream->offset=%lu", offset, stream->offset);
+
 	if (audio_hook_wait_for_thread(audio_hook, stream))
 		return 0;
 
 	if ((ret = audio_hook_set_data_size(stream, snd_pcm_frames_to_bytes(pcm, frames))))
 		return ret;
 	stream->capture_time = util_time(audio_hook->glc);
-	
-	if (stream->flags & GLC_AUDIO_INTERLEAVED)
+
+	if (stream->flags & GLC_AUDIO_INTERLEAVED) {
 		memcpy(stream->capture_data,
 		       audio_hook_alsa_mmap_pos(stream->mmap_areas, offset),
 		       stream->capture_size);
-	else if (stream->complex)
+	} else if (stream->complex) {
 		audio_hook_complex_to_interleaved(stream, stream->mmap_areas, offset,
-		                                     frames, stream->capture_data);
-	else {
+		                                  frames, stream->capture_data);
+	} else {
 		for (c = 0; c < stream->channels; c++)
 			memcpy(&stream->capture_data[c * snd_pcm_samples_to_bytes(stream->pcm, frames)],
 			       audio_hook_alsa_mmap_pos(&stream->mmap_areas[c], offset),

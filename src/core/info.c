@@ -219,7 +219,7 @@ void pic_info(struct info_private_s *info, glc_picture_header_t *pic_header)
 		print_time(stdout, info->time);
 		printf("picture\n");
 
-		printf("  timestamp   = %lu\n", pic_header->timestamp);
+		printf("  timestamp   = %llu\n", pic_header->timestamp);
 		printf("  ctx         = %d\n", pic_header->ctx);
 		printf("  size        = %ux%u\n", ctx->w, ctx->h);
 	} else if (info->glc->info_level >= INFO_PICTURE) {
@@ -275,8 +275,8 @@ void audio_info(struct info_private_s *info, glc_audio_header_t *audio_header)
 		print_time(stdout, info->time);
 		printf("audio packet\n");
 		printf("  stream      = %d\n", audio_header->audio);
-		printf("  timestamp   = %lu\n", audio_header->timestamp);
-		printf("  size        = %ld\n", audio_header->size);
+		printf("  timestamp   = %llu\n", audio_header->timestamp);
+		printf("  size        = %lld\n", audio_header->size);
 	} else if (info->glc->info_level >= INFO_AUDIO) {
 		print_time(stdout, info->time);
 		printf("audio packet\n");

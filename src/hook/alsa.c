@@ -325,7 +325,7 @@ int __alsa_snd_pcm_mmap_begin(snd_pcm_t *pcm, const snd_pcm_channel_area_t **are
 	INIT_GLC
 	int ret = alsa.snd_pcm_mmap_begin(pcm, areas, offset, frames);
 	if ((alsa.capture) && (ret >= 0) && (alsa.glc->flags & GLC_CAPTURE))
-		audio_hook_alsa_mmap_begin(alsa.audio_hook, pcm, *areas);
+		audio_hook_alsa_mmap_begin(alsa.audio_hook, pcm, *areas, *offset, *frames);
 	return ret;
 }
 
@@ -337,9 +337,14 @@ __PUBLIC snd_pcm_sframes_t snd_pcm_mmap_commit(snd_pcm_t *pcm, snd_pcm_uframes_t
 snd_pcm_sframes_t __alsa_snd_pcm_mmap_commit(snd_pcm_t *pcm, snd_pcm_uframes_t offset, snd_pcm_uframes_t frames)
 {
 	INIT_GLC
+	snd_pcm_uframes_t ret;
 	if (alsa.capture && (alsa.glc->flags & GLC_CAPTURE))
 		audio_hook_alsa_mmap_commit(alsa.audio_hook, pcm, offset,  frames);
-	return alsa.snd_pcm_mmap_commit(pcm, offset, frames);
+
+	ret = alsa.snd_pcm_mmap_commit(pcm, offset, frames);
+	if (ret != frames)
+		util_log(alsa.glc, GLC_WARNING, "alsa", "frames=%lu, ret=%ld", frames, ret);
+	return ret;
 }
 
 /**  \} */
