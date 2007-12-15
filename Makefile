@@ -2,8 +2,9 @@
 LD = gcc
 CC = gcc
 
-CFLAGS = -g -Wall -ansi -D_XOPEN_SOURCE=500
+CFLAGS = -g -Wall -ansi -D_XOPEN_SOURCE=500 -D_FILE_OFFSET_BITS=64
 LDFLAGS = -Wall -ansi
+FEATURES = -D_XOPEN_SOURCE=500 -D_FILE_OFFSET_BITS=64
 VISIBILITY = -fvisibility=hidden
 SO_CFLAGS = $(CFLAGS) $(VISIBILITY) -fPIC
 
@@ -26,13 +27,13 @@ RELEASE=$(VERSION).4.1
 # remove following lines to disable minilzo:
 MINILZO = support/minilzo/
 LZO_OBJ = $(BUILD)/minilzo.o
-USE_LZO = -D__MINILZO -I$(MINILZO)
+FEATURES += -D__MINILZO -I$(MINILZO)
 
 # quicklz is licenced under GPL
 # remove following lines to disable quicklz:
 QUICKLZ = support/quicklz/
 QUICKLZ_OBJ = $(BUILD)/quicklz.o
-USE_QUICKLZ = -D__QUICKLZ -I$(QUICKLZ)
+FEATURES += -D__QUICKLZ -I$(QUICKLZ)
 
 HEADERS = $(COMMON)/glc.h \
 	  $(COMMON)/util.h \
@@ -143,7 +144,7 @@ $(BUILD)/glc-play: $(BUILD)/play.o $(BUILD)/libglc-play.so.$(RELEASE)
 		-o $(BUILD)/glc-play $(BUILD)/play.o
 
 $(BUILD)/play.o: $(SRC)/play.c $(HEADERS)
-	$(CC) $(CFLAGS) -o $(BUILD)/play.o -c $(SRC)/play.c
+	$(CC) $(CFLAGS) $(FEATURES) -o $(BUILD)/play.o -c $(SRC)/play.c
 
 
 # capture app
@@ -151,92 +152,92 @@ $(BUILD)/glc-capture: $(BUILD)/capture.o
 	$(LD) $(LDFLAGS) -o $(BUILD)/glc-capture $(BUILD)/capture.o
 
 $(BUILD)/capture.o: $(SRC)/capture.c
-	$(CC) $(CFLAGS) -o $(BUILD)/capture.o -c $(SRC)/capture.c
+	$(CC) $(CFLAGS) $(FEATURES) -o $(BUILD)/capture.o -c $(SRC)/capture.c
 
 
 # common objects
 $(BUILD)/util.o: $(COMMON)/util.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/util.o -c $(COMMON)/util.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/util.o -c $(COMMON)/util.c
 
 $(BUILD)/thread.o: $(COMMON)/thread.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/thread.o -c $(COMMON)/thread.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/thread.o -c $(COMMON)/thread.c
 
 
 # glc core
 $(BUILD)/pack.o: $(CORE)/pack.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/pack.o -c $(CORE)/pack.c $(USE_LZO) $(USE_QUICKLZ)
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/pack.o -c $(CORE)/pack.c
 
 $(BUILD)/file.o: $(CORE)/file.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/file.o -c $(CORE)/file.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/file.o -c $(CORE)/file.c
 
 $(BUILD)/scale.o: $(CORE)/scale.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/scale.o -c $(CORE)/scale.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/scale.o -c $(CORE)/scale.c
 
 $(BUILD)/info.o: $(CORE)/info.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/info.o -c $(CORE)/info.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/info.o -c $(CORE)/info.c
 
 $(BUILD)/ycbcr.o: $(CORE)/ycbcr.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/ycbcr.o -c $(CORE)/ycbcr.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/ycbcr.o -c $(CORE)/ycbcr.c
 
 $(BUILD)/rgb.o: $(CORE)/rgb.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/rgb.o -c $(CORE)/rgb.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/rgb.o -c $(CORE)/rgb.c
 
 $(BUILD)/color.o: $(CORE)/color.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/color.o -c $(CORE)/color.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/color.o -c $(CORE)/color.c
 
 
 # capture
 $(BUILD)/gl_capture.o: $(CAPTURE)/gl_capture.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/gl_capture.o -c $(CAPTURE)/gl_capture.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/gl_capture.o -c $(CAPTURE)/gl_capture.c
 
 $(BUILD)/audio_hook.o: $(CAPTURE)/audio_hook.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/audio_hook.o -c $(CAPTURE)/audio_hook.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/audio_hook.o -c $(CAPTURE)/audio_hook.c
 
 $(BUILD)/audio_capture.o: $(CAPTURE)/audio_capture.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/audio_capture.o -c $(CAPTURE)/audio_capture.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/audio_capture.o -c $(CAPTURE)/audio_capture.c
 
 # play
 $(BUILD)/demux.o: $(PLAY)/demux.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/demux.o -c $(PLAY)/demux.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/demux.o -c $(PLAY)/demux.c
 
 $(BUILD)/gl_play.o: $(PLAY)/gl_play.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/gl_play.o -c $(PLAY)/gl_play.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/gl_play.o -c $(PLAY)/gl_play.c
 
 $(BUILD)/audio_play.o: $(PLAY)/audio_play.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/audio_play.o -c $(PLAY)/audio_play.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/audio_play.o -c $(PLAY)/audio_play.c
 
 
 # export
 $(BUILD)/img.o: $(EXPORT)/img.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/img.o -c $(EXPORT)/img.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/img.o -c $(EXPORT)/img.c
 
 $(BUILD)/wav.o: $(EXPORT)/wav.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/wav.o -c $(EXPORT)/wav.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/wav.o -c $(EXPORT)/wav.c
 
 $(BUILD)/yuv4mpeg.o: $(EXPORT)/yuv4mpeg.c $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/yuv4mpeg.o -c $(EXPORT)/yuv4mpeg.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/yuv4mpeg.o -c $(EXPORT)/yuv4mpeg.c
 
 
 # hook objects
 $(BUILD)/main.o: $(HOOK)/main.c $(HOOK)/lib.h $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/main.o -c $(HOOK)/main.c $(USE_LZO) $(USE_QUICKLZ)
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/main.o -c $(HOOK)/main.c
 
 $(BUILD)/alsa.o: $(HOOK)/alsa.c $(HOOK)/lib.h $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/alsa.o -c $(HOOK)/alsa.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/alsa.o -c $(HOOK)/alsa.c
 
 $(BUILD)/opengl.o: $(HOOK)/opengl.c $(HOOK)/lib.h $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/opengl.o -c $(HOOK)/opengl.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/opengl.o -c $(HOOK)/opengl.c
 
 $(BUILD)/x11.o: $(HOOK)/x11.c $(HOOK)/lib.h $(HEADERS)
-	$(CC) $(SO_CFLAGS) -o $(BUILD)/x11.o -c $(HOOK)/x11.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/x11.o -c $(HOOK)/x11.c
 
 
 # support code
 $(LZO_OBJ): $(MINILZO)minilzo.c $(MINILZO)lzoconf.h $(MINILZO)lzodefs.h $(MINILZO)minilzo.h
-	$(CC) $(SO_CFLAGS) -o $(LZO_OBJ) -c $(MINILZO)minilzo.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(LZO_OBJ) -c $(MINILZO)minilzo.c
 
 $(QUICKLZ_OBJ): $(QUICKLZ)quicklz.c $(QUICKLZ)quicklz.h
-	$(CC) $(SO_CFLAGS) -o $(QUICKLZ_OBJ) -c $(QUICKLZ)quicklz.c
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(QUICKLZ_OBJ) -c $(QUICKLZ)quicklz.c
 
 
 install-scripts: $(SCRIPTS)/encode.sh $(SCRIPTS)/capture.sh $(SCRIPTS)/play.sh
