@@ -383,6 +383,8 @@ void *wrapped_func(const char *symbol)
 		return &__opengl_glFinish;
 	else if (!strcmp(symbol, "snd_pcm_open"))
 		return &__alsa_snd_pcm_open;
+	else if (!strcmp(symbol, "snd_pcm_close"))
+		return &__alsa_snd_pcm_close;
 	else if (!strcmp(symbol, "snd_pcm_open_lconf"))
 		return &__alsa_snd_pcm_open_lconf;
 	else if (!strcmp(symbol, "snd_pcm_hw_params"))

@@ -24,6 +24,7 @@ __PUBLIC int audio_hook_close(void *audiopriv);
 
 __PUBLIC int audio_hook_alsa_open(void *audiopriv, snd_pcm_t *pcm, const char *name,
 				  snd_pcm_stream_t pcm_stream, int mode);
+__PUBLIC int audio_hook_alsa_close(void *audiopriv, snd_pcm_t *pcm);
 __PUBLIC int audio_hook_alsa_hw_params(void *audiopriv, snd_pcm_t *pcm, snd_pcm_hw_params_t *params);
 
 __PUBLIC int audio_hook_alsa_i(void *audiopriv, snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size);

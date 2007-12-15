@@ -44,6 +44,7 @@ struct alsa_private_s {
 	void *libasound_handle;
 	int (*snd_pcm_open)(snd_pcm_t **, const char *, snd_pcm_stream_t, int);
 	int (*snd_pcm_open_lconf)(snd_pcm_t **, const char *, snd_pcm_stream_t, int, snd_config_t *);
+	int (*snd_pcm_close)(snd_pcm_t *);
 	int (*snd_pcm_hw_params)(snd_pcm_t *, snd_pcm_hw_params_t *);
 	snd_pcm_sframes_t (*snd_pcm_writei)(snd_pcm_t *, const void *, snd_pcm_uframes_t);
 	snd_pcm_sframes_t (*snd_pcm_writen)(snd_pcm_t *, void **, snd_pcm_uframes_t);
@@ -248,6 +249,12 @@ void get_real_alsa()
 	if (!alsa.snd_pcm_open_lconf)
 		goto err;
 
+	alsa.snd_pcm_close =
+	  (int (*)(snd_pcm_t *))
+	    lib.dlsym(alsa.libasound_handle, "snd_pcm_close");
+	if (!alsa.snd_pcm_close)
+		goto err;
+
 	alsa.snd_pcm_writei =
 	  (snd_pcm_sframes_t (*)(snd_pcm_t *, const void *, snd_pcm_uframes_t))
 	    lib.dlsym(alsa.libasound_handle, "snd_pcm_writei");
@@ -293,6 +300,7 @@ int alsa_unhook_so(const char *soname)
 	/* don't look at 'elfhacks'... contains some serious black magic */
 	eh_set_rel(&so, "snd_pcm_open", alsa.snd_pcm_open);
 	eh_set_rel(&so, "snd_pcm_open_lconf", alsa.snd_pcm_open_lconf);
+	eh_set_rel(&so, "snd_pcm_close", alsa.snd_pcm_close);
 	eh_set_rel(&so, "snd_pcm_writei", alsa.snd_pcm_writei);
 	eh_set_rel(&so, "snd_pcm_writen", alsa.snd_pcm_writen);
 	eh_set_rel(&so, "snd_pcm_mmap_begin", alsa.snd_pcm_mmap_begin);
@@ -334,6 +342,20 @@ int __alsa_snd_pcm_open_lconf(snd_pcm_t **pcmp, const char *name, snd_pcm_stream
 	int ret = alsa.snd_pcm_open_lconf(pcmp, name, stream, mode, lconf);
 	if ((alsa.capture) && (ret == 0))
 		audio_hook_alsa_open(alsa.audio_hook, *pcmp, name, stream, mode);
+	return ret;
+}
+
+__PUBLIC int snd_pcm_close(snd_pcm_t *pcm)
+{
+	return __alsa_snd_pcm_close(pcm);
+}
+
+int __alsa_snd_pcm_close(snd_pcm_t *pcm)
+{
+	INIT_GLC
+	int ret = alsa.snd_pcm_close(pcm);
+	if ((alsa.capture) && (ret == 0))
+		audio_hook_alsa_close(alsa.audio_hook, pcm);
 	return ret;
 }
 

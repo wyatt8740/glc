@@ -111,7 +111,8 @@ int audio_hook_start(void *audiopriv, ps_buffer_t *to)
 
 	/* initialize all pending streams */
 	while (stream != NULL) {
-		audio_hook_stream_init(audio_hook, stream);
+		if ((stream->fmt) && (!stream->initialized))
+			audio_hook_stream_init(audio_hook, stream);
 		stream = stream->next;
 	}
 
@@ -188,7 +189,7 @@ int audio_hook_get_stream_alsa(struct audio_hook_private_s *audio_hook, snd_pcm_
 		memset(find, 0, sizeof(struct audio_hook_stream_s));
 		find->pcm = pcm;
 
-		find->audio_i = util_audio_stream_id(audio_hook->glc);
+		find->audio_i = 0; /* zero until it is initialized */
 		sem_init(&find->capture_finished, 0, 0);
 
 		sem_init(&find->capture_full, 0, 0);
@@ -319,6 +320,17 @@ int audio_hook_alsa_open(void *audiopriv, snd_pcm_t *pcm, const char *name,
 		 stream->audio_i, mode,
 		 mode & SND_PCM_ASYNC ? "yes" : "no",
 		 mode & SND_PCM_NONBLOCK ? "yes" : "no");
+
+	return 0;
+}
+
+int audio_hook_alsa_close(void *audiopriv, snd_pcm_t *pcm)
+{
+	struct audio_hook_private_s *audio_hook = audiopriv;
+	struct audio_hook_stream_s *stream;
+
+	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
+	stream->fmt = 0; /* no format -> do not initialize */
 
 	return 0;
 }
@@ -577,6 +589,10 @@ int audio_hook_stream_init(struct audio_hook_private_s *audio_hook, struct audio
 
 	if (!stream->fmt)
 		return EINVAL;
+
+	/* we need proper id for the stream */
+	if (stream->audio_i < 1)
+		stream->audio_i = util_audio_stream_id(audio_hook->glc);
 
 	util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
 		 "initializing stream %d", stream->audio_i);
