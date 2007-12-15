@@ -6,7 +6,7 @@
  */
 
 /* glc.h -- ALSA & OpenGL video capture tool
-  version 0.4.1, December 6th, 2007
+  version 0.4.2, December 15th, 2007
 
   Copyright (C) 2007 Pyry Haulos <pyry.haulos@gmail.com>
 
