@@ -231,6 +231,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* our cleanup */
+	util_log_close(&glc);
 	util_free_info(&glc);
 	util_free(&glc);
 

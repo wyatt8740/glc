@@ -30,7 +30,7 @@
 struct audio_play_private_s {
 	glc_t *glc;
 	glc_thread_t thread;
-	sem_t *finished;
+	sem_t finished;
 
 	glc_audio_i audio_i;
 	snd_pcm_t *pcm;
@@ -66,15 +66,15 @@ snd_pcm_format_t glc_fmt_to_pcm_fmt(glc_flags_t flags)
 	return 0;
 }
 
-int audio_play_init(glc_t *glc, ps_buffer_t *from, glc_audio_i audio, sem_t *finished)
+void *audio_play_init(glc_t *glc, ps_buffer_t *from, glc_audio_i audio)
 {
 	struct audio_play_private_s *audio_play = (struct audio_play_private_s *) malloc(sizeof(struct audio_play_private_s));
 	memset(audio_play, 0, sizeof(struct audio_play_private_s));
 
 	audio_play->glc = glc;
+	sem_init(&audio_play->finished, 0, 0);
 	audio_play->device = "default"; /** \todo make this configurable */
 	audio_play->audio_i = audio;
-	audio_play->finished = finished;
 
 	audio_play->thread.flags = GLC_THREAD_READ;
 	audio_play->thread.ptr = audio_play;
@@ -82,7 +82,21 @@ int audio_play_init(glc_t *glc, ps_buffer_t *from, glc_audio_i audio, sem_t *fin
 	audio_play->thread.finish_callback = &audio_play_finish_callback;
 	audio_play->thread.threads = 1;
 
-	return glc_thread_create(glc, &audio_play->thread, from, NULL);
+	if (glc_thread_create(glc, &audio_play->thread, from, NULL))
+		return NULL;
+
+	return audio_play;
+}
+
+int audio_play_wait(void *priv)
+{
+	struct audio_play_private_s *audio_play = priv;
+
+	sem_wait(&audio_play->finished);
+	sem_destroy(&audio_play->finished);
+	free(audio_play);
+
+	return 0;
 }
 
 void audio_play_finish_callback(void *priv, int err)
@@ -98,8 +112,7 @@ void audio_play_finish_callback(void *priv, int err)
 	if (audio_play->bufs)
 		free(audio_play->bufs);
 
-	sem_post(audio_play->finished);
-	free(audio_play);
+	sem_post(&audio_play->finished);
 }
 
 int audio_play_read_callback(glc_thread_state_t *state)

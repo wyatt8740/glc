@@ -34,7 +34,7 @@ struct demux_ctx_s {
 	ps_packet_t packet;
 
 	int running;
-	sem_t finished;
+	void *gl_play;
 
 	struct demux_ctx_s *next;
 };
@@ -45,7 +45,7 @@ struct demux_stream_s {
 	ps_packet_t packet;
 
 	int running;
-	sem_t finished;
+	void *audio_play;
 
 	struct demux_stream_s *next;
 };
@@ -291,9 +291,8 @@ int demux_video_get_ctx(struct demux_private_s *demux, glc_ctx_i ctx_i, struct d
 		if ((ret = ps_packet_init(&(*ctx)->packet, &(*ctx)->buffer)))
 			return ret;
 
-		sem_init(&(*ctx)->finished, 0, 0);
-		if ((ret = gl_play_init(demux->glc, &(*ctx)->buffer, (*ctx)->ctx_i, &(*ctx)->finished)))
-			return ret;
+		if (((*ctx)->gl_play = gl_play_init(demux->glc, &(*ctx)->buffer, (*ctx)->ctx_i)) == NULL)
+			return EAGAIN;
 		(*ctx)->running = 1;
 
 		(*ctx)->next = demux->ctx;
@@ -307,12 +306,11 @@ int demux_video_ctx_clean(struct demux_private_s *demux, struct demux_ctx_s *ctx
 	int ret;
 	ctx->running = 0;
 
-	if ((ret = sem_wait(&ctx->finished)))
+	if ((ret = gl_play_wait(ctx->gl_play)))
 		return ret;
 
 	ps_packet_destroy(&ctx->packet);
 	ps_buffer_destroy(&ctx->buffer);
-	sem_destroy(&ctx->finished);
 
 	return 0;
 }
@@ -393,10 +391,9 @@ int demux_audio_get_stream(struct demux_private_s *demux, glc_audio_i audio_i,
 		if ((ret = ps_packet_init(&(*stream)->packet, &(*stream)->buffer)))
 			return ret;
 
-		sem_init(&(*stream)->finished, 0, 0);
-		if ((ret = audio_play_init(demux->glc, &(*stream)->buffer,
-					   (*stream)->audio_i, &(*stream)->finished)))
-			return ret;
+		if (((*stream)->audio_play = audio_play_init(demux->glc, &(*stream)->buffer,
+							     (*stream)->audio_i)) == NULL)
+			return EAGAIN;
 		(*stream)->running = 1;
 
 		(*stream)->next = demux->stream;
@@ -431,12 +428,11 @@ int demux_audio_stream_clean(struct demux_private_s *demux, struct demux_stream_
 	int ret;
 	stream->running = 0;
 
-	if ((ret = sem_wait(&stream->finished)))
+	if ((ret = audio_play_wait(stream->audio_play)))
 		return ret;
 
 	ps_packet_destroy(&stream->packet);
 	ps_buffer_destroy(&stream->buffer);
-	sem_destroy(&stream->finished);
 
 	return 0;
 }

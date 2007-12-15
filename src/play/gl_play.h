@@ -17,7 +17,8 @@
 #include <packetstream.h>
 #include "../common/glc.h"
 
-__PUBLIC int gl_play_init(glc_t *glc, ps_buffer_t *from, glc_ctx_i ctx, sem_t *finished);
+__PUBLIC void *gl_play_init(glc_t *glc, ps_buffer_t *from, glc_ctx_i ctx);
+__PUBLIC int gl_play_wait(void *priv);
 
 #endif
 
