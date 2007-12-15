@@ -108,6 +108,8 @@ __PRIVATE int __x11_XPeekIfEvent(Display *display, XEvent *event_return, Bool ( 
 __PRIVATE Bool __x11_XF86VidModeSetGamma(Display *display, int screen, XF86VidModeGamma *Gamma);
 
 __PRIVATE int __alsa_snd_pcm_open(snd_pcm_t **pcmp, const char *name, snd_pcm_stream_t stream, int mode);
+__PRIVATE int __alsa_snd_pcm_open_lconf(snd_pcm_t **pcmp, const char *name, snd_pcm_stream_t stream, int mode, snd_config_t *lconf);
+__PRIVATE int __alsa_snd_pcm_hw_params(snd_pcm_t *pcm, snd_pcm_hw_params_t *params);
 __PRIVATE snd_pcm_sframes_t __alsa_snd_pcm_writei(snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size);
 __PRIVATE snd_pcm_sframes_t __alsa_snd_pcm_writen(snd_pcm_t *pcm, void **bufs, snd_pcm_uframes_t size);
 __PRIVATE int __alsa_snd_pcm_mmap_begin(snd_pcm_t *pcm, const snd_pcm_channel_area_t **areas, snd_pcm_uframes_t *offset, snd_pcm_uframes_t *frames);

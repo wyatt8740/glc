@@ -43,6 +43,8 @@ struct alsa_private_s {
 
 	void *libasound_handle;
 	int (*snd_pcm_open)(snd_pcm_t **, const char *, snd_pcm_stream_t, int);
+	int (*snd_pcm_open_lconf)(snd_pcm_t **, const char *, snd_pcm_stream_t, int, snd_config_t *);
+	int (*snd_pcm_hw_params)(snd_pcm_t *, snd_pcm_hw_params_t *);
 	snd_pcm_sframes_t (*snd_pcm_writei)(snd_pcm_t *, const void *, snd_pcm_uframes_t);
 	snd_pcm_sframes_t (*snd_pcm_writen)(snd_pcm_t *, void **, snd_pcm_uframes_t);
 	int (*snd_pcm_mmap_begin)(snd_pcm_t *, const snd_pcm_channel_area_t **,
@@ -62,6 +64,7 @@ int alsa_init(glc_t *glc)
 	alsa.glc = glc;
 	alsa.started = 0;
 	alsa.capture_stream = NULL;
+	alsa.audio_hook = NULL;
 
 	util_log(alsa.glc, GLC_DEBUG, "alsa", "initializing");
 
@@ -79,6 +82,16 @@ int alsa_init(glc_t *glc)
 		alsa_parse_capture_cfg(getenv("GLC_AUDIO_RECORD"));
 
 	get_real_alsa();
+
+	/* make sure libasound.so does not call our hooked functions */
+	alsa_unhook_so("*libasound.so*");
+
+	/* initialize audio hook system */
+	if (alsa.capture) {
+		if (!(alsa.audio_hook = audio_hook_init(alsa.glc)))
+			return EAGAIN;
+	}
+
 	return 0;
 }
 
@@ -131,16 +144,15 @@ int alsa_parse_capture_cfg(const char *cfg)
 int alsa_start(ps_buffer_t *buffer)
 {
 	struct alsa_capture_stream_s *stream = alsa.capture_stream;
+	int ret;
 
 	if (alsa.started)
 		return EINVAL;
 
-	/* make sure libasound.so does not call our hooked functions */
-	alsa_unhook_so("*libasound.so*");
-
-	if (alsa.capture) {
-		if (!(alsa.audio_hook = audio_hook_init(alsa.glc, buffer)))
-			return EAGAIN;
+	/* actually start audio hooks */
+	if (alsa.audio_hook) {
+		if ((ret = audio_hook_start(alsa.audio_hook, buffer)))
+			return ret;
 	}
 
 	/* start capture streams */
@@ -217,26 +229,43 @@ void get_real_alsa()
 	alsa.libasound_handle = lib.dlopen("libasound.so", RTLD_LAZY);
 	if (!alsa.libasound_handle)
 		goto err;
+
 	alsa.snd_pcm_open =
 	  (int (*)(snd_pcm_t **, const char *, snd_pcm_stream_t, int))
 	    lib.dlsym(alsa.libasound_handle, "snd_pcm_open");
 	if (!alsa.snd_pcm_open)
 		goto err;
+
+	alsa.snd_pcm_hw_params =
+	  (int (*)(snd_pcm_t *, snd_pcm_hw_params_t *))
+	    lib.dlsym(alsa.libasound_handle, "snd_pcm_hw_params");
+	if (!alsa.snd_pcm_hw_params)
+		goto err;
+
+	alsa.snd_pcm_open_lconf =
+	  (int (*)(snd_pcm_t **, const char *, snd_pcm_stream_t, int, snd_config_t *))
+	    lib.dlsym(alsa.libasound_handle, "snd_pcm_open_lconf");
+	if (!alsa.snd_pcm_open_lconf)
+		goto err;
+
 	alsa.snd_pcm_writei =
 	  (snd_pcm_sframes_t (*)(snd_pcm_t *, const void *, snd_pcm_uframes_t))
 	    lib.dlsym(alsa.libasound_handle, "snd_pcm_writei");
 	if (!alsa.snd_pcm_writei)
 		goto err;
+
 	alsa.snd_pcm_writen =
 	  (snd_pcm_sframes_t (*)(snd_pcm_t *, void **, snd_pcm_uframes_t))
 	    lib.dlsym(alsa.libasound_handle, "snd_pcm_writen");
 	if (!alsa.snd_pcm_writen)
 		goto err;
+
 	alsa.snd_pcm_mmap_begin =
 	  (int (*)(snd_pcm_t *, const snd_pcm_channel_area_t **, snd_pcm_uframes_t *, snd_pcm_uframes_t *))
 	    lib.dlsym(alsa.libasound_handle, "snd_pcm_mmap_begin");
 	if (!alsa.snd_pcm_mmap_begin)
 		goto err;
+
 	alsa.snd_pcm_mmap_commit =
 	  (snd_pcm_sframes_t (*)(snd_pcm_t *, snd_pcm_uframes_t, snd_pcm_uframes_t))
 	    lib.dlsym(alsa.libasound_handle, "snd_pcm_mmap_commit");
@@ -262,6 +291,8 @@ int alsa_unhook_so(const char *soname)
 		return ret;
 
 	/* don't look at 'elfhacks'... contains some serious black magic */
+	eh_set_rel(&so, "snd_pcm_open", alsa.snd_pcm_open);
+	eh_set_rel(&so, "snd_pcm_open_lconf", alsa.snd_pcm_open_lconf);
 	eh_set_rel(&so, "snd_pcm_writei", alsa.snd_pcm_writei);
 	eh_set_rel(&so, "snd_pcm_writen", alsa.snd_pcm_writen);
 	eh_set_rel(&so, "snd_pcm_mmap_begin", alsa.snd_pcm_mmap_begin);
@@ -284,7 +315,40 @@ int __alsa_snd_pcm_open(snd_pcm_t **pcmp, const char *name, snd_pcm_stream_t str
 	/* it is not necessarily safe to call glc_init() from write funcs
 	   especially async mode (initiated from signal) is troublesome */
 	INIT_GLC
-	return alsa.snd_pcm_open(pcmp, name, stream, mode);
+	int ret = alsa.snd_pcm_open(pcmp, name, stream, mode);
+	if ((alsa.capture) && (ret == 0))
+		audio_hook_alsa_open(alsa.audio_hook, *pcmp, name, stream, mode);
+	return ret;
+}
+
+__PUBLIC int snd_pcm_open_lconf(snd_pcm_t **pcmp, const char *name, snd_pcm_stream_t stream,
+				int mode, snd_config_t *lconf)
+{
+	return __alsa_snd_pcm_open_lconf(pcmp, name, stream, mode, lconf);
+}
+
+int __alsa_snd_pcm_open_lconf(snd_pcm_t **pcmp, const char *name, snd_pcm_stream_t stream,
+			      int mode, snd_config_t *lconf)
+{
+	INIT_GLC
+	int ret = alsa.snd_pcm_open_lconf(pcmp, name, stream, mode, lconf);
+	if ((alsa.capture) && (ret == 0))
+		audio_hook_alsa_open(alsa.audio_hook, *pcmp, name, stream, mode);
+	return ret;
+}
+
+__PUBLIC int snd_pcm_hw_params(snd_pcm_t *pcm, snd_pcm_hw_params_t *params)
+{
+	return __alsa_snd_pcm_hw_params(pcm, params);
+}
+
+int __alsa_snd_pcm_hw_params(snd_pcm_t *pcm, snd_pcm_hw_params_t *params)
+{
+	INIT_GLC
+	int ret = alsa.snd_pcm_hw_params(pcm, params);
+	if ((alsa.capture) && (ret == 0))
+		audio_hook_alsa_hw_params(alsa.audio_hook, pcm, params);
+	return ret;
 }
 
 __PUBLIC snd_pcm_sframes_t snd_pcm_writei(snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size)

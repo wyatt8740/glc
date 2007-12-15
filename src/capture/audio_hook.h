@@ -18,8 +18,13 @@
 #include <alsa/asoundlib.h>
 #include "../common/glc.h"
 
-__PUBLIC void *audio_hook_init(glc_t *glc, ps_buffer_t *to);
+__PUBLIC void *audio_hook_init(glc_t *glc);
+__PUBLIC int audio_hook_start(void *audiopriv, ps_buffer_t *to);
 __PUBLIC int audio_hook_close(void *audiopriv);
+
+__PUBLIC int audio_hook_alsa_open(void *audiopriv, snd_pcm_t *pcm, const char *name,
+				  snd_pcm_stream_t pcm_stream, int mode);
+__PUBLIC int audio_hook_alsa_hw_params(void *audiopriv, snd_pcm_t *pcm, snd_pcm_hw_params_t *params);
 
 __PUBLIC int audio_hook_alsa_i(void *audiopriv, snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size);
 __PUBLIC int audio_hook_alsa_n(void *audiopriv, snd_pcm_t *pcm, void **bufs, snd_pcm_uframes_t size);

@@ -35,25 +35,38 @@
 struct audio_hook_stream_s {
 	glc_audio_i audio_i;
 	snd_pcm_t *pcm;
+	int mode;
 	const snd_pcm_channel_area_t *mmap_areas;
 	snd_pcm_uframes_t frames, offset;
-	
+
 	unsigned int channels;
 	unsigned int rate;
 	glc_flags_t flags;
 	int complex;
 
-	int fmt;
+	int fmt, initialized;
 
 	ps_packet_t packet;
 
+	/* thread-related */
 	pthread_t capture_thread;
-	sem_t capture, capture_finished;
-	int capture_ready, capture_running;
+	sem_t capture_finished;
+	int capture_running;
+
+	/* for communicating with capture thread */
+	sem_t capture_empty, capture_full;
+
+	/* for locking access */
+	pthread_mutex_t write_mutex;
+	pthread_spinlock_t write_spinlock;
+
+	/* for busy waiting */
+	int capture_ready;
+
 	char *capture_data;
 	size_t capture_size, capture_data_size;
 	glc_utime_t capture_time;
-	
+
 	struct audio_hook_stream_s *next;
 };
 
@@ -61,53 +74,84 @@ struct audio_hook_private_s {
 	glc_t *glc;
 	ps_buffer_t *to;
 
+	int started;
+
 	struct audio_hook_stream_s *stream;
 };
 
 int audio_hook_get_stream_alsa(struct audio_hook_private_s *audio_hook, snd_pcm_t *pcm, struct audio_hook_stream_s **stream);
-int audio_hook_alsa_fmt(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream);
+int audio_hook_stream_init(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream);
 void *audio_hook_alsa_mmap_pos(const snd_pcm_channel_area_t *area, snd_pcm_uframes_t offset);
 int audio_hook_complex_to_interleaved(struct audio_hook_stream_s *stream, const snd_pcm_channel_area_t *areas, snd_pcm_uframes_t offset, snd_pcm_uframes_t frames, char *to);
 
 int audio_hook_wait_for_thread(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream);
+int audio_hook_lock_write(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream);
+int audio_hook_unlock_write(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream);
 int audio_hook_set_data_size(struct audio_hook_stream_s *stream, size_t size);
 void *audio_hook_thread(void *argptr);
 
 glc_flags_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt);
 
-void *audio_hook_init(glc_t *glc, ps_buffer_t *to)
+void *audio_hook_init(glc_t *glc)
 {
 	struct audio_hook_private_s *audio_hook = malloc(sizeof(struct audio_hook_private_s));
 	memset(audio_hook, 0, sizeof(struct audio_hook_private_s));
-	
+
 	audio_hook->glc = glc;
-	audio_hook->to = to;
 
 	return audio_hook;
 }
 
+int audio_hook_start(void *audiopriv, ps_buffer_t *to)
+{
+	struct audio_hook_private_s *audio_hook = audiopriv;
+	struct audio_hook_stream_s *stream = audio_hook->stream;
+
+	audio_hook->to = to;
+
+	/* initialize all pending streams */
+	while (stream != NULL) {
+		audio_hook_stream_init(audio_hook, stream);
+		stream = stream->next;
+	}
+
+	audio_hook->started = 1;
+
+	return 0;
+}
+
 int audio_hook_close(void *audiopriv)
 {
-	struct audio_hook_private_s *audio_hook = (struct audio_hook_private_s *) audiopriv;
+	struct audio_hook_private_s *audio_hook = audiopriv;
 	struct audio_hook_stream_s *del;
+
 	if (audio_hook == NULL)
 		return EINVAL;
-	
+
 	while (audio_hook->stream != NULL) {
 		del = audio_hook->stream;
 		audio_hook->stream = audio_hook->stream->next;
-		
+
 		if (del->capture_running) {
 			del->capture_running = 0;
-			sem_post(&del->capture);
+
+			/* tell thread to quit */
+			sem_post(&del->capture_full);
+
 			sem_wait(&del->capture_finished);
-			sem_destroy(&del->capture);
 			sem_destroy(&del->capture_finished);
+
+			sem_destroy(&del->capture_full);
+			sem_destroy(&del->capture_empty);
+
+			pthread_mutex_destroy(&del->write_mutex);
+			pthread_spin_destroy(&del->write_spinlock);
 		}
-		
+
 		if (del->capture_data)
 			free(del->capture_data);
-		ps_packet_destroy(&del->packet);
+		if (del->initialized)
+			ps_packet_destroy(&del->packet);
 		free(del);
 	}
 
@@ -144,10 +188,14 @@ int audio_hook_get_stream_alsa(struct audio_hook_private_s *audio_hook, snd_pcm_
 		memset(find, 0, sizeof(struct audio_hook_stream_s));
 		find->pcm = pcm;
 
-		ps_packet_init(&find->packet, audio_hook->to);
 		find->audio_i = util_audio_stream_id(audio_hook->glc);
-		sem_init(&find->capture, 0, 0);
 		sem_init(&find->capture_finished, 0, 0);
+
+		sem_init(&find->capture_full, 0, 0);
+		sem_init(&find->capture_empty, 0, 1);
+
+		pthread_mutex_init(&find->write_mutex, NULL);
+		pthread_spin_init(&find->write_spinlock, 0);
 
 		find->next = audio_hook->stream;
 		audio_hook->stream = find;
@@ -166,21 +214,25 @@ void *audio_hook_thread(void *argptr)
 	msg_hdr.type = GLC_MESSAGE_AUDIO;
 	hdr.audio = stream->audio_i;
 
+	stream->capture_ready = 1;
 	while (1) {
-		stream->capture_ready = 1;
-		sem_wait(&stream->capture);
+		sem_wait(&stream->capture_full);
 		stream->capture_ready = 0;
+
 		if (!stream->capture_running)
 			break;
 
 		hdr.timestamp = stream->capture_time;
 		hdr.size = stream->capture_size;
-		
+
 		ps_packet_open(&stream->packet, PS_PACKET_WRITE);
 		ps_packet_write(&stream->packet, &msg_hdr, GLC_MESSAGE_HEADER_SIZE);
 		ps_packet_write(&stream->packet, &hdr, GLC_AUDIO_HEADER_SIZE);
 		ps_packet_write(&stream->packet, stream->capture_data, hdr.size);
 		ps_packet_close(&stream->packet);
+
+		sem_post(&stream->capture_empty);
+		stream->capture_ready = 1;
 	}
 
 	sem_post(&stream->capture_finished);
@@ -189,15 +241,19 @@ void *audio_hook_thread(void *argptr)
 
 int audio_hook_wait_for_thread(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream)
 {
-	/**
-	 * \note this is ugly, but snd_pcm_...() functions can be called from
-	 *       signal handler (f.ex. async mode)
-	 */
-	while (!stream->capture_ready) {
-		if (audio_hook->glc->flags & GLC_AUDIO_ALLOW_SKIP)
-			goto busy;
-		sched_yield();
-	}
+	if (stream->mode & SND_PCM_ASYNC) {
+		/**
+		* \note this is ugly, but snd_pcm_...() functions can be called from
+		*       signal handler (f.ex. async mode)
+		*/
+		while (!stream->capture_ready) {
+			if (audio_hook->glc->flags & GLC_AUDIO_ALLOW_SKIP)
+				goto busy;
+			sched_yield();
+		}
+	} else
+		sem_wait(&stream->capture_empty);
+
 	return 0;
 busy:
 	util_log(audio_hook->glc, GLC_WARNING, "audio_hook",
@@ -205,18 +261,65 @@ busy:
 	return EBUSY;
 }
 
+int audio_hook_lock_write(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream)
+{
+	int ret = 0;
+	if (stream->mode & SND_PCM_ASYNC)
+		ret = pthread_spin_lock(&stream->write_spinlock);
+	else
+		ret = pthread_mutex_lock(&stream->write_mutex);
+	return ret;
+}
+
+int audio_hook_unlock_write(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream)
+{
+	int ret = 0;
+	if (stream->mode & SND_PCM_ASYNC)
+		ret = pthread_spin_unlock(&stream->write_spinlock);
+	else
+		ret = pthread_mutex_unlock(&stream->write_mutex);
+	return ret;
+}
+
 int audio_hook_set_data_size(struct audio_hook_stream_s *stream, size_t size)
 {
 	stream->capture_size = size;
 	if (size <= stream->capture_data_size)
 		return 0;
+
 	stream->capture_data_size = size;
+
 	if (stream->capture_data)
 		stream->capture_data = (char *) realloc(stream->capture_data, stream->capture_data_size);
 	else
 		stream->capture_data = (char *) malloc(stream->capture_data_size);
+
 	if (!stream->capture_data)
 		return ENOMEM;
+
+	return 0;
+}
+
+
+int audio_hook_alsa_open(void *audiopriv, snd_pcm_t *pcm, const char *name,
+			 snd_pcm_stream_t pcm_stream, int mode)
+{
+	struct audio_hook_private_s *audio_hook = audiopriv;
+	struct audio_hook_stream_s *stream;
+
+	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
+
+	stream->mode = mode;
+
+	util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
+		 "stream %d: opened device \"%s\"",
+		 stream->audio_i, name);
+	util_log(audio_hook->glc, GLC_DEBUG, "audio_hook",
+		 "stream %d: mode is 0x%02x (async=%s, nonblock=%s)",
+		 stream->audio_i, mode,
+		 mode & SND_PCM_ASYNC ? "yes" : "no",
+		 mode & SND_PCM_NONBLOCK ? "yes" : "no");
+
 	return 0;
 }
 
@@ -224,65 +327,72 @@ int audio_hook_alsa_i(void *audiopriv, snd_pcm_t *pcm, const void *buffer, snd_p
 {
 	struct audio_hook_private_s *audio_hook = (struct audio_hook_private_s *) audiopriv;
 	struct audio_hook_stream_s *stream;
-	int ret;
+	int ret = 0;
 
 	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
 
-	if (!stream->fmt) { /** \todo update this? */
-		if ((ret = audio_hook_alsa_fmt(audio_hook, stream)))
-			return ret;
+	if (!stream->initialized) {
+		ret = EINVAL;
+		goto unlock;
 	}
 
-	if (audio_hook_wait_for_thread(audio_hook, stream))
-		return 0;
+	if ((ret = audio_hook_lock_write(audio_hook, stream)))
+		return ret;
 
-	if (!stream->capture_ready) {
-		/*fprintf(stderr, "audio: capture thread not ready, skipping...\n");*/
-		return 0;
-	}
+	if ((ret = audio_hook_wait_for_thread(audio_hook, stream)))
+		goto unlock;
 
 	if ((ret = audio_hook_set_data_size(stream, snd_pcm_frames_to_bytes(pcm, size))))
-		return ret;
+		goto unlock;
 
 	stream->capture_time = util_time(audio_hook->glc);
 	memcpy(stream->capture_data, buffer, stream->capture_size);
-	sem_post(&stream->capture);
+	sem_post(&stream->capture_full);
 
-	return 0;
+unlock:
+	audio_hook_unlock_write(audio_hook, stream);
+	return ret;
 }
 
 int audio_hook_alsa_n(void *audiopriv, snd_pcm_t *pcm, void **bufs, snd_pcm_uframes_t size)
 {
 	struct audio_hook_private_s *audio_hook = (struct audio_hook_private_s *) audiopriv;
 	struct audio_hook_stream_s *stream;
-	int c, ret;
+	int c, ret = 0;
 
 	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
 
-	if (!stream->fmt) {
-		if ((ret = audio_hook_alsa_fmt(audio_hook, stream)))
-			return ret;
+	if (!stream->initialized) {
+		ret = EINVAL;
+		goto unlock;
 	}
+
+	if ((ret = audio_hook_lock_write(audio_hook, stream)))
+		return ret;
 
 	if (stream->flags & GLC_AUDIO_INTERLEAVED) {
 		util_log(audio_hook->glc, GLC_ERROR, "audio_hook",
 			 "stream format (interleaved) incompatible with snd_pcm_writen()");
-		return EINVAL;
+		ret = EINVAL;
+		goto unlock;
 	}
 
-	if (audio_hook_wait_for_thread(audio_hook, stream))
-		return 0;
+	if ((ret = audio_hook_wait_for_thread(audio_hook, stream)))
+		goto unlock;
 
 	if ((ret = audio_hook_set_data_size(stream, snd_pcm_frames_to_bytes(pcm, size))))
-		return ret;
+		goto unlock;
+
 	stream->capture_time = util_time(audio_hook->glc);
-	
 	for (c = 0; c < stream->channels; c++)
 		memcpy(&stream->capture_data[c * snd_pcm_samples_to_bytes(pcm, size)], bufs[c],
 		       snd_pcm_samples_to_bytes(pcm, size));
-	
-	sem_post(&stream->capture);
-	return 0;
+
+	sem_post(&stream->capture_full);
+
+unlock:
+	audio_hook_unlock_write(audio_hook, stream);
+	return ret;
 }
 
 int audio_hook_alsa_mmap_begin(void *audiopriv, snd_pcm_t *pcm,
@@ -292,13 +402,17 @@ int audio_hook_alsa_mmap_begin(void *audiopriv, snd_pcm_t *pcm,
 	struct audio_hook_private_s *audio_hook = (struct audio_hook_private_s *) audiopriv;
 	struct audio_hook_stream_s *stream;
 	int ret;
-	
+fprintf(stderr, "audio_hook_alsa_mmap_begin()\n");
+
 	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
 
-	if (!stream->fmt) {
-		if ((ret = audio_hook_alsa_fmt(audio_hook, stream)))
-			return ret;
+	if (!stream->initialized) {
+		audio_hook_unlock_write(audio_hook, stream);
+		return EINVAL;
 	}
+
+	if ((ret = audio_hook_lock_write(audio_hook, stream)))
+		return ret;
 
 	stream->mmap_areas = areas;
 	stream->frames = frames;
@@ -312,29 +426,31 @@ int audio_hook_alsa_mmap_commit(void *audiopriv, snd_pcm_t *pcm,
 	struct audio_hook_private_s *audio_hook = (struct audio_hook_private_s *) audiopriv;
 	struct audio_hook_stream_s *stream;
 	unsigned int c;
-	int ret;
+	int ret = 0;
+fprintf(stderr, "audio_hook_alsa_mmap_commit()\n");
 
 	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
-	
+
 	if (stream->channels == 0)
-		return 0; /* 0 channels :P */
+		goto unlock; /* 0 channels :P */
 
 	if (!stream->mmap_areas) {
 		/* this might actually happen */
 		util_log(audio_hook->glc, GLC_WARNING, "audio_hook",
 			 "snd_pcm_mmap_commit() before snd_pcm_mmap_begin()");
-		return EINVAL;
+		return EINVAL; /* not locked */
 	}
 
 	if (offset != stream->offset)
 		util_log(audio_hook->glc, GLC_WARNING, "audio_hook",
 			 "offset=%lu != stream->offset=%lu", offset, stream->offset);
 
-	if (audio_hook_wait_for_thread(audio_hook, stream))
-		return 0;
+	if ((ret = audio_hook_wait_for_thread(audio_hook, stream)))
+		goto unlock;
 
 	if ((ret = audio_hook_set_data_size(stream, snd_pcm_frames_to_bytes(pcm, frames))))
-		return ret;
+		goto unlock;
+
 	stream->capture_time = util_time(audio_hook->glc);
 
 	if (stream->flags & GLC_AUDIO_INTERLEAVED) {
@@ -350,9 +466,12 @@ int audio_hook_alsa_mmap_commit(void *audiopriv, snd_pcm_t *pcm,
 			       audio_hook_alsa_mmap_pos(&stream->mmap_areas[c], offset),
 			       snd_pcm_samples_to_bytes(stream->pcm, frames));
 	}
-	
-	sem_post(&stream->capture);
-	return 0;
+
+	sem_post(&stream->capture_full);
+
+unlock:
+	audio_hook_unlock_write(audio_hook, stream);
+	return ret;
 }
 
 void *audio_hook_alsa_mmap_pos(const snd_pcm_channel_area_t *area, snd_pcm_uframes_t offset)
@@ -369,7 +488,7 @@ int audio_hook_complex_to_interleaved(struct audio_hook_stream_s *stream, const 
 	/** \note this is quite expensive operation */
 	unsigned int c;
 	size_t s, off, add, ssize;
-	
+
 	add = snd_pcm_frames_to_bytes(stream->pcm, 1);
 	ssize = snd_pcm_samples_to_bytes(stream->pcm, 1);
 
@@ -380,28 +499,26 @@ int audio_hook_complex_to_interleaved(struct audio_hook_stream_s *stream, const 
 			off += add;
 		}
 	}
-	
+
 	return 0;
 }
 
-int audio_hook_alsa_fmt(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream)
+int audio_hook_alsa_hw_params(void *audiopriv, snd_pcm_t *pcm, snd_pcm_hw_params_t *params)
 {
-	snd_pcm_hw_params_t *params;
+	struct audio_hook_private_s *audio_hook = audiopriv;
+	struct audio_hook_stream_s *stream;
+
 	snd_pcm_format_t format;
 	snd_pcm_uframes_t period_size;
 	snd_pcm_access_t access;
-	glc_message_header_t msg_hdr;
-	glc_audio_format_message_t fmt_msg;
 	int dir, ret;
+
+	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
+	if ((ret = audio_hook_lock_write(audio_hook, stream)))
+		return ret;
 
 	util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
 		 "creating/updating configuration for stream %d", stream->audio_i);
-
-	/* read configuration */
-	if ((ret = snd_pcm_hw_params_malloc(&params)) < 0)
-		goto err;
-	if ((ret = snd_pcm_hw_params_current(stream->pcm, params)) < 0)
-		goto err;
 
 	/* extract information */
 	if ((ret = snd_pcm_hw_params_get_format(params, &format)) < 0)
@@ -411,7 +528,8 @@ int audio_hook_alsa_fmt(struct audio_hook_private_s *audio_hook, struct audio_ho
 	if (stream->flags & GLC_AUDIO_FORMAT_UNKNOWN) {
 		util_log(audio_hook->glc, GLC_ERROR, "audio_hook",
 			 "unsupported audio format 0x%02x", format);
-		return ENOTSUP;
+		ret = ENOTSUP;
+		goto err;
 	}
 	if ((ret = snd_pcm_hw_params_get_rate(params, &stream->rate, &dir)) < 0)
 		goto err;
@@ -429,8 +547,46 @@ int audio_hook_alsa_fmt(struct audio_hook_private_s *audio_hook, struct audio_ho
 	} else {
 		util_log(audio_hook->glc, GLC_ERROR, "audio_hook",
 			 "unsupported access mode 0x%02x", access);
-		return ENOTSUP;
+		ret = ENOTSUP;
+		goto err;
 	}
+
+	util_log(audio_hook->glc, GLC_DEBUG, "audio_hook",
+		 "stream %d: %d channels, rate %d, flags 0x%02x",
+		 stream->audio_i, stream->channels, stream->rate, stream->flags);
+
+	stream->fmt = 1;
+	if (audio_hook->started) {
+		if ((ret = audio_hook_stream_init(audio_hook, stream)))
+			goto err;
+	}
+
+	audio_hook_unlock_write(audio_hook, stream);
+	return 0;
+
+err:
+	util_log(audio_hook->glc, GLC_ERROR, "audio_hook",
+		 "can't extract hardware configuration: %s (%d)", snd_strerror(ret), ret);
+
+	audio_hook_unlock_write(audio_hook, stream);
+	return ret;
+}
+
+int audio_hook_stream_init(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream)
+{
+	glc_message_header_t msg_hdr;
+	glc_audio_format_message_t fmt_msg;
+
+	if (!stream->fmt)
+		return EINVAL;
+
+	util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
+		 "initializing stream %d", stream->audio_i);
+
+	/* init packet */
+	if (stream->initialized)
+		ps_packet_destroy(&stream->packet);
+	ps_packet_init(&stream->packet, audio_hook->to);
 
 	/* prepare audio format message */
 	msg_hdr.type = GLC_MESSAGE_AUDIO_FORMAT;
@@ -443,28 +599,18 @@ int audio_hook_alsa_fmt(struct audio_hook_private_s *audio_hook, struct audio_ho
 	ps_packet_write(&stream->packet, &fmt_msg, GLC_AUDIO_FORMAT_MESSAGE_SIZE);
 	ps_packet_close(&stream->packet);
 
-	if (stream->capture_running) { /* kill old thread */
+	if (stream->capture_running) {
+		/* kill old thread */
 		stream->capture_running = 0;
-		sem_post(&stream->capture);
+		sem_post(&stream->capture_full);
 		sem_wait(&stream->capture_finished);
 	}
+
 	stream->capture_running = 1;
 	pthread_create(&stream->capture_thread, NULL, audio_hook_thread, stream);
 
-	stream->fmt = 1;
-	snd_pcm_hw_params_free(params);
-
-	util_log(audio_hook->glc, GLC_DEBUG, "audio_hook",
-		 "stream %d: %d channels, rate %d, flags 0x%02x",
-		 stream->audio_i, stream->channels, stream->rate, stream->flags);
-
+	stream->initialized = 1;
 	return 0;
-err:
-	if (params)
-		snd_pcm_hw_params_free(params);
-	util_log(audio_hook->glc, GLC_ERROR, "audio_hook",
-		 "can't extract hardware configuration: %s (%d)", snd_strerror(ret), ret);
-	return ret;
 }
 
 /**  \} */
