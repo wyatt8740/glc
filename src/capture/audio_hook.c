@@ -140,14 +140,15 @@ int audio_hook_close(void *audiopriv)
 			sem_post(&del->capture_full);
 
 			sem_wait(&del->capture_finished);
-			sem_destroy(&del->capture_finished);
-
-			sem_destroy(&del->capture_full);
-			sem_destroy(&del->capture_empty);
-
-			pthread_mutex_destroy(&del->write_mutex);
-			pthread_spin_destroy(&del->write_spinlock);
 		}
+
+		sem_destroy(&del->capture_finished);
+
+		sem_destroy(&del->capture_full);
+		sem_destroy(&del->capture_empty);
+
+		pthread_mutex_destroy(&del->write_mutex);
+		pthread_spin_destroy(&del->write_spinlock);
 
 		if (del->capture_data)
 			free(del->capture_data);
@@ -232,7 +233,8 @@ void *audio_hook_thread(void *argptr)
 		ps_packet_write(&stream->packet, stream->capture_data, hdr.size);
 		ps_packet_close(&stream->packet);
 
-		sem_post(&stream->capture_empty);
+		if (!(stream->mode & SND_PCM_ASYNC))
+			sem_post(&stream->capture_empty);
 		stream->capture_ready = 1;
 	}
 
@@ -330,6 +332,7 @@ int audio_hook_alsa_close(void *audiopriv, snd_pcm_t *pcm)
 	struct audio_hook_stream_s *stream;
 
 	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
+	util_log(audio_hook->glc, GLC_DEBUG, "audio_hook", "closing stream %d", stream->audio_i);
 	stream->fmt = 0; /* no format -> do not initialize */
 
 	return 0;
