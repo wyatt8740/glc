@@ -315,11 +315,8 @@ int audio_hook_alsa_open(void *audiopriv, snd_pcm_t *pcm, const char *name,
 	stream->mode = mode;
 
 	util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
-		 "stream %d: opened device \"%s\" (%p)",
-		 stream->audio_i, name, pcm);
-	util_log(audio_hook->glc, GLC_DEBUG, "audio_hook",
-		 "stream %d: mode is 0x%02x (async=%s, nonblock=%s)",
-		 stream->audio_i, mode,
+		 "%p: opened device \"%s\" with mode is 0x%02x (async=%s, nonblock=%s)",
+		 stream->pcm, name, mode,
 		 mode & SND_PCM_ASYNC ? "yes" : "no",
 		 mode & SND_PCM_NONBLOCK ? "yes" : "no");
 
@@ -532,7 +529,8 @@ int audio_hook_alsa_hw_params(void *audiopriv, snd_pcm_t *pcm, snd_pcm_hw_params
 		return ret;
 
 	util_log(audio_hook->glc, GLC_DEBUG, "audio_hook",
-		 "creating/updating configuration for stream %d", stream->audio_i);
+		 "%p: creating/updating configuration for stream %d",
+		 stream->pcm, stream->audio_i);
 
 	/* extract information */
 	if ((ret = snd_pcm_hw_params_get_format(params, &format)) < 0)
