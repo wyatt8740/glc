@@ -17,7 +17,8 @@
 #include <packetstream.h>
 #include "../common/glc.h"
 
-__PUBLIC int wav_init(glc_t *glc, ps_buffer_t *from);
+__PUBLIC void *wav_init(glc_t *glc, ps_buffer_t *from);
+__PUBLIC int wav_wait(void *wavpriv);
 
 #endif
 

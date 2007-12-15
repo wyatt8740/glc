@@ -17,7 +17,8 @@
 #include <packetstream.h>
 #include "../common/glc.h"
 
-__PUBLIC int file_init(glc_t *glc, ps_buffer_t *from);
+__PUBLIC void *file_init(glc_t *glc, ps_buffer_t *from);
+__PUBLIC int file_wait(void *filepriv);
 
 __PUBLIC int file_read(glc_t *glc, ps_buffer_t *to);
 

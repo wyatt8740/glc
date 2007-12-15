@@ -31,6 +31,7 @@
 struct yuv4mpeg_private_s {
 	glc_t *glc;
 	glc_thread_t thread;
+	sem_t finished;
 	unsigned int file_count;
 	FILE *to;
 
@@ -48,12 +49,13 @@ int yuv4mpeg_handle_hdr(struct yuv4mpeg_private_s *yuv4mpeg, glc_ctx_message_t *
 int yuv4mpeg_handle_pic(struct yuv4mpeg_private_s *yuv4mpeg, glc_picture_header_t *pic_header, char *data);
 int yuv4mpeg_write_pic(struct yuv4mpeg_private_s *yuv4mpeg, char *pic);
 
-int yuv4mpeg_init(glc_t *glc, ps_buffer_t *from)
+void *yuv4mpeg_init(glc_t *glc, ps_buffer_t *from)
 {
 	struct yuv4mpeg_private_s *yuv4mpeg = malloc(sizeof(struct yuv4mpeg_private_s));
 	memset(yuv4mpeg, 0, sizeof(struct yuv4mpeg_private_s));
 
 	yuv4mpeg->glc = glc;
+	sem_init(&yuv4mpeg->finished, 0, 0);
 	yuv4mpeg->fps = 1000000 / yuv4mpeg->glc->fps;
 
 	yuv4mpeg->thread.flags = GLC_THREAD_READ;
@@ -62,7 +64,21 @@ int yuv4mpeg_init(glc_t *glc, ps_buffer_t *from)
 	yuv4mpeg->thread.finish_callback = &yuv4mpeg_finish_callback;
 	yuv4mpeg->thread.threads = 1;
 
-	return glc_thread_create(glc, &yuv4mpeg->thread, from, NULL);
+	if (glc_thread_create(glc, &yuv4mpeg->thread, from, NULL))
+		return NULL;
+
+	return yuv4mpeg;
+}
+
+int yuv4mpeg_wait(void *yuv4mpegpriv)
+{
+	struct yuv4mpeg_private_s *yuv4mpeg = yuv4mpegpriv;
+
+	sem_wait(&yuv4mpeg->finished);
+	sem_destroy(&yuv4mpeg->finished);
+	free(yuv4mpeg);
+
+	return 0;
 }
 
 void yuv4mpeg_finish_callback(void *priv, int err)
@@ -72,8 +88,7 @@ void yuv4mpeg_finish_callback(void *priv, int err)
 	if (err)
 		util_log(yuv4mpeg->glc, GLC_ERROR, "yuv4mpeg", "%s (%d)", strerror(err), err);
 
-	sem_post(&yuv4mpeg->glc->signal[GLC_SIGNAL_YUV4MPEG_FINISHED]);
-	free(yuv4mpeg);
+	sem_post(&yuv4mpeg->finished);
 }
 
 int yuv4mpeg_read_callback(glc_thread_state_t *state)

@@ -18,9 +18,6 @@
 #include <stdarg.h>
 #include "glc.h"
 
-__PUBLIC int glc_create(glc_t **glc);
-__PUBLIC int glc_destroy(glc_t *glc);
-
 __PUBLIC int util_init(glc_t *glc);
 __PUBLIC int util_free(glc_t *glc);
 

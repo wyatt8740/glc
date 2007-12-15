@@ -81,6 +81,7 @@ struct ycbcr_ctx_s {
 struct ycbcr_private_s {
 	glc_t *glc;
 	glc_thread_t thread;
+	sem_t finished;
 
 	struct ycbcr_ctx_s *ctx;
 };
@@ -101,12 +102,13 @@ void ycbcr_bgr_to_jpeg420_half(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s
 void ycbcr_bgr_to_jpeg420_scale(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx,
 				unsigned char *from, unsigned char *to);
 
-int ycbcr_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
+void *ycbcr_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 {
 	struct ycbcr_private_s *ycbcr = malloc(sizeof(struct ycbcr_private_s));
 	memset(ycbcr, 0, sizeof(struct ycbcr_private_s));
 
 	ycbcr->glc = glc;
+	sem_init(&ycbcr->finished, 0, 0);
 
 	ycbcr->thread.flags = GLC_THREAD_READ | GLC_THREAD_WRITE;
 	ycbcr->thread.read_callback = &ycbcr_read_callback;
@@ -115,7 +117,21 @@ int ycbcr_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 	ycbcr->thread.ptr = ycbcr;
 	ycbcr->thread.threads = util_cpus();
 
-	return glc_thread_create(glc, &ycbcr->thread, from, to);
+	if (glc_thread_create(glc, &ycbcr->thread, from, to))
+		return NULL;
+
+	return ycbcr;
+}
+
+int ycbcr_wait(void *ycbcrpriv)
+{
+	struct ycbcr_private_s *ycbcr = ycbcrpriv;
+
+	sem_wait(&ycbcr->finished);
+	sem_destroy(&ycbcr->finished);
+	free(ycbcr);
+
+	return 0;
 }
 
 void ycbcr_finish_callback(void *ptr, int err)
@@ -139,8 +155,7 @@ void ycbcr_finish_callback(void *ptr, int err)
 		free(del);
 	}
 
-	sem_post(&ycbcr->glc->signal[GLC_SIGNAL_YCBCR_FINISHED]);
-	free(ycbcr);
+	sem_post(&ycbcr->finished);
 }
 
 int ycbcr_read_callback(glc_thread_state_t *state)

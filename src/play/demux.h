@@ -17,7 +17,8 @@
 #include <packetstream.h>
 #include "../common/glc.h"
 
-__PUBLIC int demux_init(glc_t *glc, ps_buffer_t *from);
+__PUBLIC void *demux_init(glc_t *glc, ps_buffer_t *from);
+__PUBLIC int demux_wait(void *demuxpriv);
 
 #endif
 

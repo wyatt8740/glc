@@ -60,6 +60,7 @@ struct color_ctx_s {
 struct color_private_s {
 	glc_t *glc;
 	glc_thread_t thread;
+	sem_t finished;
 	struct color_ctx_s *ctx;
 };
 
@@ -95,12 +96,13 @@ __inline__ unsigned char color_clamp(int val)
 	return val;
 }
 
-int color_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
+void *color_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 {
 	struct color_private_s *color = malloc(sizeof(struct color_private_s));
 	memset(color, 0, sizeof(struct color_private_s));
 
 	color->glc = glc;
+	sem_init(&color->finished, 0, 0);
 
 	color->thread.flags = GLC_THREAD_READ | GLC_THREAD_WRITE;
 	color->thread.read_callback = &color_read_callback;
@@ -109,7 +111,21 @@ int color_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 	color->thread.ptr = color;
 	color->thread.threads = util_cpus();
 
-	return glc_thread_create(glc, &color->thread, from, to);
+	if (glc_thread_create(glc, &color->thread, from, to))
+		return NULL;
+
+	return color;
+}
+
+int color_wait(void *colorpriv)
+{
+	struct color_private_s *color = colorpriv;
+
+	sem_wait(&color->finished);
+	sem_destroy(&color->finished);
+	free(color);
+
+	return 0;
 }
 
 void color_finish_callback(void *ptr, int err)
@@ -130,8 +146,7 @@ void color_finish_callback(void *ptr, int err)
 		free(del);
 	}
 
-	sem_post(&color->glc->signal[GLC_SIGNAL_COLOR_FINISHED]);
-	free(color);
+	sem_post(&color->finished);
 }
 
 int color_read_callback(glc_thread_state_t *state)

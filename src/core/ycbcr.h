@@ -17,7 +17,8 @@
 #include "../common/glc.h"
 #include <packetstream.h>
 
-__PUBLIC int ycbcr_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
+__PUBLIC void *ycbcr_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
+__PUBLIC int ycbcr_wait(void *ycbcrpriv);
 
 #endif
 

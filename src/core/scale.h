@@ -17,7 +17,8 @@
 #include <packetstream.h>
 #include "../common/glc.h"
 
-__PUBLIC int scale_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
+__PUBLIC void *scale_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
+__PUBLIC int scale_wait(void *scalepriv);
 
 #endif
 

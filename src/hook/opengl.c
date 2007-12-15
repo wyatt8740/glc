@@ -27,6 +27,7 @@
 struct opengl_private_s {
 	glc_t *glc;
 	ps_buffer_t *unscaled, *buffer;
+	void *ycbcr, *scale;
 	size_t unscaled_size;
 
 	void *libGL_handle;
@@ -154,9 +155,9 @@ int opengl_start(ps_buffer_t *buffer)
 		ps_buffer_init(opengl.unscaled, &attr);
 
 		if (opengl.glc->flags & GLC_CONVERT_420JPEG)
-			ycbcr_init(opengl.glc, opengl.unscaled, buffer);
+			opengl.ycbcr = ycbcr_init(opengl.glc, opengl.unscaled, buffer);
 		else
-			scale_init(opengl.glc, opengl.unscaled, buffer);
+			opengl.scale = scale_init(opengl.glc, opengl.unscaled, buffer);
 		lib.gl = gl_capture_init(opengl.glc, opengl.unscaled);
 	} else
 		lib.gl = gl_capture_init(opengl.glc, buffer);
@@ -186,9 +187,9 @@ int opengl_close()
 			ps_buffer_cancel(opengl.unscaled);
 
 		if (opengl.glc->flags & GLC_CONVERT_420JPEG)
-			sem_wait(&opengl.glc->signal[GLC_SIGNAL_YCBCR_FINISHED]);
+			ycbcr_wait(opengl.ycbcr);
 		else
-			sem_wait(&opengl.glc->signal[GLC_SIGNAL_SCALE_FINISHED]);
+			scale_wait(opengl.scale);
 	} else if (lib.running) {
 		if ((ret = util_write_end_of_stream(opengl.glc, opengl.buffer)))
 			return ret;

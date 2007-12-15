@@ -28,6 +28,7 @@ struct img_private_s {
 	glc_t *glc;
 	glc_utime_t fps;
 	glc_thread_t thread;
+	sem_t finished;
 
 	unsigned int w, h;
 	unsigned int row;
@@ -41,12 +42,13 @@ int img_read_callback(glc_thread_state_t *state);
 
 int write_pic(struct img_private_s *img, char *pic, unsigned int w, unsigned int h, int num);
 
-int img_init(glc_t *glc, ps_buffer_t *from)
+void *img_init(glc_t *glc, ps_buffer_t *from)
 {
 	struct img_private_s *img = malloc(sizeof(struct img_private_s));
 	memset(img, 0, sizeof(struct img_private_s));
 
 	img->glc = glc;
+	sem_init(&img->finished, 0, 0);
 	img->fps = 1000000 / img->glc->fps;
 	img->total = 0;
 
@@ -56,7 +58,21 @@ int img_init(glc_t *glc, ps_buffer_t *from)
 	img->thread.finish_callback = &img_finish_callback;
 	img->thread.threads = 1;
 
-	return glc_thread_create(glc, &img->thread, from, NULL);
+	if (glc_thread_create(glc, &img->thread, from, NULL))
+		return NULL;
+
+	return img;
+}
+
+int img_wait(void *imgpriv)
+{
+	struct img_private_s *img = imgpriv;
+
+	sem_wait(&img->finished);
+	sem_destroy(&img->finished);
+	free(img);
+
+	return 0;
 }
 
 void img_finish_callback(void *ptr, int err)
@@ -71,8 +87,7 @@ void img_finish_callback(void *ptr, int err)
 	if (img->prev_pic)
 		free(img->prev_pic);
 
-	sem_post(&img->glc->signal[GLC_SIGNAL_IMG_FINISHED]);
-	free(img);
+	sem_post(&img->finished);
 }
 
 int img_read_callback(glc_thread_state_t *state)

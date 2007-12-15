@@ -58,40 +58,6 @@
 /** file signature = "GLC" */
 #define GLC_SIGNATURE            0x00434c47
 
-/** \todo better signal framework */
-/** gl capture has finished */
-#define GLC_SIGNAL_GL_CAPTURE_FINISHED    0
-/** pack/unpack has finished */
-#define GLC_SIGNAL_PACK_FINISHED          1
-/** file has finished */
-#define GLC_SIGNAL_FILE_FINISHED          2
-/** img has finished */
-#define GLC_SIGNAL_IMG_FINISHED           3
-/** scale has finished */
-#define GLC_SIGNAL_SCALE_FINISHED         4
-/** info has finished */
-#define GLC_SIGNAL_INFO_FINISHED          5
-/** audio has finished */
-#define GLC_SIGNAL_AUDIO_FINISHED         6
-/** wav has finished */
-#define GLC_SIGNAL_WAV_FINISHED           7
-/** demux has finished */
-#define GLC_SIGNAL_DEMUX_FINISHED         8
-/** ycbcr has finished */
-#define GLC_SIGNAL_YCBCR_FINISHED         9
-/** yuv4mpeg has finished */
-#define GLC_SIGNAL_YUV4MPEG_FINISHED     10
-/** rgb has finished */
-#define GLC_SIGNAL_RGB_FINISHED          11
-/** gl playback has finished */
-#define GLC_SIGNAL_GL_PLAY_FINISHED      12
-/** color correction filter has finished */
-#define GLC_SIGNAL_COLOR_FINISHED        13
-/** decompression threads have finished */
-#define GLC_SIGNAL_UNPACK_FINISHED       14
-/** number of signals */
-#define GLC_SIGNALS                      15
-
 /** unsigned time in microseconds */
 typedef u_int64_t glc_utime_t;
 /** signed time in microseconds */
@@ -184,8 +150,6 @@ typedef struct {
 typedef struct {
 	/** active flags */
 	glc_flags_t flags;
-	/** signals */
-	sem_t signal[GLC_SIGNALS];
 	/** stream file */
 	char *stream_file;
 	/** log file */

@@ -17,7 +17,8 @@
 #include <packetstream.h>
 #include "../common/glc.h"
 
-__PUBLIC int img_init(glc_t *glc, ps_buffer_t *from);
+__PUBLIC void *img_init(glc_t *glc, ps_buffer_t *from);
+__PUBLIC int img_wait(void *imgpriv);
 
 #endif
 

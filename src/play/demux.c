@@ -53,6 +53,7 @@ struct demux_stream_s {
 struct demux_private_s {
 	glc_t *glc;
 	ps_buffer_t *from;
+	sem_t finished;
 
 	pthread_t thread;
 
@@ -82,18 +83,33 @@ int demux_audio_stream_send(struct demux_private_s *demux, struct demux_stream_s
 			 glc_message_header_t *header, char *data, size_t size);
 int demux_audio_stream_clean(struct demux_private_s *demux, struct demux_stream_s *stream);
 
-int demux_init(glc_t *glc, ps_buffer_t *from)
+void *demux_init(glc_t *glc, ps_buffer_t *from)
 {
 	struct demux_private_s *demux = (struct demux_private_s *) malloc(sizeof(struct demux_private_s));
 	memset(demux, 0, sizeof(struct demux_private_s));
 
 	demux->glc = glc;
+	sem_init(&demux->finished, 0, 0);
 	demux->from = from;
 
 	ps_bufferattr_init(&demux->bufferattr);
 	ps_bufferattr_setsize(&demux->bufferattr, glc->uncompressed_size);
 
-	return pthread_create(&demux->thread, NULL, demux_thread, demux);
+	if (pthread_create(&demux->thread, NULL, demux_thread, demux))
+		return NULL;
+
+	return demux;
+}
+
+int demux_wait(void *demuxpriv)
+{
+	struct demux_private_s *demux = demuxpriv;
+
+	sem_wait(&demux->finished);
+	sem_destroy(&demux->finished);
+	free(demux);
+
+	return 0;
 }
 
 int demux_close(struct demux_private_s *demux)
@@ -113,20 +129,7 @@ int demux_close(struct demux_private_s *demux)
 				 strerror(ret), ret);
 	}
 
-	util_log(demux->glc, GLC_DEBUG, "demux",
-		"&demux->glc->signal[GLC_SIGNAL_DEMUX_FINISHED]=%p",
-		&demux->glc->signal[GLC_SIGNAL_DEMUX_FINISHED]);
-
-	if ((ret = sem_post(&demux->glc->signal[GLC_SIGNAL_DEMUX_FINISHED]))) {
-		util_log(demux->glc, GLC_ERROR, "demux", "sem_post(): %s (%d)", strerror(ret), ret);
-		return ret;
-	}
-	
-	int val;
-	sem_getvalue(&demux->glc->signal[GLC_SIGNAL_DEMUX_FINISHED], &val);
-	util_log(demux->glc, GLC_DEBUG, "demux", "semaphore value is %d", val);
-
-	free(demux);
+	sem_post(&demux->finished);
 	return 0;
 }
 

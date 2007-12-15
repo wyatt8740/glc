@@ -29,13 +29,14 @@
 struct file_private_s {
 	glc_t *glc;
 	glc_thread_t thread;
+	sem_t finished;
 	FILE *to;
 };
 
 void file_finish_callback(void *ptr, int err);
 int file_read_callback(glc_thread_state_t *state);
 
-int file_init(glc_t *glc, ps_buffer_t *from)
+void *file_init(glc_t *glc, ps_buffer_t *from)
 {
 	struct file_private_s *file;
 
@@ -43,6 +44,7 @@ int file_init(glc_t *glc, ps_buffer_t *from)
 	memset(file, 0, sizeof(struct file_private_s));
 
 	file->glc = glc;
+	sem_init(&file->finished, 0, 0);
 
 	util_log(file->glc, GLC_INFORMATION, "file",
 		 "opening %s for stream", file->glc->stream_file);
@@ -69,13 +71,26 @@ int file_init(glc_t *glc, ps_buffer_t *from)
 	file->thread.finish_callback = &file_finish_callback;
 	file->thread.threads = 1;
 
-	return glc_thread_create(glc, &file->thread, from, NULL);
+	if (glc_thread_create(glc, &file->thread, from, NULL))
+		return NULL;
+
+	return file;
 
 cancel:
 	file->glc->flags |= GLC_CANCEL;
 	ps_buffer_cancel(from);
-	sem_post(&file->glc->signal[GLC_SIGNAL_FILE_FINISHED]);
-	return EAGAIN;
+	return NULL;
+}
+
+int file_wait(void *filepriv)
+{
+	struct file_private_s *file = filepriv;
+
+	sem_wait(&file->finished);
+	sem_destroy(&file->finished);
+	free(file);
+
+	return 0;
 }
 
 void file_finish_callback(void *ptr, int err)
@@ -89,8 +104,7 @@ void file_finish_callback(void *ptr, int err)
 		util_log(file->glc, GLC_ERROR, "file",
 			 "can't close file: %s (%d)", strerror(errno), errno);
 
-	sem_post(&file->glc->signal[GLC_SIGNAL_FILE_FINISHED]);
-	free(file);
+	sem_post(&file->finished);
 }
 
 int file_read_callback(glc_thread_state_t *state)

@@ -14,7 +14,8 @@
 #ifndef _YUV4MPEG_H
 #define _YUV4MPEG_H
 
-__PUBLIC int yuv4mpeg_init(glc_t *glc, ps_buffer_t *from);
+__PUBLIC void *yuv4mpeg_init(glc_t *glc, ps_buffer_t *from);
+__PUBLIC int yuv4mpeg_wait(void *yuv4mpegpriv);
 
 #endif
 

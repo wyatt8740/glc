@@ -185,8 +185,6 @@ void gl_capture_close(void *glpriv)
 		free(del);
 	}
 
-	sem_post(&gl_capture->glc->signal[GLC_SIGNAL_GL_CAPTURE_FINISHED]);
-
 	pthread_rwlock_destroy(&gl_capture->ctxlist_lock);
 	pthread_mutex_destroy(&gl_capture->init_pbo_mutex);
 

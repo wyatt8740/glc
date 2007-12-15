@@ -17,9 +17,11 @@
 #include <packetstream.h>
 #include "../common/glc.h"
 
-__PUBLIC int pack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
+__PUBLIC void *pack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
+__PUBLIC int pack_wait(void *packpriv);
 
-__PUBLIC int unpack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
+__PUBLIC void *unpack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
+__PUBLIC int unpack_wait(void *unpackpriv);
 
 #endif
 

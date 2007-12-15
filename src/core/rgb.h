@@ -17,7 +17,8 @@
 #include <packetstream.h>
 #include "../common/glc.h"
 
-__PUBLIC int rgb_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
+__PUBLIC void *rgb_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
+__PUBLIC int rgb_wait(void *rgbpriv);
 
 #endif
 

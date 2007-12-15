@@ -45,10 +45,13 @@ struct info_ctx_s {
 struct info_private_s {
 	glc_t *glc;
 	glc_thread_t thread;
+	sem_t finished;
+
 	glc_utime_t time;
 	int level;
 	int stream_info;
 	glc_ctx_i prev_ctx;
+
 	struct info_ctx_s *ctx_list;
 };
 
@@ -64,12 +67,13 @@ void color_info(struct info_private_s *info, glc_color_message_t *color_msg);
 
 void print_time(FILE *stream, glc_utime_t time);
 
-int info_init(glc_t *glc, ps_buffer_t *from)
+void *info_init(glc_t *glc, ps_buffer_t *from)
 {
 	struct info_private_s *info = malloc(sizeof(struct info_private_s));
 	memset(info, 0, sizeof(struct info_private_s));
 
 	info->glc = glc;
+	sem_init(&info->finished, 0, 0);
 	info->ctx_list = NULL;
 	info->time = 0;
 
@@ -79,7 +83,21 @@ int info_init(glc_t *glc, ps_buffer_t *from)
 	info->thread.finish_callback = &info_finish_callback;
 	info->thread.threads = 1;
 
-	return glc_thread_create(glc, &info->thread, from, NULL);
+	if (glc_thread_create(glc, &info->thread, from, NULL))
+		return NULL;
+
+	return info;
+}
+
+int info_wait(void *infopriv)
+{
+	struct info_private_s *info = infopriv;
+
+	sem_wait(&info->finished);
+	sem_destroy(&info->finished);
+	free(info);
+
+	return 0;
 }
 
 void info_finish_callback(void *ptr, int err)
@@ -97,8 +115,7 @@ void info_finish_callback(void *ptr, int err)
 		free(del);
 	}
 
-	sem_post(&info->glc->signal[GLC_SIGNAL_INFO_FINISHED]);
-	free(info);
+	sem_post(&info->finished);
 }
 
 int info_read_callback(glc_thread_state_t *state)

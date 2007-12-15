@@ -49,6 +49,7 @@
 struct pack_private_s {
 	glc_t *glc;
 	glc_thread_t thread;
+	sem_t finished;
 	size_t compress_min;
 };
 
@@ -63,12 +64,13 @@ int unpack_read_callback(glc_thread_state_t *state);
 int unpack_write_callback(glc_thread_state_t *state);
 void unpack_finish_callback(void *ptr, int err);
 
-int pack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
+void *pack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 {
 	struct pack_private_s *pack = malloc(sizeof(struct pack_private_s));
 	memset(pack, 0, sizeof(struct pack_private_s));
 
 	pack->glc = glc;
+	sem_init(&pack->finished, 0, 0);
 	pack->compress_min = 1024;
 
 	pack->thread.flags = GLC_THREAD_WRITE | GLC_THREAD_READ;
@@ -85,7 +87,7 @@ int pack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 		util_log(pack->glc, GLC_INFORMATION, "pack", "compressing using QuickLZ");
 #else
 		util_log(pack->glc, GLC_ERROR, "pack", "QuickLZ not supported");
-		return ENOTSUP;
+		return NULL;
 #endif
 	} else if (pack->glc->flags & GLC_COMPRESS_LZO) {
 #ifdef __LZO
@@ -94,14 +96,28 @@ int pack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 		lzo_init();
 #else
 		util_log(pack->glc, GLC_ERROR, "pack", "LZO not supported");
-		return ENOTSUP;
+		return NULL;
 #endif
 	} else {
 		util_log(pack->glc, GLC_ERROR, "pack", "no compression selected");
-		return EINVAL;
+		return NULL;
 	}
 
-	return glc_thread_create(glc, &pack->thread, from, to);
+	if (glc_thread_create(glc, &pack->thread, from, to))
+		return NULL;
+
+	return pack;
+}
+
+int pack_wait(void *packpriv)
+{
+	struct pack_private_s *pack = packpriv;
+
+	sem_wait(&pack->finished);
+	sem_destroy(&pack->finished);
+	free(pack);
+
+	return 0;
 }
 
 void pack_finish_callback(void *ptr, int err)
@@ -111,8 +127,7 @@ void pack_finish_callback(void *ptr, int err)
 	if (err)
 		util_log(pack->glc, GLC_ERROR, "pack", "%s (%d)", strerror(err), err);
 
-	sem_post(&pack->glc->signal[GLC_SIGNAL_PACK_FINISHED]);
-	free(pack);
+	sem_post(&pack->finished);
 }
 
 int pack_thread_create_callback(void *ptr, void **threadptr)
@@ -227,12 +242,13 @@ int pack_quicklz_write_callback(glc_thread_state_t *state)
 #endif
 }
 
-int unpack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
+void *unpack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 {
 	struct pack_private_s *pack = malloc(sizeof(struct pack_private_s));
 	memset(pack, 0, sizeof(struct pack_private_s));
 
 	pack->glc = glc;
+	sem_init(&pack->finished, 0, 0);
 
 	pack->thread.flags = GLC_THREAD_WRITE | GLC_THREAD_READ;
 	pack->thread.ptr = pack;
@@ -245,7 +261,21 @@ int unpack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 	lzo_init();
 #endif
 
-	return glc_thread_create(glc, &pack->thread, from, to);
+	if (glc_thread_create(glc, &pack->thread, from, to))
+		return NULL;
+
+	return pack;
+}
+
+int unpack_wait(void *unpackpriv)
+{
+	struct pack_private_s *pack = unpackpriv;
+
+	sem_wait(&pack->finished);
+	sem_destroy(&pack->finished);
+	free(pack);
+
+	return 0;
 }
 
 void unpack_finish_callback(void *ptr, int err)
@@ -255,8 +285,7 @@ void unpack_finish_callback(void *ptr, int err)
 	if (err)
 		util_log(pack->glc, GLC_ERROR, "unpack", "%s (%d)", strerror(err), err);
 
-	sem_post(&pack->glc->signal[GLC_SIGNAL_UNPACK_FINISHED]);
-	free(pack);
+	sem_post(&pack->finished);
 }
 
 int unpack_read_callback(glc_thread_state_t *state)

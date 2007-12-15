@@ -51,6 +51,7 @@ struct wav_data {
 struct wav_private_s {
 	glc_t *glc;
 	glc_thread_t thread;
+	sem_t finished;
 	unsigned int file_count;
 	
 	char *silence;
@@ -73,12 +74,13 @@ void wav_finish_callback(void *priv, int err);
 int wav_write_hdr(struct wav_private_s *wav, glc_audio_format_message_t *fmt_msg);
 int wav_write_audio(struct wav_private_s *wav, glc_audio_header_t *audio_msg, char *data);
 
-int wav_init(glc_t *glc, ps_buffer_t *from)
+void *wav_init(glc_t *glc, ps_buffer_t *from)
 {
 	struct wav_private_s *wav = (struct wav_private_s *) malloc(sizeof(struct wav_private_s));
 	memset(wav, 0, sizeof(struct wav_private_s));
 
 	wav->glc = glc;
+	sem_init(&wav->finished, 0, 0);
 
 	wav->silence_size = 1024;
 	wav->silence = (char *) malloc(wav->silence_size);
@@ -89,7 +91,21 @@ int wav_init(glc_t *glc, ps_buffer_t *from)
 	wav->thread.finish_callback = &wav_finish_callback;
 	wav->thread.threads = 1;
 
-	return glc_thread_create(glc, &wav->thread, from, NULL);
+	if (glc_thread_create(glc, &wav->thread, from, NULL))
+		return NULL;
+
+	return wav;
+}
+
+int wav_wait(void *wavpriv)
+{
+	struct wav_private_s *wav = wavpriv;
+
+	sem_wait(&wav->finished);
+	sem_destroy(&wav->finished);
+	free(wav);
+
+	return 0;
 }
 
 void wav_finish_callback(void *priv, int err)
@@ -102,9 +118,8 @@ void wav_finish_callback(void *priv, int err)
 	if (wav->to)
 		fclose(wav->to);
 
-	sem_post(&wav->glc->signal[GLC_SIGNAL_WAV_FINISHED]);
+	sem_post(&wav->finished);
 	free(wav->silence);
-	free(wav);
 }
 
 int wav_read_callback(glc_thread_state_t *state)

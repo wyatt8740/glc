@@ -56,6 +56,7 @@ struct scale_private_s {
 	glc_t *glc;
 	struct scale_ctx_s *ctx;
 	glc_thread_t thread;
+	sem_t finished;
 };
 
 int scale_read_callback(glc_thread_state_t *state);
@@ -81,12 +82,13 @@ void scale_ycbcr_half(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 void scale_ycbcr_scale(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 		       unsigned char *from, unsigned char *to);
 
-int scale_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
+void *scale_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 {
 	struct scale_private_s *scale = malloc(sizeof(struct scale_private_s));
 	memset(scale, 0, sizeof(struct scale_private_s));
 
 	scale->glc = glc;
+	sem_init(&scale->finished, 0, 0);
 
 	scale->thread.flags = GLC_THREAD_READ | GLC_THREAD_WRITE;
 	scale->thread.read_callback = &scale_read_callback;
@@ -95,7 +97,21 @@ int scale_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 	scale->thread.ptr = scale;
 	scale->thread.threads = util_cpus();
 
-	return glc_thread_create(glc, &scale->thread, from, to);
+	if (glc_thread_create(glc, &scale->thread, from, to))
+		return NULL;
+
+	return scale;
+}
+
+int scale_wait(void *scalepriv)
+{
+	struct scale_private_s *scale = scalepriv;
+
+	sem_wait(&scale->finished);
+	sem_destroy(&scale->finished);
+	free(scale);
+
+	return 0;
 }
 
 void scale_finish_callback(void *ptr, int err)
@@ -119,8 +135,7 @@ void scale_finish_callback(void *ptr, int err)
 		free(del);
 	}
 
-	sem_post(&scale->glc->signal[GLC_SIGNAL_SCALE_FINISHED]);
-	free(scale);
+	sem_post(&scale->finished);
 }
 
 int scale_read_callback(glc_thread_state_t *state) {
