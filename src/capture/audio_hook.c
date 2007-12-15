@@ -315,8 +315,8 @@ int audio_hook_alsa_open(void *audiopriv, snd_pcm_t *pcm, const char *name,
 	stream->mode = mode;
 
 	util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
-		 "stream %d: opened device \"%s\"",
-		 stream->audio_i, name);
+		 "stream %d: opened device \"%s\" (%p)",
+		 stream->audio_i, name, pcm);
 	util_log(audio_hook->glc, GLC_DEBUG, "audio_hook",
 		 "stream %d: mode is 0x%02x (async=%s, nonblock=%s)",
 		 stream->audio_i, mode,
@@ -332,7 +332,8 @@ int audio_hook_alsa_close(void *audiopriv, snd_pcm_t *pcm)
 	struct audio_hook_stream_s *stream;
 
 	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
-	util_log(audio_hook->glc, GLC_DEBUG, "audio_hook", "closing stream %d", stream->audio_i);
+	util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook", "closing stream %d (%p)",
+		 stream->audio_i, pcm);
 	stream->fmt = 0; /* no format -> do not initialize */
 
 	return 0;
@@ -530,7 +531,7 @@ int audio_hook_alsa_hw_params(void *audiopriv, snd_pcm_t *pcm, snd_pcm_hw_params
 	if ((ret = audio_hook_lock_write(audio_hook, stream)))
 		return ret;
 
-	util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
+	util_log(audio_hook->glc, GLC_DEBUG, "audio_hook",
 		 "creating/updating configuration for stream %d", stream->audio_i);
 
 	/* extract information */
@@ -598,7 +599,7 @@ int audio_hook_stream_init(struct audio_hook_private_s *audio_hook, struct audio
 		stream->audio_i = util_audio_stream_id(audio_hook->glc);
 
 	util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
-		 "initializing stream %d", stream->audio_i);
+		 "initializing stream %d (%p)", stream->audio_i, stream->pcm);
 
 	/* init packet */
 	if (stream->initialized)

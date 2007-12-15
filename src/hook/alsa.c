@@ -301,6 +301,7 @@ int alsa_unhook_so(const char *soname)
 	eh_set_rel(&so, "snd_pcm_open", alsa.snd_pcm_open);
 	eh_set_rel(&so, "snd_pcm_open_lconf", alsa.snd_pcm_open_lconf);
 	eh_set_rel(&so, "snd_pcm_close", alsa.snd_pcm_close);
+	eh_set_rel(&so, "snd_pcm_hw_params", alsa.snd_pcm_hw_params);
 	eh_set_rel(&so, "snd_pcm_writei", alsa.snd_pcm_writei);
 	eh_set_rel(&so, "snd_pcm_writen", alsa.snd_pcm_writen);
 	eh_set_rel(&so, "snd_pcm_mmap_begin", alsa.snd_pcm_mmap_begin);
