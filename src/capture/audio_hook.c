@@ -402,7 +402,6 @@ int audio_hook_alsa_mmap_begin(void *audiopriv, snd_pcm_t *pcm,
 	struct audio_hook_private_s *audio_hook = (struct audio_hook_private_s *) audiopriv;
 	struct audio_hook_stream_s *stream;
 	int ret;
-fprintf(stderr, "audio_hook_alsa_mmap_begin()\n");
 
 	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
 
@@ -427,7 +426,6 @@ int audio_hook_alsa_mmap_commit(void *audiopriv, snd_pcm_t *pcm,
 	struct audio_hook_stream_s *stream;
 	unsigned int c;
 	int ret = 0;
-fprintf(stderr, "audio_hook_alsa_mmap_commit()\n");
 
 	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
 
