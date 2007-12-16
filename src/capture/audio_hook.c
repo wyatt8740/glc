@@ -329,8 +329,8 @@ int audio_hook_alsa_close(void *audiopriv, snd_pcm_t *pcm)
 	struct audio_hook_stream_s *stream;
 
 	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
-	util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook", "closing stream %d (%p)",
-		 stream->audio_i, pcm);
+	util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook", "%p: closing stream %d",
+		 pcm, stream->audio_i);
 	stream->fmt = 0; /* no format -> do not initialize */
 
 	return 0;
@@ -539,7 +539,7 @@ int audio_hook_alsa_hw_params(void *audiopriv, snd_pcm_t *pcm, snd_pcm_hw_params
 	stream->flags |= pcm_fmt_to_glc_fmt(format);
 	if (stream->flags & GLC_AUDIO_FORMAT_UNKNOWN) {
 		util_log(audio_hook->glc, GLC_ERROR, "audio_hook",
-			 "unsupported audio format 0x%02x", format);
+			 "%p: unsupported audio format 0x%02x", stream->pcm, format);
 		ret = ENOTSUP;
 		goto err;
 	}
@@ -558,14 +558,14 @@ int audio_hook_alsa_hw_params(void *audiopriv, snd_pcm_t *pcm, snd_pcm_hw_params
 		stream->complex = 1; /* do conversion */
 	} else {
 		util_log(audio_hook->glc, GLC_ERROR, "audio_hook",
-			 "unsupported access mode 0x%02x", access);
+			 "%p: unsupported access mode 0x%02x", stream->pcm, access);
 		ret = ENOTSUP;
 		goto err;
 	}
 
 	util_log(audio_hook->glc, GLC_DEBUG, "audio_hook",
-		 "stream %d: %d channels, rate %d, flags 0x%02x",
-		 stream->audio_i, stream->channels, stream->rate, stream->flags);
+		 "%p: %d channels, rate %d, flags 0x%02x",
+		 stream->pcm, stream->channels, stream->rate, stream->flags);
 
 	stream->fmt = 1;
 	if (audio_hook->started) {
@@ -578,7 +578,8 @@ int audio_hook_alsa_hw_params(void *audiopriv, snd_pcm_t *pcm, snd_pcm_hw_params
 
 err:
 	util_log(audio_hook->glc, GLC_ERROR, "audio_hook",
-		 "can't extract hardware configuration: %s (%d)", snd_strerror(ret), ret);
+		 "%p: can't extract hardware configuration: %s (%d)",
+		 stream->pcm, snd_strerror(ret), ret);
 
 	audio_hook_unlock_write(audio_hook, stream);
 	return ret;
@@ -597,7 +598,7 @@ int audio_hook_stream_init(struct audio_hook_private_s *audio_hook, struct audio
 		stream->audio_i = util_audio_stream_id(audio_hook->glc);
 
 	util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
-		 "initializing stream %d (%p)", stream->audio_i, stream->pcm);
+		 "%p: initializing stream %d", stream->pcm, stream->audio_i);
 
 	/* init packet */
 	if (stream->initialized)
