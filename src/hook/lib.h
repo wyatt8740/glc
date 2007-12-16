@@ -113,6 +113,8 @@ __PRIVATE int __alsa_snd_pcm_close(snd_pcm_t *pcm);
 __PRIVATE int __alsa_snd_pcm_hw_params(snd_pcm_t *pcm, snd_pcm_hw_params_t *params);
 __PRIVATE snd_pcm_sframes_t __alsa_snd_pcm_writei(snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size);
 __PRIVATE snd_pcm_sframes_t __alsa_snd_pcm_writen(snd_pcm_t *pcm, void **bufs, snd_pcm_uframes_t size);
+__PRIVATE snd_pcm_sframes_t __alsa_snd_pcm_mmap_writei(snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size);
+__PRIVATE snd_pcm_sframes_t __alsa_snd_pcm_mmap_writen(snd_pcm_t *pcm, void **bufs, snd_pcm_uframes_t size);
 __PRIVATE int __alsa_snd_pcm_mmap_begin(snd_pcm_t *pcm, const snd_pcm_channel_area_t **areas, snd_pcm_uframes_t *offset, snd_pcm_uframes_t *frames);
 __PRIVATE snd_pcm_sframes_t __alsa_snd_pcm_mmap_commit(snd_pcm_t *pcm, snd_pcm_uframes_t offset, snd_pcm_uframes_t frames);
 /**  \} */
