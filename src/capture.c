@@ -270,6 +270,42 @@ int set_opt(struct glc_opt_s *option, const char *arg)
 		option->name, option->env, option->val, arg);
 	*/
 
+	/*
+	 Append current working directory to -o and -l
+	 if they don't start with /. Otherwise running capture
+	 against script can cause glc to write those files into different
+	 directory.
+	 */
+	char *fullpath;
+	size_t len, pos;
+	if ((option->short_name == 'o') || (option->short_name == 'l')) {
+		if (arg == NULL)
+			return EINVAL; /* no segfaults, thanks */
+
+		if (arg[0] != '/') {
+			fullpath = malloc(1024);
+			fullpath[0] = '\0'; /* just to make sure */
+
+			getcwd(fullpath, 1024);
+
+			pos = strlen(fullpath);
+			len = strlen(arg);
+			if (len + pos + 1 > 1024)
+				len = 1023 - pos;
+
+			fullpath[pos++] = '/';
+			memcpy(&fullpath[pos], arg, len);
+			fullpath[pos + len] = '\0';
+
+			setenv(option->env, fullpath, 1);
+
+			free(fullpath);
+
+			return 0;
+		}
+	}
+
+	/* otherwise just normal argument handling */
 	if (option->val == NULL) {
 		if (arg == NULL)
 			return EINVAL;

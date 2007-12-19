@@ -84,8 +84,6 @@ ask "  (${DEFAULT_CFLAGS})"
 ask-prompt
 read CFLAGS
 [ "${CFLAGS}" == "" ] && CFLAGS="${DEFAULT_CFLAGS}"
-# we need rwlocks
-CFLAGS="${CFLAGS} -D_XOPEN_SOURCE=500"
 
 ask "Enter linker optimizations. (-Wl,-O1)"
 ask-prompt
