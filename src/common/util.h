@@ -34,6 +34,7 @@ __PUBLIC int util_create_info(glc_t *glc);
 __PUBLIC int util_init_info(glc_t *glc);
 __PUBLIC int util_free_info(glc_t *glc);
 
+__PUBLIC void util_log_version(glc_t *glc);
 __PUBLIC void util_log_info(glc_t *glc);
 
 __PUBLIC long int util_cpus();

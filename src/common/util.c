@@ -418,6 +418,27 @@ int util_log_close(glc_t *glc)
 }
 
 /**
+ * \brief write glc version information to log
+ * \param glc glc
+ */
+void util_log_version(glc_t *glc)
+{
+	struct util_private_s *util = glc->util;
+
+	if (!(glc->flags & GLC_LOG))
+		return;
+
+	util_write_log_prefix(glc, util->log_file, GLC_INFORMATION, "util");
+	fprintf(util->log_file, "version %s\n", GLC_VERSION);
+
+	if (glc->log_level >= GLC_DEBUG) {
+		util_write_log_prefix(glc, util->log_file, GLC_DEBUG, "util");
+		fprintf(util->log_file, "%s %s, %s\n",
+			__DATE__, __TIME__, __VERSION__);
+	}
+}
+
+/**
  * \brief write stream and system information to log
  * \param glc glc
  */

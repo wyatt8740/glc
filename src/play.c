@@ -189,8 +189,10 @@ int main(int argc, char *argv[])
 
 	/* we do global initialization */
 	util_init(&glc);
-	if (glc.flags & GLC_LOG)
+	if (glc.flags & GLC_LOG) {
 		util_log_init(&glc);
+		util_log_version(&glc);
+	}
 
 	/* load information and check that the file is valid */
 	if (util_load_info(&glc, glc.stream_file))

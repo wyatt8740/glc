@@ -79,7 +79,9 @@ void init_glc()
 	if (mpriv.glc.flags & GLC_LOG) {
 		if (util_log_init(&mpriv.glc))
 			mpriv.glc.flags &= ~GLC_LOG;
+		util_log_version(&mpriv.glc);
 	}
+
 
 	if ((ret = init_buffers()))
 		goto err;
