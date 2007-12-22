@@ -1,3 +1,13 @@
+0.4.3 (2007/12/22)
+   Append current working directory into output file names if absolute
+    path is not specified. Fixes files appearing into different
+    directory when running glc-capture against some shell script
+    -wrapped applications.
+   Hook snd_pcm_mmap_writei() and snd_pcm_mmap_writen(). Fixes capturing
+    wine applications when "Hardware Acceleration" is not "Full".
+   Print out totals of each video and audio stream when extracting stream
+    information.
+
 0.4.2 (2007/12/15)
    Improved audio capture system:
     Lots of threading bug fixes.

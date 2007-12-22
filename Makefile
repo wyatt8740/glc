@@ -21,7 +21,7 @@ EXPORT = $(SRC)/export
 SCRIPTS = scripts
 
 VERSION=0
-RELEASE=$(VERSION).4.2
+RELEASE=$(VERSION).4.3
 
 # minilzo is licenced under GPL
 # remove following lines to disable minilzo:

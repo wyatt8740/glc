@@ -6,7 +6,7 @@
  */
 
 /* glc.h -- ALSA & OpenGL video capture tool
-  version 0.4.2, December 15th, 2007
+  version 0.4.3, December 22th, 2007
 
   Copyright (C) 2007 Pyry Haulos <pyry.haulos@gmail.com>
 
@@ -54,9 +54,11 @@
 #define __PRIVATE __attribute__ ((visibility ("hidden")))
 
 /** stream version */
-#define GLC_STREAM_VERSION              0x2
+#define GLC_STREAM_VERSION                  0x2
 /** file signature = "GLC" */
-#define GLC_SIGNATURE            0x00434c47
+#define GLC_SIGNATURE                0x00434c47
+/** glc version string */
+#define GLC_VERSION                     "0.4.3"
 
 /** unsigned time in microseconds */
 typedef u_int64_t glc_utime_t;
@@ -70,7 +72,7 @@ typedef int32_t glc_audio_i;
 /** size, used in stream to ensure compability */
 typedef u_int64_t glc_size_t;
 /** sizeof(glc_size_t) */
-#define GLC_SIZE_SIZE                     8
+#define GLC_SIZE_SIZE                         8
 
 /** flags */
 typedef u_int32_t glc_flags_t;
