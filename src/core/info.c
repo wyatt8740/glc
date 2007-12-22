@@ -34,12 +34,22 @@ struct info_ctx_s {
 	int created;
 	unsigned int w, h;
 	glc_ctx_i ctx_i;
+	glc_flags_t flags;
 	unsigned long pictures;
+	size_t bytes;
 
 	unsigned long fps;
 	glc_utime_t last_fps_time, fps_time;
 
 	struct info_ctx_s *next;
+};
+
+struct info_audio_s {
+	glc_audio_i audio_i;
+	unsigned long packets;
+	size_t bytes;
+
+	struct info_audio_s *next;
 };
 
 struct info_private_s {
@@ -53,7 +63,12 @@ struct info_private_s {
 	glc_ctx_i prev_ctx;
 
 	struct info_ctx_s *ctx_list;
+	struct info_audio_s *audio_list;
 };
+
+int info_get_ctx(struct info_private_s *info, struct info_ctx_s **ctx, glc_ctx_i ctx_i);
+int info_get_audio(struct info_private_s *info, struct info_audio_s **audio,
+		   glc_audio_i audio_i);
 
 void info_finish_callback(void *ptr, int err);
 int info_read_callback();
@@ -66,6 +81,7 @@ void stream_info(struct info_private_s *info);
 void color_info(struct info_private_s *info, glc_color_message_t *color_msg);
 
 void print_time(FILE *stream, glc_utime_t time);
+void print_bytes(FILE *stream, size_t bytes);
 
 void *info_init(glc_t *glc, ps_buffer_t *from)
 {
@@ -103,16 +119,38 @@ int info_wait(void *infopriv)
 void info_finish_callback(void *ptr, int err)
 {
 	struct info_private_s *info = (struct info_private_s *) ptr;
+	struct info_ctx_s *ctx;
+	struct info_audio_s *audio;
 
 	if (err)
 		fprintf(stderr, "info failed: %s (%d)\n", strerror(err), err);
 
-	struct info_ctx_s *del;
 	while (info->ctx_list != NULL) {
-		del = info->ctx_list;
+		ctx = info->ctx_list;
 		info->ctx_list = info->ctx_list->next;
 
-		free(del);
+		printf("video stream %d\n", ctx->ctx_i);
+		printf("  frames      = %lu\n", ctx->pictures);
+		printf("  fps         = %04.2f\n",
+		       (double) (ctx->pictures * 1000000) / (double) (info->time));
+		printf("  bytes       = "); print_bytes(stdout, ctx->bytes);
+		printf("  bps         = "); print_bytes(stdout, (ctx->bytes * 1000000) / info->time);
+
+		free(ctx);
+	}
+
+	while (info->audio_list != NULL) {
+		audio = info->audio_list;
+		info->audio_list = info->audio_list->next;
+
+		printf("audio stream %d\n", audio->audio_i);
+		printf("  packets     = %lu\n", audio->packets);
+		printf("  pps         = %04.2f\n",
+		       (double) (audio->packets * 1000000) / (double) (info->time));
+		printf("  bytes       = "); print_bytes(stdout, audio->bytes);
+		printf("  bps         = "); print_bytes(stdout, (audio->bytes * 1000000) / info->time);
+
+		free(audio);
 	}
 
 	sem_post(&info->finished);
@@ -170,6 +208,29 @@ int info_get_ctx(struct info_private_s *info, struct info_ctx_s **ctx, glc_ctx_i
 	return 0;
 }
 
+int info_get_audio(struct info_private_s *info, struct info_audio_s **audio,
+		   glc_audio_i audio_i)
+{
+	*audio = info->audio_list;
+
+	while (*audio != NULL) {
+		if ((*audio)->audio_i == audio_i)
+			break;
+		*audio = (*audio)->next;
+	}
+
+	if (*audio == NULL) {
+		*audio = malloc(sizeof(struct info_audio_s));
+		memset(*audio, 0, sizeof(struct info_audio_s));
+
+		(*audio)->next = info->audio_list;
+		info->audio_list = *audio;
+		(*audio)->audio_i = audio_i;
+	}
+
+	return 0;
+}
+
 #define INFO_FLAGS \
 	const char *__info_flag_op = "";
 #define INFO_FLAG(var, flag) \
@@ -187,6 +248,7 @@ void ctx_info(struct info_private_s *info, glc_ctx_message_t *ctx_message)
 
 	ctx->w = ctx_message->w;
 	ctx->h = ctx_message->h;
+	ctx->flags = ctx_message->flags;
 
 	if ((ctx_message->flags & GLC_CTX_UPDATE) && (!(ctx->created))) {
 		print_time(stdout, info->time);
@@ -252,6 +314,17 @@ void pic_info(struct info_private_s *info, glc_picture_header_t *pic_header)
 	ctx->pictures++;
 	ctx->fps++;
 
+	if (ctx->flags & GLC_CTX_BGR) {
+		ctx->bytes += ctx->w * ctx->h * 3;
+		if (ctx->flags & GLC_CTX_DWORD_ALIGNED)
+			ctx->bytes += ctx->h * (8 - (ctx->w * 3) % 8);
+	} else if (ctx->flags & GLC_CTX_BGRA) {
+		ctx->bytes += ctx->w * ctx->h * 4;
+		if (ctx->flags & GLC_CTX_DWORD_ALIGNED)
+			ctx->bytes += ctx->h * (8 - (ctx->w * 4) % 8);
+	} else if (ctx->flags & GLC_CTX_YCBCR_420JPEG)
+		ctx->bytes += (ctx->w * ctx->h * 3) / 2;
+
 	if ((info->glc->info_level >= INFO_FPS) && (pic_header->timestamp - ctx->fps_time >= 1000000)) {
 		print_time(stdout, info->time);
 		printf("ctx %d: %04.2f fps\n", ctx->ctx_i, (double) (ctx->fps * 1000000) / (double) (pic_header->timestamp - ctx->last_fps_time));
@@ -287,6 +360,11 @@ void audio_fmt_info(struct info_private_s *info, glc_audio_format_message_t *fmt
 void audio_info(struct info_private_s *info, glc_audio_header_t *audio_header)
 {
 	info->time = audio_header->timestamp;
+	struct info_audio_s *audio;
+
+	info_get_audio(info, &audio, audio_header->audio);
+	audio->packets++;
+	audio->bytes += audio_header->size;
 
 	if (info->glc->info_level >= INFO_AUDIO_DETAILED) {
 		print_time(stdout, info->time);
@@ -339,6 +417,18 @@ void stream_info(struct info_private_s *info)
 void print_time(FILE *stream, glc_utime_t time)
 {
 	fprintf(stream, "[%7.2fs] ", (double) time / 1000000.0);
+}
+
+void print_bytes(FILE *stream, size_t bytes)
+{
+	if (bytes >= 1024 * 1024 * 1024)
+		fprintf(stream, "%.2f GiB\n", (float) bytes / (float) (1024 * 1024 * 1024));
+	else if (bytes >= 1024 * 1024)
+		fprintf(stream, "%.2f MiB\n", (float) bytes / (float) (1024 * 1024));
+	else if (bytes >= 1024)
+		fprintf(stream, "%.2f KiB\n", (float) bytes / 1024.0f);
+	else
+		fprintf(stream, "%d B\n", (int) bytes);
 }
 
 /**  \} */
