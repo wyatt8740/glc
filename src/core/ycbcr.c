@@ -224,7 +224,7 @@ void ycbcr_get_ctx(struct ycbcr_private_s *ycbcr, glc_ctx_i ctx_i, struct ycbcr_
 void ycbcr_bgr_to_jpeg420(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx,
 			  unsigned char *from, unsigned char *to)
 {
-	unsigned int Cpix;
+	unsigned int Ypix;
 	unsigned int op1, op2, op3, op4;
 	unsigned char Rd, Gd, Bd;
 	unsigned int ox, oy, Yy, Yx;
@@ -234,37 +234,37 @@ void ycbcr_bgr_to_jpeg420(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx
 	Cb = &to[ctx->yw * ctx->yh];
 	Cr = &to[ctx->yw * ctx->yh + ctx->cw * ctx->ch];
 
-	Cpix = 0;
 	oy = (ctx->h - 2) * ctx->row;
 	ox = 0;
 
 	for (Yy = 0; Yy < ctx->yh; Yy += 2) {
 		for (Yx = 0; Yx < ctx->yw; Yx += 2) {
 			op1 = ox + oy;
-			op2 = ox + oy + ctx->bpp;
-			op3 = ox + oy + ctx->row;
-			op4 = ox + oy + ctx->row + ctx->bpp;
+			op2 = op1 + ctx->bpp;
+			op3 = op1 + ctx->row;
+			op4 = op2 + ctx->row;
 			Rd = (from[op1 + 2] + from[op2 + 2] + from[op3 + 2] + from[op4 + 2]) >> 2;
 			Gd = (from[op1 + 1] + from[op2 + 1] + from[op3 + 1] + from[op4 + 1]) >> 2;
 			Bd = (from[op1 + 0] + from[op2 + 0] + from[op3 + 0] + from[op4 + 0]) >> 2;
 
 			/* CbCr */
-			Cb[Cpix  ] = RGB_TO_YCbCrJPEG_Cb(Rd, Gd, Bd);
-			Cr[Cpix++] = RGB_TO_YCbCrJPEG_Cr(Rd, Gd, Bd);
+			*Cb++ = RGB_TO_YCbCrJPEG_Cb(Rd, Gd, Bd);
+			*Cr++ = RGB_TO_YCbCrJPEG_Cr(Rd, Gd, Bd);
 
 			/* Y' */
-			Y[(Yx + 0) + (Yy + 0) * ctx->yw] = RGB_TO_YCbCrJPEG_Y(from[op3 + 2],
-									      from[op3 + 1],
-									      from[op3 + 0]);
-			Y[(Yx + 1) + (Yy + 0) * ctx->yw] = RGB_TO_YCbCrJPEG_Y(from[op4 + 2],
-									      from[op4 + 1],
-									      from[op4 + 0]);
-			Y[(Yx + 0) + (Yy + 1) * ctx->yw] = RGB_TO_YCbCrJPEG_Y(from[op1 + 2],
-									      from[op1 + 1],
-									      from[op1 + 0]);
-			Y[(Yx + 1) + (Yy + 1) * ctx->yw] = RGB_TO_YCbCrJPEG_Y(from[op2 + 2],
-									      from[op2 + 1],
-									      from[op2 + 0]);
+			Ypix = Yx + Yy * ctx->yw;
+			Y[Ypix] = RGB_TO_YCbCrJPEG_Y(from[op3 + 2],
+						     from[op3 + 1],
+						     from[op3 + 0]);
+			Y[Ypix + 1] = RGB_TO_YCbCrJPEG_Y(from[op4 + 2],
+							 from[op4 + 1],
+							 from[op4 + 0]);
+			Y[Ypix + ctx->yw] = RGB_TO_YCbCrJPEG_Y(from[op1 + 2],
+							       from[op1 + 1],
+							       from[op1 + 0]);
+			Y[Ypix + 1 + ctx->yw] = RGB_TO_YCbCrJPEG_Y(from[op2 + 2],
+								   from[op2 + 1],
+								   from[op2 + 0]);
 			ox += ctx->bpp * 2;
 		}
 		ox = 0;
@@ -284,17 +284,15 @@ void ycbcr_bgr_to_jpeg420(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx
 void ycbcr_bgr_to_jpeg420_half(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx,
 			       unsigned char *from, unsigned char *to)
 {
-	unsigned int Cpix;
+	unsigned int Ypix;
 	unsigned int op1, op2, op3, op4;
 	unsigned char Rd, Gd, Bd;
 	unsigned int ox, oy, Yy, Yx;
-	unsigned char *Y, *Cb, *Cr;
+	unsigned char *Cb, *Cr;
 
-	Y = to;
 	Cb = &to[ctx->yw * ctx->yh];
 	Cr = &to[ctx->yw * ctx->yh + ctx->cw * ctx->ch];
 
-	Cpix = 0;
 	oy = (ctx->h - 4);
 	ox = 0;
 
@@ -302,21 +300,23 @@ void ycbcr_bgr_to_jpeg420_half(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s
 		for (Yx = 0; Yx < ctx->yw; Yx += 2) {
 			/* CbCr */
 			CALC_BILINEAR_RGB(ctx->bpp, ctx->bpp * 2, 1, 2)
-			Cb[Cpix  ] = RGB_TO_YCbCrJPEG_Cb(Rd, Gd, Bd);
-			Cr[Cpix++] = RGB_TO_YCbCrJPEG_Cr(Rd, Gd, Bd);
+			*Cb++ = RGB_TO_YCbCrJPEG_Cb(Rd, Gd, Bd);
+			*Cr++ = RGB_TO_YCbCrJPEG_Cr(Rd, Gd, Bd);
 
 			/* Y' */
+			Ypix = Yx + Yy * ctx->yw;
+
 			CALC_BILINEAR_RGB(0, ctx->bpp, 2, 3)
-			Y[(Yx + 0) + (Yy + 0) * ctx->yw] = RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd);
+			to[Ypix] = RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd);
 
 			CALC_BILINEAR_RGB(ctx->bpp * 2, ctx->bpp * 3, 2, 3)
-			Y[(Yx + 1) + (Yy + 0) * ctx->yw] = RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd);
+			to[Ypix + 1] = RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd);
 
 			CALC_BILINEAR_RGB(0, ctx->bpp, 0, 1)
-			Y[(Yx + 0) + (Yy + 1) * ctx->yw] = RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd);
+			to[Ypix + ctx->yw] = RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd);
 
 			CALC_BILINEAR_RGB(ctx->bpp * 2, ctx->bpp * 3, 0, 1)
-			Y[(Yx + 1) + (Yy + 1) * ctx->yw] = RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd);
+			to[Ypix + 1 + ctx->yw] = RGB_TO_YCbCrJPEG_Y(Rd, Gd, Bd);
 
 			ox += ctx->bpp * 4;
 		}

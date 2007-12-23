@@ -230,36 +230,29 @@ void scale_rgb_convert(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 void scale_rgb_half(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 		    unsigned char *from, unsigned char *to)
 {
-	unsigned int x, y, ox, oy, tp, op1, op2, op3, op4;
-	unsigned int swi = ctx->sw * 3;
-	unsigned int shi = ctx->sh * 3;
-	ox = oy = 0;
+	unsigned int ox, oy, op1, op2, op3, op4;
 
-	for (y = 0; y < shi; y += 3) {
-		for (x = 0; x < swi; x += 3) {
-			tp = x + y * ctx->sw;
-			op1 = (ox +        0) + (oy + 0) * ctx->row;
-			op2 = (ox + ctx->bpp) + (oy + 0) * ctx->row;
-			op3 = (ox +        0) + (oy + 1) * ctx->row;
-			op4 = (ox + ctx->bpp) + (oy + 1) * ctx->row;
-			ox += 2 * ctx->bpp;
+	for (oy = 0; oy < ctx->h; oy += 2) {
+		for (ox = 0; ox < ctx->w; ox += 2) {
+			op1 = ox * ctx->bpp + oy * ctx->row;
+			op2 = op1 + ctx->bpp;
+			op3 = op1 + ctx->row;
+			op4 = op2 + ctx->row;
 
-			to[tp + 0] = (from[op1 + 0] +
-				      from[op2 + 0] +
-				      from[op3 + 0] +
-				      from[op4 + 0]) >> 2;
-			to[tp + 1] = (from[op1 + 1] +
-				      from[op2 + 1] +
-				      from[op3 + 1] +
-				      from[op4 + 1]) >> 2;
-			to[tp + 2] = (from[op1 + 2] +
-				      from[op2 + 2] +
-				      from[op3 + 2] +
-				      from[op4 + 2]) >> 2;
+			*to++ = (from[op1 + 0] +
+				 from[op2 + 0] +
+				 from[op3 + 0] +
+				 from[op4 + 0]) >> 2;
+			*to++ = (from[op1 + 1] +
+				 from[op2 + 1] +
+				 from[op3 + 1] +
+				 from[op4 + 1]) >> 2;
+			*to++ = (from[op1 + 2] +
+				 from[op2 + 2] +
+				 from[op3 + 2] +
+				 from[op4 + 2]) >> 2;
 
 		}
-		oy += 2;
-		ox = 0;
 	}
 }
 
@@ -296,37 +289,35 @@ void scale_ycbcr_half(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 		      unsigned char *from, unsigned char *to)
 {
 	unsigned int x, y, ox, oy, cw_from, ch_from, cw_to, ch_to, op1, op2, op3, op4;
-	unsigned char *Y_to, *Cb_to, *Cr_to;
-	unsigned char *Y_from, *Cb_from, *Cr_from;
+	unsigned char *Cb_to, *Cr_to;
+	unsigned char *Cb_from, *Cr_from;
 
 	cw_from = ctx->w / 2;
 	ch_from = ctx->h / 2;
-	Y_from = from;
 	Cb_from = &from[ctx->w * ctx->h];
 	Cr_from = &Cb_from[cw_from * ch_from];
 
 	cw_to = ctx->sw / 2;
 	ch_to = ctx->sh / 2;
-	Y_to = to;
 	Cb_to = &to[ctx->sw * ctx->sh];
 	Cr_to = &Cb_to[cw_to * ch_to];
 
 	ox = oy = 0;
 	for (y = 0; y < ch_to; y++) {
 		for (x = 0; x < cw_to; x++) {
-			op1 = (oy + 0) * cw_from + (ox + 0);
-			op2 = (oy + 0) * cw_from + (ox + 1);
-			op3 = (oy + 1) * cw_from + (ox + 0);
-			op4 = (oy + 1) * cw_from + (ox + 1);
+			op1 = oy * cw_from + ox;
+			op2 = op1 + 1;
+			op3 = op2 + cw_from;
+			op4 = op2 + cw_from;
 
-			Cb_to[y * cw_to + x] = (Cb_from[op1] +
-						Cb_from[op2] +
-						Cb_from[op3] +
-						Cb_from[op4]) >> 2;
-			Cr_to[y * cw_to + x] = (Cr_from[op1] +
-						Cr_from[op2] +
-						Cr_from[op3] +
-						Cr_from[op4]) >> 2;
+			*Cb_to++ = (Cb_from[op1] +
+				    Cb_from[op2] +
+				    Cb_from[op3] +
+				    Cb_from[op4]) >> 2;
+			*Cr_to++ = (Cr_from[op1] +
+				    Cr_from[op2] +
+				    Cr_from[op3] +
+				    Cr_from[op4]) >> 2;
 
 			ox += 2;
 		}
@@ -337,15 +328,15 @@ void scale_ycbcr_half(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 	ox = oy = 0;
 	for (y = 0; y < ctx->sh; y++) {
 		for (x = 0; x < ctx->sw; x++) {
-			op1 = (oy + 0) * ctx->w + (ox + 0);
-			op2 = (oy + 0) * ctx->w + (ox + 1);
-			op3 = (oy + 1) * ctx->w + (ox + 0);
-			op4 = (oy + 1) * ctx->w + (ox + 1);
+			op1 = oy * ctx->w + ox;
+			op2 = op1 + 1;
+			op3 = op1 + ctx->w;
+			op4 = op2 + ctx->w;
 
-			Y_to[y * ctx->sw + x] = (Y_from[op1] +
-						 Y_from[op2] +
-						 Y_from[op3] +
-						 Y_from[op4]) >> 2;
+			*to++ = (from[op1] +
+				 from[op2] +
+				 from[op3] +
+				 from[op4]) >> 2;
 
 			ox += 2;
 		}
@@ -495,6 +486,8 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg, glc
 	} else if (ctx_msg->flags & GLC_CTX_YCBCR_420JPEG) {
 		ctx->sw -= ctx->sw % 2;
 		ctx->sh -= ctx->sh % 2;
+		ctx->rw -= ctx->rw % 2;
+		ctx->rh -= ctx->rh % 2;
 		ctx_msg->w = ctx->rw;
 		ctx_msg->h = ctx->rh;
 		ctx->size = ctx->rw * ctx->rh + 2 * ((ctx->rw / 2) * (ctx->rh / 2));
@@ -557,13 +550,13 @@ int scale_generate_rgb_map(struct scale_private_s *scale, struct scale_ctx_s *ct
 			tp = (x + y * ctx->sw) * 4;
 
 			ctx->pos[tp + 0] = ((unsigned int) ofx + 0) * ctx->bpp +
-			                   ((unsigned int) ofy + 0) * ctx->row;
+					   ((unsigned int) ofy + 0) * ctx->row;
 			ctx->pos[tp + 1] = ((unsigned int) ofx + 1) * ctx->bpp +
-			                   ((unsigned int) ofy + 0) * ctx->row;
+					   ((unsigned int) ofy + 0) * ctx->row;
 			ctx->pos[tp + 2] = ((unsigned int) ofx + 0) * ctx->bpp +
-			                   ((unsigned int) ofy + 1) * ctx->row;
+					   ((unsigned int) ofy + 1) * ctx->row;
 			ctx->pos[tp + 3] = ((unsigned int) ofx + 1) * ctx->bpp +
-			                   ((unsigned int) ofy + 1) * ctx->row;
+					   ((unsigned int) ofy + 1) * ctx->row;
 
 			fx1 = (float) x * d - (float) ((unsigned int) ofx);
 			fx0 = 1.0 - fx1;
@@ -616,13 +609,13 @@ int scale_generate_ycbcr_map(struct scale_private_s *scale, struct scale_ctx_s *
 			tp = (x + y * ctx->sw) * 4;
 
 			ctx->pos[tp + 0] = ((unsigned int) ofx + 0) +
-			                   ((unsigned int) ofy + 0) * ctx->w;
+					   ((unsigned int) ofy + 0) * ctx->w;
 			ctx->pos[tp + 1] = ((unsigned int) ofx + 1) +
-			                   ((unsigned int) ofy + 0) * ctx->w;
+					   ((unsigned int) ofy + 0) * ctx->w;
 			ctx->pos[tp + 2] = ((unsigned int) ofx + 0) +
-			                   ((unsigned int) ofy + 1) * ctx->w;
+					   ((unsigned int) ofy + 1) * ctx->w;
 			ctx->pos[tp + 3] = ((unsigned int) ofx + 1) +
-			                   ((unsigned int) ofy + 1) * ctx->w;
+					   ((unsigned int) ofy + 1) * ctx->w;
 
 			fx1 = (float) x * d - (float) ((unsigned int) ofx);
 			fx0 = 1.0 - fx1;
@@ -655,13 +648,13 @@ int scale_generate_ycbcr_map(struct scale_private_s *scale, struct scale_ctx_s *
 			tp = ctx->sw * ctx->sh * 4 + (x + y * cw) * 4;
 
 			ctx->pos[tp + 0] = ((unsigned int) ofx + 0) +
-			                   ((unsigned int) ofy + 0) * (ctx->w / 2);
+					   ((unsigned int) ofy + 0) * (ctx->w / 2);
 			ctx->pos[tp + 1] = ((unsigned int) ofx + 1) +
-			                   ((unsigned int) ofy + 0) * (ctx->w / 2);
+					   ((unsigned int) ofy + 0) * (ctx->w / 2);
 			ctx->pos[tp + 2] = ((unsigned int) ofx + 0) +
-			                   ((unsigned int) ofy + 1) * (ctx->w / 2);
+					   ((unsigned int) ofy + 1) * (ctx->w / 2);
 			ctx->pos[tp + 3] = ((unsigned int) ofx + 1) +
-			                   ((unsigned int) ofy + 1) * (ctx->w / 2);
+					   ((unsigned int) ofy + 1) * (ctx->w / 2);
 
 			fx1 = (float) x * d - (float) ((unsigned int) ofx);
 			fx0 = 1.0 - fx1;
