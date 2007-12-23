@@ -274,9 +274,9 @@ void ycbcr_bgr_to_jpeg420(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx
 
 #define CALC_BILINEAR_RGB(x0, x1, y0, y1) \
 	op1 = (ox + x0) + (oy + y0) * ctx->row; \
-	op2 = (ox + x1) + (oy + y0) * ctx->row; \
-	op3 = (ox + x0) + (oy + y1) * ctx->row; \
-	op4 = (ox + x1) + (oy + y1) * ctx->row; \
+	op2 = op1 + (x1 - x0); \
+	op3 = op1 + (y1 - y0) * ctx->row; \
+	op4 = op2 + (y1 - y0) * ctx->row; \
 	Rd = (from[op1 + 2] + from[op2 + 2] + from[op3 + 2] + from[op4 + 2]) >> 2; \
 	Gd = (from[op1 + 1] + from[op2 + 1] + from[op3 + 1] + from[op4 + 1]) >> 2; \
 	Bd = (from[op1 + 0] + from[op2 + 0] + from[op3 + 0] + from[op4 + 0]) >> 2;
