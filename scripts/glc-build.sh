@@ -26,11 +26,13 @@ die () {
 }
 
 download () {
-	wget -c -q "$1" || die "Can't fetch $1"
+	[ -f "$1.tar.gz" ] && rm -f "$1.tar.gz"
+	wget -q "http://nullkey.ath.cx/$1/$1.tar.gz" || die "Can't fetch $1"
 }
 
 unpack () {
-	tar -xzf "$1" || die "Can't unpack $1"
+	[ -d "$1" ] && rm -rdf "$1"
+	tar -xzf "$1.tar.gz" || die "Can't unpack $1.tar.gz"
 }
 
 gitfetch () {
@@ -123,14 +125,14 @@ if [ "${USE_GIT}" == "y" ]; then
 	fi
 else
 	info "Fetching sources..."
-	download "http://nullkey.ath.cx/elfhacks/elfhacks.tar.gz"
-	download "http://nullkey.ath.cx/packetstream/packetstream.tar.gz"
-	download "http://nullkey.ath.cx/glc/glc.tar.gz"
+	download elfhacks
+	download packetstream
+	download glc
 	
 	info "Unpacking sources..."
-	unpack "elfhacks.tar.gz"
-	unpack "packetstream.tar.gz"
-	unpack "glc.tar.gz"
+	unpack elfhacks
+	unpack packetstream
+	unpack glc
 fi
 
 info "Building elfhacks..."
