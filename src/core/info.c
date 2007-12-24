@@ -265,7 +265,7 @@ void ctx_info(struct info_private_s *info, glc_ctx_message_t *ctx_message)
 
 	print_time(stdout, info->time);
 	if (info->glc->info_level >= INFO_DETAILED_CTX) {
-		printf("ctx message\n");
+		printf("video stream format message\n");
 
 		printf("  ctx         = %d\n", ctx_message->ctx);
 		printf("  flags       = ");
@@ -279,7 +279,7 @@ void ctx_info(struct info_private_s *info, glc_ctx_message_t *ctx_message)
 		printf("  width       = %u\n", ctx_message->w);
 		printf("  height      = %u\n", ctx_message->h);
 	} else
-		printf("ctx %d\n", ctx_message->ctx);
+		printf("video stream %d\n", ctx_message->ctx);
 }
 
 void pic_info(struct info_private_s *info, glc_picture_header_t *pic_header)
@@ -303,7 +303,7 @@ void pic_info(struct info_private_s *info, glc_picture_header_t *pic_header)
 		printf("  size        = %ux%u\n", ctx->w, ctx->h);
 	} else if (info->glc->info_level >= INFO_PICTURE) {
 		print_time(stdout, info->time);
-		printf("picture\n");
+		printf("picture (ctx %d)\n", pic_header->ctx);
 	}
 
 	if ((info->glc->info_level >= INFO_DETAILED_PICTURE) && (info->prev_ctx != pic_header->ctx)) {
@@ -341,7 +341,7 @@ void audio_fmt_info(struct info_private_s *info, glc_audio_format_message_t *fmt
 	INFO_FLAGS
 	print_time(stdout, info->time);
 	if (info->glc->info_level >= INFO_DETAILED_AUDIO_FORMAT) {
-		printf("audio format message\n");
+		printf("audio stream format message\n");
 
 		printf("  stream      = %d\n", fmt_message->audio);
 		printf("  flags       = ");
@@ -354,7 +354,7 @@ void audio_fmt_info(struct info_private_s *info, glc_audio_format_message_t *fmt
 		printf("  rate        = %d\n", fmt_message->rate);
 		printf("  channels    = %d\n", fmt_message->channels);
 	} else
-		printf("audio format message\n");
+		printf("audio stream %d\n", fmt_message->audio);
 }
 
 void audio_info(struct info_private_s *info, glc_audio_header_t *audio_header)
@@ -374,7 +374,7 @@ void audio_info(struct info_private_s *info, glc_audio_header_t *audio_header)
 		printf("  size        = %ld\n", audio_header->size);
 	} else if (info->glc->info_level >= INFO_AUDIO) {
 		print_time(stdout, info->time);
-		printf("audio packet\n");
+		printf("audio packet (stream %d)\n", audio_header->audio);
 	}
 }
 

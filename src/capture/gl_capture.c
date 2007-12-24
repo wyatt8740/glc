@@ -699,7 +699,7 @@ int gl_capture_update_color(struct gl_capture_private_s *gl_capture, struct gl_c
 	msg.brightness = msg.contrast = 0;
 
 	util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
-		 "color correction: brightness=%f, contrast=%f, red=%f, green=%f, blue%f",
+		 "color correction: brightness=%f, contrast=%f, red=%f, green=%f, blue=%f",
 		 msg.brightness, msg.contrast, msg.red, msg.green, msg.blue);
 
 	if ((ret = ps_packet_open(&ctx->packet, PS_PACKET_WRITE)))
