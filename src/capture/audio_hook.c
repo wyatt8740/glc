@@ -429,6 +429,8 @@ int audio_hook_alsa_mmap_begin(void *audiopriv, snd_pcm_t *pcm,
 	stream->mmap_areas = areas;
 	stream->frames = frames;
 	stream->offset = offset;
+
+	audio_hook_unlock_write(audio_hook, stream);
 	return 0;
 }
 
@@ -441,6 +443,9 @@ int audio_hook_alsa_mmap_commit(void *audiopriv, snd_pcm_t *pcm,
 	int ret = 0;
 
 	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
+
+	if ((ret = audio_hook_lock_write(audio_hook, stream)))
+		return ret;
 
 	if (stream->channels == 0)
 		goto unlock; /* 0 channels :P */
