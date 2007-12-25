@@ -1,3 +1,6 @@
+0.4.4 (2007/12/25)
+   Fixed wine audio system hang.
+
 0.4.3 (2007/12/22)
    Append current working directory into output file names if absolute
     path is not specified. Fixes files appearing into different

@@ -400,7 +400,7 @@ void stream_info(struct info_private_s *info)
 
 	/* show stream info header */
 	if (info->glc->info) {
-		printf("GLC stream info\n");
+		printf("glc stream info\n");
 		printf("  signature   = 0x%08x\n", info->glc->info->signature);
 		printf("  version     = 0x%02x\n", info->glc->info->version);
 		printf("  flags       = %d\n", info->glc->info->flags);
@@ -409,7 +409,7 @@ void stream_info(struct info_private_s *info)
 		printf("  name        = %s\n", info->glc->info_name);
 		printf("  date        = %s\n", info->glc->info_date);
 	} else
-		printf("no GLC stream info available\n");
+		printf("no glc stream info available\n");
 
 	info->stream_info = 1;
 }
