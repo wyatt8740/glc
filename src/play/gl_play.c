@@ -311,7 +311,7 @@ int gl_handle_xevents(struct gl_play_private_s *gl_play, glc_thread_state_t *sta
 				gl_play->glc->flags |= GLC_CANCEL;
 			break;
 		case DestroyNotify:
-			state->flags |= GLC_THREAD_STOP;
+			gl_play->glc->flags |= GLC_CANCEL;
 			break;
 		case ClientMessage:
 			if (event.xclient.message_type == gl_play->wm_proto_atom) {
