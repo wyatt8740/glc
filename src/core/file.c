@@ -241,6 +241,7 @@ err:
 		goto finish; /* just cancel */
 
 	util_log(glc, GLC_ERROR, "file", "%s (%d)", strerror(ret), ret);
+	util_log(glc, GLC_DEBUG, "file", "packet size is %zd", packet_size);
 	close(fd);
 	ps_buffer_cancel(to);
 	return ret;
