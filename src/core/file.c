@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <fcntl.h>
 
 #include "../common/glc.h"
@@ -54,10 +55,18 @@ void *file_init(glc_t *glc, ps_buffer_t *from)
 	util_log(file->glc, GLC_INFORMATION, "file",
 		 "opening %s for stream", file->glc->stream_file);
 
-	file->fd = open(file->glc->stream_file, O_CREAT | O_WRONLY | O_TRUNC | O_SYNC);
+	file->fd = open(file->glc->stream_file,
+			O_CREAT | O_WRONLY | O_TRUNC | O_SYNC, 0644);
 
-	if (!file->fd) {
-		util_log(file->glc, GLC_ERROR, "file", "can't open %s", file->glc->stream_file);
+	if (file->fd == -1) {
+		util_log(file->glc, GLC_ERROR, "file", "can't open %s: %s (%d)",
+			 file->glc->stream_file, strerror(errno), errno);
+		goto cancel;
+	}
+
+	if (flock(file->fd, LOCK_EX | LOCK_NB) == -1) {
+		util_log(file->glc, GLC_ERROR, "file", "can't lock %s: %s (%d)",
+			 file->glc->stream_file, strerror(errno), errno);
 		goto cancel;
 	}
 
@@ -104,6 +113,11 @@ void file_finish_callback(void *ptr, int err)
 
 	if (err)
 		util_log(file->glc, GLC_ERROR, "file", "%s (%d)", strerror(err), err);
+
+	/* try to remove lock */
+	if (flock(file->fd, LOCK_UN) == -1)
+		util_log(file->glc, GLC_WARNING, "file", "can't unlock file: %s (%d)",
+			 strerror(errno), errno);
 
 	if (close(file->fd))
 		util_log(file->glc, GLC_ERROR, "file",
