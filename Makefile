@@ -2,7 +2,7 @@
 LD = gcc
 CC = gcc
 
-CFLAGS = -g -Wall -ansi -D_XOPEN_SOURCE=500 -D_FILE_OFFSET_BITS=64
+CFLAGS = -g -Wall -ansi
 LDFLAGS = -Wall -ansi
 FEATURES = -D_XOPEN_SOURCE=600 -D_FILE_OFFSET_BITS=64
 VISIBILITY = -fvisibility=hidden
