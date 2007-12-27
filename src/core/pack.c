@@ -295,7 +295,8 @@ int unpack_read_callback(glc_thread_state_t *state)
 		state->write_size = ((glc_lzo_header_t *) state->read_data)->size;
 		return 0;
 #else
-		util_log(pack->glc, GLC_ERROR, "unpack", "LZO not supported");
+		util_log(((struct pack_private_s *) state->ptr)->glc,
+			 GLC_ERROR, "unpack", "LZO not supported");
 		return ENOTSUP;
 #endif
 	} else if (state->header.type == GLC_MESSAGE_QUICKLZ) {
@@ -303,7 +304,8 @@ int unpack_read_callback(glc_thread_state_t *state)
 		state->write_size = ((glc_quicklz_header_t *) state->read_data)->size;
 		return 0;
 #else
-		util_log(pack->glc, GLC_ERROR, "unpack", "unpack: QuickLZ not supported");
+		util_log(((struct pack_private_s *) state->ptr)->glc,
+			 , GLC_ERROR, "unpack", "unpack: QuickLZ not supported");
 		return ENOTSUP;
 #endif
 	}
