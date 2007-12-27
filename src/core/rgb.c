@@ -90,7 +90,6 @@ struct rgb_ctx_s {
 struct rgb_private_s {
 	glc_t *glc;
 	glc_thread_t thread;
-	sem_t finished;
 
 	unsigned char *lookup_table;
 
@@ -118,7 +117,6 @@ void *rgb_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
 	memset(rgb, 0, sizeof(struct rgb_private_s));
 
 	rgb->glc = glc;
-	sem_init(&rgb->finished, 0, 0);
 
 	rgb_init_lookup(rgb);
 
@@ -139,8 +137,7 @@ int rgb_wait(void *rgbpriv)
 {
 	struct rgb_private_s *rgb = rgbpriv;
 
-	sem_wait(&rgb->finished);
-	sem_destroy(&rgb->finished);
+	glc_thread_wait(&rgb->thread);
 	free(rgb);
 
 	return 0;
@@ -164,8 +161,6 @@ void rgb_finish_callback(void *ptr, int err)
 
 	if (rgb->lookup_table)
 		free(rgb->lookup_table);
-
-	sem_post(&rgb->finished);
 }
 
 int rgb_read_callback(glc_thread_state_t *state)

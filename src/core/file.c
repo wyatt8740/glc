@@ -35,7 +35,6 @@
 struct file_private_s {
 	glc_t *glc;
 	glc_thread_t thread;
-	sem_t finished;
 	int fd;
 };
 
@@ -50,7 +49,6 @@ void *file_init(glc_t *glc, ps_buffer_t *from)
 	memset(file, 0, sizeof(struct file_private_s));
 
 	file->glc = glc;
-	sem_init(&file->finished, 0, 0);
 
 	util_log(file->glc, GLC_INFORMATION, "file",
 		 "opening %s for stream", file->glc->stream_file);
@@ -100,8 +98,7 @@ int file_wait(void *filepriv)
 {
 	struct file_private_s *file = filepriv;
 
-	sem_wait(&file->finished);
-	sem_destroy(&file->finished);
+	glc_thread_wait(&file->thread);
 	free(file);
 
 	return 0;
@@ -122,8 +119,6 @@ void file_finish_callback(void *ptr, int err)
 	if (close(file->fd))
 		util_log(file->glc, GLC_ERROR, "file",
 			 "can't close file: %s (%d)", strerror(errno), errno);
-
-	sem_post(&file->finished);
 }
 
 int file_read_callback(glc_thread_state_t *state)

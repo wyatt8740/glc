@@ -51,7 +51,6 @@ struct wav_data {
 struct wav_private_s {
 	glc_t *glc;
 	glc_thread_t thread;
-	sem_t finished;
 	unsigned int file_count;
 	
 	char *silence;
@@ -80,7 +79,6 @@ void *wav_init(glc_t *glc, ps_buffer_t *from)
 	memset(wav, 0, sizeof(struct wav_private_s));
 
 	wav->glc = glc;
-	sem_init(&wav->finished, 0, 0);
 
 	wav->silence_size = 1024;
 	wav->silence = (char *) malloc(wav->silence_size);
@@ -101,8 +99,7 @@ int wav_wait(void *wavpriv)
 {
 	struct wav_private_s *wav = wavpriv;
 
-	sem_wait(&wav->finished);
-	sem_destroy(&wav->finished);
+	glc_thread_wait(&wav->thread);
 	free(wav);
 
 	return 0;
@@ -118,7 +115,6 @@ void wav_finish_callback(void *priv, int err)
 	if (wav->to)
 		fclose(wav->to);
 
-	sem_post(&wav->finished);
 	free(wav->silence);
 }
 

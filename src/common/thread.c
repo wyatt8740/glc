@@ -36,6 +36,7 @@ struct glc_thread_private_s {
 	pthread_mutex_t open, finish;
 
 	glc_thread_t *thread;
+	size_t running_threads;
 
 	int stop;
 	int ret;
@@ -57,6 +58,7 @@ int glc_thread_create(glc_t *glc, glc_thread_t *thread, ps_buffer_t *from, ps_bu
 {
 	int ret;
 	struct glc_thread_private_s *private;
+	pthread_attr_t attr;
 	size_t t;
 
 	if (thread->threads < 1)
@@ -66,6 +68,7 @@ int glc_thread_create(glc_t *glc, glc_thread_t *thread, ps_buffer_t *from, ps_bu
 		return ENOMEM;
 	memset(private, 0, sizeof(struct glc_thread_private_s));
 
+	thread->priv = private;
 	private->glc = glc;
 	private->from = from;
 	private->to = to;
@@ -74,11 +77,50 @@ int glc_thread_create(glc_t *glc, glc_thread_t *thread, ps_buffer_t *from, ps_bu
 	pthread_mutex_init(&private->open, NULL);
 	pthread_mutex_init(&private->finish, NULL);
 
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
 	private->pthread_thread = malloc(sizeof(pthread_t) * thread->threads);
 	for (t = 0; t < thread->threads; t++) {
-		if ((ret = pthread_create(&private->pthread_thread[t], NULL, glc_thread, private)))
+		private->running_threads++;
+		if ((ret = pthread_create(&private->pthread_thread[t], &attr, glc_thread, private))) {
+			util_log(private->glc, GLC_ERROR, "glc_thread",
+				 "can't create thread: %s (%d)", strerror(ret), ret);
+			private->running_threads--;
 			return ret;
+		}
+		private->running_threads++;
 	}
+
+	pthread_attr_destroy(&attr);
+	return 0;
+}
+
+/**
+ * \brief block until threads have finished and clean up
+ * \param thread thread
+ * \return 0 on success otherwise an error code
+ */
+int glc_thread_wait(glc_thread_t *thread)
+{
+	struct glc_thread_private_s *private = thread->priv;
+	int ret;
+	size_t t;
+
+	for (t = 0; t < thread->threads; t++) {
+		if ((ret = pthread_join(private->pthread_thread[t], NULL))) {
+			util_log(private->glc, GLC_ERROR, "glc_thread",
+				 "can't join thread: %s (%d)", strerror(ret), ret);
+			return ret;
+		}
+	}
+
+	free(private->pthread_thread);
+	pthread_mutex_destroy(&private->finish);
+	pthread_mutex_destroy(&private->open);
+	free(private);
+	thread->priv = NULL;
+
 	return 0;
 }
 
@@ -264,13 +306,13 @@ finish:
 		thread->thread_finish_callback(state.ptr, state.threadptr, ret);
 
 	pthread_mutex_lock(&private->finish);
-	thread->threads--;
+	private->running_threads--;
 
 	/* let other threads know about the error */
 	if (ret)
 		private->ret = ret;
 
-	if (thread->threads > 0) {
+	if (private->running_threads > 0) {
 		pthread_mutex_unlock(&private->finish);
 		return NULL;
 	}
@@ -282,10 +324,6 @@ finish:
 	if (thread->finish_callback)
 		thread->finish_callback(state.ptr, private->ret);
 
-	free(private->pthread_thread);
-	pthread_mutex_destroy(&private->finish);
-	pthread_mutex_destroy(&private->open);
-	free(private);
 	return NULL;
 
 err:

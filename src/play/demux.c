@@ -53,7 +53,6 @@ struct demux_stream_s {
 struct demux_private_s {
 	glc_t *glc;
 	ps_buffer_t *from;
-	sem_t finished;
 
 	pthread_t thread;
 
@@ -85,18 +84,23 @@ int demux_audio_stream_clean(struct demux_private_s *demux, struct demux_stream_
 
 void *demux_init(glc_t *glc, ps_buffer_t *from)
 {
-	struct demux_private_s *demux = (struct demux_private_s *) malloc(sizeof(struct demux_private_s));
+	pthread_attr_t attr;
+	struct demux_private_s *demux = malloc(sizeof(struct demux_private_s));
 	memset(demux, 0, sizeof(struct demux_private_s));
 
 	demux->glc = glc;
-	sem_init(&demux->finished, 0, 0);
 	demux->from = from;
 
 	ps_bufferattr_init(&demux->bufferattr);
 	ps_bufferattr_setsize(&demux->bufferattr, glc->uncompressed_size);
 
-	if (pthread_create(&demux->thread, NULL, demux_thread, demux))
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	if (pthread_create(&demux->thread, &attr, demux_thread, demux))
 		return NULL;
+
+	pthread_attr_destroy(&attr);
 
 	return demux;
 }
@@ -105,8 +109,7 @@ int demux_wait(void *demuxpriv)
 {
 	struct demux_private_s *demux = demuxpriv;
 
-	sem_wait(&demux->finished);
-	sem_destroy(&demux->finished);
+	pthread_join(demux->thread, NULL);
 	free(demux);
 
 	return 0;
@@ -129,7 +132,6 @@ int demux_close(struct demux_private_s *demux)
 				 strerror(ret), ret);
 	}
 
-	sem_post(&demux->finished);
 	return 0;
 }
 

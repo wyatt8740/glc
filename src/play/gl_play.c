@@ -35,7 +35,6 @@
 struct gl_play_private_s {
 	glc_t *glc;
 	glc_thread_t play_thread;
-	sem_t finished;
 
 	glc_ctx_i ctx_i;
 	GLenum format;
@@ -78,7 +77,6 @@ void *gl_play_init(glc_t *glc, ps_buffer_t *from, glc_ctx_i ctx)
 	memset(gl_play, 0, sizeof(struct gl_play_private_s));
 
 	gl_play->glc = glc;
-	sem_init(&gl_play->finished, 0, 0);
 	gl_play->ctx_i = ctx;
 
 	gl_play->play_thread.flags = GLC_THREAD_READ;
@@ -105,8 +103,7 @@ int gl_play_wait(void *priv)
 {
 	struct gl_play_private_s *gl_play = priv;
 
-	sem_wait(&gl_play->finished);
-	sem_destroy(&gl_play->finished);
+	glc_thread_wait(&gl_play->play_thread);
 	free(gl_play);
 
 	return 0;
@@ -129,8 +126,6 @@ void gl_play_finish_callback(void *ptr, int err)
 	}
 
 	XCloseDisplay(gl_play->dpy);
-
-	sem_post(&gl_play->finished);
 }
 
 int gl_play_draw_picture(struct gl_play_private_s *gl_play, char *from)

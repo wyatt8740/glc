@@ -30,7 +30,6 @@
 struct audio_play_private_s {
 	glc_t *glc;
 	glc_thread_t thread;
-	sem_t finished;
 
 	glc_audio_i audio_i;
 	snd_pcm_t *pcm;
@@ -72,7 +71,6 @@ void *audio_play_init(glc_t *glc, ps_buffer_t *from, glc_audio_i audio)
 	memset(audio_play, 0, sizeof(struct audio_play_private_s));
 
 	audio_play->glc = glc;
-	sem_init(&audio_play->finished, 0, 0);
 	audio_play->device = audio_play->glc->alsa_playback_device;
 	audio_play->audio_i = audio;
 
@@ -92,8 +90,7 @@ int audio_play_wait(void *priv)
 {
 	struct audio_play_private_s *audio_play = priv;
 
-	sem_wait(&audio_play->finished);
-	sem_destroy(&audio_play->finished);
+	glc_thread_wait(&audio_play->thread);
 	free(audio_play);
 
 	return 0;
@@ -112,8 +109,6 @@ void audio_play_finish_callback(void *priv, int err)
 
 	if (audio_play->bufs)
 		free(audio_play->bufs);
-
-	sem_post(&audio_play->finished);
 }
 
 int audio_play_read_callback(glc_thread_state_t *state)

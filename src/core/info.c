@@ -55,7 +55,6 @@ struct info_audio_s {
 struct info_private_s {
 	glc_t *glc;
 	glc_thread_t thread;
-	sem_t finished;
 
 	glc_utime_t time;
 	int level;
@@ -89,7 +88,6 @@ void *info_init(glc_t *glc, ps_buffer_t *from)
 	memset(info, 0, sizeof(struct info_private_s));
 
 	info->glc = glc;
-	sem_init(&info->finished, 0, 0);
 	info->ctx_list = NULL;
 	info->time = 0;
 
@@ -109,8 +107,7 @@ int info_wait(void *infopriv)
 {
 	struct info_private_s *info = infopriv;
 
-	sem_wait(&info->finished);
-	sem_destroy(&info->finished);
+	glc_thread_wait(&info->thread);
 	free(info);
 
 	return 0;
@@ -152,8 +149,6 @@ void info_finish_callback(void *ptr, int err)
 
 		free(audio);
 	}
-
-	sem_post(&info->finished);
 }
 
 int info_read_callback(glc_thread_state_t *state)

@@ -28,7 +28,6 @@ struct img_private_s {
 	glc_t *glc;
 	glc_utime_t fps;
 	glc_thread_t thread;
-	sem_t finished;
 
 	unsigned int w, h;
 	unsigned int row;
@@ -48,7 +47,6 @@ void *img_init(glc_t *glc, ps_buffer_t *from)
 	memset(img, 0, sizeof(struct img_private_s));
 
 	img->glc = glc;
-	sem_init(&img->finished, 0, 0);
 	img->fps = 1000000 / img->glc->fps;
 	img->total = 0;
 
@@ -68,8 +66,7 @@ int img_wait(void *imgpriv)
 {
 	struct img_private_s *img = imgpriv;
 
-	sem_wait(&img->finished);
-	sem_destroy(&img->finished);
+	glc_thread_wait(&img->thread);
 	free(img);
 
 	return 0;
@@ -86,8 +83,6 @@ void img_finish_callback(void *ptr, int err)
 
 	if (img->prev_pic)
 		free(img->prev_pic);
-
-	sem_post(&img->finished);
 }
 
 int img_read_callback(glc_thread_state_t *state)

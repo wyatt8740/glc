@@ -79,6 +79,8 @@ typedef struct {
 	void *ptr;
 	/** number of threads to create */
 	size_t threads;
+	/** implementation specific */
+	void *priv;
 
 	/** thread create callback is called when a thread starts */
 	int (*thread_create_callback)(void *, void **);
@@ -105,6 +107,7 @@ typedef struct {
 } glc_thread_t;
 
 __PUBLIC int glc_thread_create(glc_t *glc, glc_thread_t *thread, ps_buffer_t *from, ps_buffer_t *to);
+__PUBLIC int glc_thread_wait(glc_thread_t *thread);
 
 #endif
 
