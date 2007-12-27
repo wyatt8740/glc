@@ -374,7 +374,7 @@ void util_log(glc_t *glc, int level, const char *module, const char *format, ...
 	    (!(glc->flags & GLC_NOERR))) {
 		va_start(ap, format);
 
-		util_write_log_prefix(glc, util->log_file, level, module);
+		util_write_log_prefix(glc, stderr, level, module);
 		vfprintf(stderr, format, ap);
 		fputc('\n', stderr);
 
