@@ -315,8 +315,14 @@ int gl_handle_xevents(struct gl_play_private_s *gl_play, glc_thread_state_t *sta
 			break;
 		case ClientMessage:
 			if (event.xclient.message_type == gl_play->wm_proto_atom) {
-				if ((Atom) event.xclient.data.l[0] == gl_play->wm_delete_window_atom)
+				if ((Atom) event.xclient.data.l[0] == gl_play->wm_delete_window_atom) {
+					/*
 					state->flags |= GLC_THREAD_STOP;
+					 this would kill just this single stream, but it confuses
+					 users, so...
+					*/
+					gl_play->glc->flags |= GLC_CANCEL;
+				}
 			}
 			break;
 		case ConfigureNotify:
