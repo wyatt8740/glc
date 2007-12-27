@@ -89,7 +89,6 @@ int glc_thread_create(glc_t *glc, glc_thread_t *thread, ps_buffer_t *from, ps_bu
 			private->running_threads--;
 			return ret;
 		}
-		private->running_threads++;
 	}
 
 	pthread_attr_destroy(&attr);

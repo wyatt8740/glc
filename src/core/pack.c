@@ -275,7 +275,6 @@ void unpack_finish_callback(void *ptr, int err)
 {
 	struct pack_private_s *pack = (struct pack_private_s *) ptr;
 
-	fprintf(stderr, "unpack_finish_callback()\n");
 	if (err)
 		util_log(pack->glc, GLC_ERROR, "unpack", "%s (%d)", strerror(err), err);
 }
