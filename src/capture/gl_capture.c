@@ -578,7 +578,8 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 		pic.timestamp = ctx->pbo_timestamp;
 	else
 		pic.timestamp = now;
-	
+
+	/* has gl_capture->fps microseconds elapsed since last capture */
 	if ((now - ctx->last < gl_capture->fps) &&
 	    !(gl_capture->glc->flags & GLC_LOCK_FPS))
 		goto finish;
@@ -628,7 +629,15 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 			usleep(gl_capture->fps + ctx->last - now);
 	}
 
+	/*
+	 We should accept framedrops (eg. not allow this difference
+	 to grow unlimited.
+	*/
 	ctx->last += gl_capture->fps;
+	now = util_time(gl_capture->glc);
+
+	if (now - ctx->last > gl_capture->fps) /* reasonable choice? */
+		ctx->last = now - 0.5 * gl_capture->fps;
 
 	ps_packet_close(&ctx->packet);
 
