@@ -54,7 +54,7 @@ void *file_init(glc_t *glc, ps_buffer_t *from)
 		 "opening %s for stream", file->glc->stream_file);
 
 	file->fd = open(file->glc->stream_file,
-			O_CREAT | O_WRONLY | O_TRUNC | O_SYNC, 0644);
+			O_CREAT | O_WRONLY | O_SYNC, 0644);
 
 	if (file->fd == -1) {
 		util_log(file->glc, GLC_ERROR, "file", "can't open %s: %s (%d)",
@@ -67,6 +67,10 @@ void *file_init(glc_t *glc, ps_buffer_t *from)
 			 file->glc->stream_file, strerror(errno), errno);
 		goto cancel;
 	}
+
+	/* truncate file when we have locked it */
+	lseek(file->fd, 0, SEEK_SET);
+	ftruncate(file->fd, 0);
 
 	if (!file->glc->info) {
 		util_log(file->glc, GLC_ERROR, "file", "stream info not available");
