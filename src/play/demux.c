@@ -260,8 +260,7 @@ int demux_video_close(struct demux_private_s *demux)
 		demux->ctx = demux->ctx->next;
 
 		if (del->running) {
-			if (demux->glc->flags & GLC_CANCEL)
-				ps_buffer_cancel(&del->buffer);
+			ps_buffer_cancel(&del->buffer);
 			demux_video_ctx_clean(demux, del);
 		}
 
@@ -359,8 +358,7 @@ int demux_audio_close(struct demux_private_s *demux)
 		demux->stream = demux->stream->next;
 
 		if (del->running) {
-			if (demux->glc->flags & GLC_CANCEL)
-				ps_buffer_cancel(&del->buffer);
+			ps_buffer_cancel(&del->buffer);
 			demux_audio_stream_clean(demux, del);
 		}
 

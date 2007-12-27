@@ -38,6 +38,7 @@ struct glc_thread_private_s {
 	glc_thread_t *thread;
 
 	int stop;
+	int ret;
 };
 
 void *glc_thread(void *argptr);
@@ -253,7 +254,7 @@ finish:
 
 		/* error might have happened @ write buffer
 		   so there could be blocking threads */
-		if ((ret) && (thread->flags & GLC_THREAD_WRITE))
+		if (thread->flags & GLC_THREAD_WRITE)
 			ps_buffer_cancel(private->to);
 	}
 
@@ -263,6 +264,10 @@ finish:
 
 	pthread_mutex_lock(&private->finish);
 	thread->threads--;
+
+	/* let other threads know about the error */
+	if (ret)
+		private->ret = ret;
 
 	if (thread->threads > 0) {
 		pthread_mutex_unlock(&private->finish);
@@ -274,7 +279,7 @@ finish:
 
 	/* finish callback */
 	if (thread->finish_callback)
-		thread->finish_callback(state.ptr, ret);
+		thread->finish_callback(state.ptr, private->ret);
 
 	free(private->pthread_thread);
 	pthread_mutex_destroy(&private->finish);
@@ -289,7 +294,7 @@ err:
 	if (ret == EINTR)
 		ret = 0;
 	else
-		util_log(private->glc, GLC_ERROR, "glc_thread", "%s (%d)\n", strerror(ret), ret);
+		util_log(private->glc, GLC_ERROR, "glc_thread", "%s (%d)", strerror(ret), ret);
 
 	goto finish;
 }
