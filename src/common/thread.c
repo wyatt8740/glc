@@ -134,7 +134,7 @@ int glc_thread_wait(glc_thread_t *thread)
  */
 void *glc_thread(void *argptr)
 {
-	int has_locked, ret, write_size_set;
+	int has_locked, ret, write_size_set, packets_init;
 
 	struct glc_thread_private_s *private = (struct glc_thread_private_s *) argptr;
 	glc_thread_t *thread = private->thread;
@@ -142,7 +142,7 @@ void *glc_thread(void *argptr)
 
 	ps_packet_t read, write;
 
-	write_size_set = ret = has_locked = 0;
+	write_size_set = ret = has_locked = packets_init = 0;
 	state.flags = state.read_size = state.write_size = 0;
 	state.ptr = thread->ptr;
 
@@ -155,6 +155,9 @@ void *glc_thread(void *argptr)
 		if ((ps_packet_init(&write, private->to)))
 			goto err;
 	}
+
+	/* safe to destroy packets etc. */
+	packets_init = 1;
 
 	/* create callback */
 	if (thread->thread_create_callback) {
@@ -284,10 +287,12 @@ void *glc_thread(void *argptr)
 		 (!private->stop));
 
 finish:
-	if (thread->flags & GLC_THREAD_READ)
-		ps_packet_destroy(&read);
-	if (thread->flags & GLC_THREAD_WRITE)
-		ps_packet_destroy(&write);
+	if (packets_init) {
+		if (thread->flags & GLC_THREAD_READ)
+			ps_packet_destroy(&read);
+		if (thread->flags & GLC_THREAD_WRITE)
+			ps_packet_destroy(&write);
+	}
 
 	/* wake up remaining threads */
 	if ((thread->flags & GLC_THREAD_READ) && (!private->stop)) {
