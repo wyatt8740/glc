@@ -160,8 +160,11 @@ typedef struct {
 	int log_level;
 	/** fps */
 	double fps;
+
 	/** playback/export silence threshold in microseconds */
 	glc_utime_t silence_threshold;
+	/** alsa device for playback */
+	const char *alsa_playback_device;
 
 	/** scale factor for rescaling */
 	double scale;

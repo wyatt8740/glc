@@ -57,6 +57,7 @@ int main(int argc, char *argv[])
 		{"resize",		1, NULL, 'r'},
 		{"adjust",		1, NULL, 'g'},
 		{"silence",		1, NULL, 'l'},
+		{"alsa-device",		1, NULL, 'd'},
 		{"compressed",		1, NULL, 'c'},
 		{"uncompressed",	1, NULL, 'u'},
 		{"show",		1, NULL, 's'},
@@ -70,7 +71,9 @@ int main(int argc, char *argv[])
 	glc.flags = 0;
 	glc.fps = 0;
 	glc.filename_format = NULL; /* user has to specify */
+
 	glc.silence_threshold = 200000; /* 0.2 sec accuracy */
+	glc.alsa_playback_device = "default";
 
 	/* don't scale by default */
 	glc.scale = 1;
@@ -90,7 +93,7 @@ int main(int argc, char *argv[])
 	glc.green_gamma = 1.0;
 	glc.blue_gamma = 1.0;
 
-	while ((opt = getopt_long(argc, argv, "i:a:p:y:o:f:r:g:l:c:u:s:v:h",
+	while ((opt = getopt_long(argc, argv, "i:a:p:y:o:f:r:g:l:d:c:u:s:v:h",
 				  long_options, &optind)) != -1) {
 		switch (opt) {
 		case 'i':
@@ -142,6 +145,9 @@ int main(int argc, char *argv[])
 		case 'l':
 			/* glc_utime_t so always positive */
 			glc.silence_threshold = atof(optarg) * 1000000;
+			break;
+		case 'd':
+			glc.alsa_playback_device = optarg;
 			break;
 		case 'o':
 			if (!strcmp(optarg, "-")) /** \todo fopen(1) ? */
@@ -254,6 +260,8 @@ usage:
 	       "                             format is brightness;contrast;red;green;blue\n"
 	       "  -l, --silence=SECONDS    audio silence threshold in seconds\n"
 	       "                             default threshold is 0.2\n"
+	       "  -d, --alsa-device=DEV    alsa playback device name\n"
+	       "                             default is 'default'\n"
 	       "  -c, --compressed=SIZE    compressed stream buffer size in MiB\n"
 	       "                             default is 10 MiB\n"
 	       "  -u, --uncompressed=SIZE  uncompressed stream buffer size in MiB\n"

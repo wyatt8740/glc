@@ -73,7 +73,7 @@ void *audio_play_init(glc_t *glc, ps_buffer_t *from, glc_audio_i audio)
 
 	audio_play->glc = glc;
 	sem_init(&audio_play->finished, 0, 0);
-	audio_play->device = "default"; /** \todo make this configurable */
+	audio_play->device = audio_play->glc->alsa_playback_device;
 	audio_play->audio_i = audio;
 
 	audio_play->thread.flags = GLC_THREAD_READ;
@@ -104,7 +104,8 @@ void audio_play_finish_callback(void *priv, int err)
 	struct audio_play_private_s *audio_play = (struct audio_play_private_s *) priv;
 
 	if (err)
-		util_log(audio_play->glc, GLC_ERROR, "audio", "%s (%d)", strerror(err), err);
+		util_log(audio_play->glc, GLC_ERROR, "audio_play", "%s (%d)",
+			 strerror(err), err);
 	
 	if (audio_play->pcm)
 		snd_pcm_close(audio_play->pcm);
@@ -129,7 +130,7 @@ int audio_play_read_callback(glc_thread_state_t *state)
 
 int audio_play_hw(struct audio_play_private_s *audio_play, glc_audio_format_message_t *fmt_msg)
 {
-	snd_pcm_hw_params_t *hw_params;
+	snd_pcm_hw_params_t *hw_params = NULL;
 	snd_pcm_access_t access;
 	snd_pcm_uframes_t max_buffer_size;
 	unsigned int min_periods;
@@ -150,7 +151,7 @@ int audio_play_hw(struct audio_play_private_s *audio_play, glc_audio_format_mess
 	else
 		access = SND_PCM_ACCESS_RW_NONINTERLEAVED;
 
-	if ((ret = snd_pcm_open(&audio_play->pcm, audio_play->device, SND_PCM_STREAM_PLAYBACK, 0)) < 0)
+	if ((ret = snd_pcm_open(&audio_play->pcm, audio_play->device, SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK)) < 0)
 		goto err;
 	if ((ret = snd_pcm_hw_params_malloc(&hw_params)) < 0)
 		goto err;
@@ -180,6 +181,8 @@ int audio_play_hw(struct audio_play_private_s *audio_play, glc_audio_format_mess
 	snd_pcm_hw_params_free(hw_params);
 	return 0;
 err:
+	util_log(audio_play->glc, GLC_ERROR, "audio_play", "can't initialize pcm: %s (%d)\n",
+		 snd_strerror(ret), ret);
 	if (hw_params)
 		snd_pcm_hw_params_free(hw_params);
 	return -ret;
@@ -195,7 +198,8 @@ int audio_play_play(struct audio_play_private_s *audio_play, glc_audio_header_t 
 		return 0;
 
 	if (!audio_play->pcm) {
-		util_log(audio_play->glc, GLC_ERROR, "audio", "broken stream %d", audio_play->audio_i);
+		util_log(audio_play->glc, GLC_ERROR, "audio_play", "broken stream %d",
+			 audio_play->audio_i);
 		return EINVAL;
 	}
 	
@@ -206,7 +210,7 @@ int audio_play_play(struct audio_play_private_s *audio_play, glc_audio_header_t 
 	if (time + audio_play->glc->silence_threshold + duration < audio_hdr->timestamp)
 		usleep(audio_hdr->timestamp - time - duration);
 	else if (time > audio_hdr->timestamp) {
-		util_log(audio_play->glc, GLC_WARNING, "audio", "dropped packet");
+		util_log(audio_play->glc, GLC_WARNING, "audio_play", "dropped packet");
 		return 0;
 	}
 
@@ -235,7 +239,7 @@ int audio_play_play(struct audio_play_private_s *audio_play, glc_audio_header_t 
 			break;
 		else if (ret < 0) {
 			if ((ret = audio_play_xrun(audio_play, ret))) {
-				util_log(audio_play->glc, GLC_ERROR, "audio",
+				util_log(audio_play->glc, GLC_ERROR, "audio_play",
 					 "xrun recovery failed: %s", snd_strerror(-ret));
 				return ret;
 			}
@@ -248,7 +252,7 @@ int audio_play_play(struct audio_play_private_s *audio_play, glc_audio_header_t 
 
 int audio_play_xrun(struct audio_play_private_s *audio_play, int err)
 {
-	util_log(audio_play->glc, GLC_DEBUG, "audio", "xrun");
+	util_log(audio_play->glc, GLC_DEBUG, "audio_play", "xrun");
 	if (err == -EPIPE) {
 		if ((err = snd_pcm_prepare(audio_play->pcm)) < 0)
 			return -err;
