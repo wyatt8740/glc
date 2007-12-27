@@ -1,3 +1,13 @@
+0.4.5 (2007/12/27)
+   Use synchronous IO which removes lag spikes caused by glibc flushing
+    its output buffers to disk.
+   Lock stream file. It is now easier to detect when multiple programs
+    try to capture into same file.
+   ALSA playback device is now configurable (-d).
+   Stop playing when a video stream window is closed.
+   Handle frame drops better.
+   Lots of bugfixes and cleanups.
+
 0.4.4 (2007/12/25)
    Fixed wine audio system hang.
 

@@ -176,7 +176,7 @@ int audio_play_hw(struct audio_play_private_s *audio_play, glc_audio_format_mess
 	snd_pcm_hw_params_free(hw_params);
 	return 0;
 err:
-	util_log(audio_play->glc, GLC_ERROR, "audio_play", "can't initialize pcm: %s (%d)\n",
+	util_log(audio_play->glc, GLC_ERROR, "audio_play", "can't initialize pcm: %s (%d)",
 		 snd_strerror(ret), ret);
 	if (hw_params)
 		snd_pcm_hw_params_free(hw_params);

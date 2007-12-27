@@ -130,6 +130,7 @@ void init_glc()
 
 	util_log_info(&mpriv.glc);
 	util_log(&mpriv.glc, GLC_INFORMATION, "main", "glc initialized");
+	util_log(&mpriv.glc, GLC_DEBUG, "main", "LD_PRELOAD=%s", getenv("LD_PRELOAD"));
 	return;
 err:
 	fprintf(stderr, "glc: %s (%d)\n", strerror(ret), ret);
