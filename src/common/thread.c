@@ -254,7 +254,8 @@ finish:
 
 		/* error might have happened @ write buffer
 		   so there could be blocking threads */
-		if (thread->flags & GLC_THREAD_WRITE)
+		if ((private->glc->flags & GLC_CANCEL) &&
+		    (thread->flags & GLC_THREAD_WRITE))
 			ps_buffer_cancel(private->to);
 	}
 
@@ -293,8 +294,10 @@ err:
 
 	if (ret == EINTR)
 		ret = 0;
-	else
+	else {
+		private->glc->flags |= GLC_CANCEL;
 		util_log(private->glc, GLC_ERROR, "glc_thread", "%s (%d)", strerror(ret), ret);
+	}
 
 	goto finish;
 }

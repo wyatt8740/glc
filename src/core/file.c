@@ -161,7 +161,7 @@ int file_read(glc_t *glc, ps_buffer_t *to)
 	int fd, ret = 0;
 	glc_stream_info_t *info;
 	glc_message_header_t header;
-	size_t packet_size;
+	size_t packet_size = 0;
 	ps_packet_t packet;
 	char *dma;
 	glc_size_t glc_ps;

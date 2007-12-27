@@ -181,8 +181,11 @@ int opengl_close()
 
 	if (opengl.glc->flags & GLC_SCALE) {
 		if (lib.running) {
-			if ((ret = util_write_end_of_stream(opengl.glc, opengl.unscaled)))
+			if ((ret = util_write_end_of_stream(opengl.glc, opengl.unscaled))) {
+				util_log(opengl.glc, GLC_ERROR, "opengl",
+					 "can't write end of stream: %s (%d)", strerror(ret), ret);
 				return ret;
+			}
 		} else
 			ps_buffer_cancel(opengl.unscaled);
 
@@ -191,8 +194,11 @@ int opengl_close()
 		else
 			scale_wait(opengl.scale);
 	} else if (lib.running) {
-		if ((ret = util_write_end_of_stream(opengl.glc, opengl.buffer)))
+		if ((ret = util_write_end_of_stream(opengl.glc, opengl.buffer))) {
+			util_log(opengl.glc, GLC_ERROR, "opengl",
+				 "can't write end of stream: %s (%d)", strerror(ret), ret);
 			return ret;
+		}
 	} else
 		ps_buffer_cancel(opengl.buffer);
 

@@ -305,7 +305,7 @@ int unpack_read_callback(glc_thread_state_t *state)
 		return 0;
 #else
 		util_log(((struct pack_private_s *) state->ptr)->glc,
-			 , GLC_ERROR, "unpack", "unpack: QuickLZ not supported");
+			 GLC_ERROR, "unpack", "unpack: QuickLZ not supported");
 		return ENOTSUP;
 #endif
 	}
