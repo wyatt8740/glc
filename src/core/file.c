@@ -144,17 +144,16 @@ int file_read_callback(glc_thread_state_t *state)
 
 int file_read(glc_t *glc, ps_buffer_t *to)
 {
-	int ret = 0;
+	int fd, ret = 0;
 	glc_stream_info_t *info;
 	glc_message_header_t header;
 	size_t packet_size;
-	FILE *from;
 	ps_packet_t packet;
 	char *dma;
 	glc_size_t glc_ps;
 
-	from = fopen(glc->stream_file, "r");
-	if (from == NULL) {
+	fd = open(glc->stream_file, O_SYNC);
+	if (!fd) {
 		util_log(glc, GLC_ERROR, "file",
 			 "can't open %s: %s (%d)", glc->stream_file, strerror(errno), errno);
 		return -1;
@@ -162,7 +161,7 @@ int file_read(glc_t *glc, ps_buffer_t *to)
 
 	info = (glc_stream_info_t *) malloc(sizeof(glc_stream_info_t));
 	memset(info, 0, sizeof(glc_stream_info_t));
-	fread(info, 1, GLC_STREAM_INFO_SIZE, from);
+	read(fd, info, GLC_STREAM_INFO_SIZE);
 
 	if (info->signature != GLC_SIGNATURE) {
 		util_log(glc, GLC_ERROR, "file", "signature does not match");
@@ -176,18 +175,18 @@ int file_read(glc_t *glc, ps_buffer_t *to)
 	}
 
 	if (info->name_size > 0)
-		fseek(from, info->name_size, SEEK_CUR);
+		lseek(fd, info->name_size, SEEK_CUR);
 	if (info->date_size > 0)
-		fseek(from, info->date_size, SEEK_CUR);
+		lseek(fd, info->date_size, SEEK_CUR);
 
 	free(info);
 
 	ps_packet_init(&packet, to);
 
 	do {
-		if (fread(&header, 1, GLC_MESSAGE_HEADER_SIZE, from) != GLC_MESSAGE_HEADER_SIZE)
+		if (read(fd, &header, GLC_MESSAGE_HEADER_SIZE) != GLC_MESSAGE_HEADER_SIZE)
 			goto send_eof;
-		if (fread(&glc_ps, 1, GLC_SIZE_SIZE, from) != GLC_SIZE_SIZE)
+		if (read(fd, &glc_ps, GLC_SIZE_SIZE) != GLC_SIZE_SIZE)
 			goto send_eof;
 
 		packet_size = glc_ps;
@@ -199,7 +198,7 @@ int file_read(glc_t *glc, ps_buffer_t *to)
 		if ((ret = ps_packet_dma(&packet, (void *) &dma, packet_size, PS_ACCEPT_FAKE_DMA)))
 			goto err;
 
-		if (fread(dma, 1, packet_size, from) != packet_size)
+		if (read(fd, dma, packet_size) != packet_size)
 			goto read_fail;
 
 		if ((ret = ps_packet_close(&packet)))
@@ -208,7 +207,7 @@ int file_read(glc_t *glc, ps_buffer_t *to)
 
 finish:
 	ps_packet_destroy(&packet);
-	fclose(from);
+	close(fd);
 
 	return 0;
 
@@ -228,11 +227,10 @@ err:
 		goto finish; /* just cancel */
 
 	util_log(glc, GLC_ERROR, "file", "%s (%d)", strerror(ret), ret);
-	fclose(from);
+	close(fd);
 	ps_buffer_cancel(to);
 	return ret;
 }
-
 
 /**  \} */
 /**  \} */
