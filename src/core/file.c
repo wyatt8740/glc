@@ -21,6 +21,11 @@
 #include <packetstream.h>
 #include <errno.h>
 
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #include "../common/glc.h"
 #include "../common/thread.h"
 #include "../common/util.h"
@@ -30,7 +35,7 @@ struct file_private_s {
 	glc_t *glc;
 	glc_thread_t thread;
 	sem_t finished;
-	FILE *to;
+	int fd;
 };
 
 void file_finish_callback(void *ptr, int err);
@@ -49,9 +54,9 @@ void *file_init(glc_t *glc, ps_buffer_t *from)
 	util_log(file->glc, GLC_INFORMATION, "file",
 		 "opening %s for stream", file->glc->stream_file);
 
-	file->to = fopen(file->glc->stream_file, "w");
+	file->fd = open(file->glc->stream_file, O_CREAT | O_WRONLY | O_TRUNC | O_SYNC);
 
-	if (!file->to) {
+	if (!file->fd) {
 		util_log(file->glc, GLC_ERROR, "file", "can't open %s", file->glc->stream_file);
 		goto cancel;
 	}
@@ -61,9 +66,9 @@ void *file_init(glc_t *glc, ps_buffer_t *from)
 		goto cancel;
 	}
 
-	fwrite(file->glc->info, 1, GLC_STREAM_INFO_SIZE, file->to);
-	fwrite(file->glc->info_name, 1, file->glc->info->name_size, file->to);
-	fwrite(file->glc->info_date, 1, file->glc->info->date_size, file->to);
+	write(file->fd, file->glc->info, GLC_STREAM_INFO_SIZE);
+	write(file->fd, file->glc->info_name, file->glc->info->name_size);
+	write(file->fd, file->glc->info_date, file->glc->info->date_size);
 
 	file->thread.flags = GLC_THREAD_READ;
 	file->thread.ptr = file;
@@ -100,7 +105,7 @@ void file_finish_callback(void *ptr, int err)
 	if (err)
 		util_log(file->glc, GLC_ERROR, "file", "%s (%d)", strerror(err), err);
 
-	if (fclose(file->to))
+	if (close(file->fd))
 		util_log(file->glc, GLC_ERROR, "file",
 			 "can't close file: %s (%d)", strerror(errno), errno);
 
@@ -116,21 +121,21 @@ int file_read_callback(glc_thread_state_t *state)
 	if (state->header.type == GLC_MESSAGE_CONTAINER) {
 		container = (glc_container_message_t *) state->read_data;
 
-		if (fwrite(&container->header, 1, GLC_MESSAGE_HEADER_SIZE, file->to)
+		if (write(file->fd, &container->header, GLC_MESSAGE_HEADER_SIZE)
 		    != GLC_MESSAGE_HEADER_SIZE)
 			return ENOSTR;
-		if (fwrite(&container->size, 1, GLC_SIZE_SIZE, file->to) != GLC_SIZE_SIZE)
+		if (write(file->fd, &container->size, GLC_SIZE_SIZE) != GLC_SIZE_SIZE)
 			return ENOSTR;
-		if (fwrite(&state->read_data[GLC_CONTAINER_MESSAGE_SIZE], 1, container->size, file->to)
+		if (write(file->fd, &state->read_data[GLC_CONTAINER_MESSAGE_SIZE], container->size)
 		    != container->size)
 			return ENOSTR;
 	} else {
-		if (fwrite(&state->header, 1, GLC_MESSAGE_HEADER_SIZE, file->to) != GLC_MESSAGE_HEADER_SIZE)
+		if (write(file->fd, &state->header, GLC_MESSAGE_HEADER_SIZE) != GLC_MESSAGE_HEADER_SIZE)
 			return ENOSTR;
 		glc_size = state->read_size;
-		if (fwrite(&glc_size, 1, GLC_SIZE_SIZE, file->to) != GLC_SIZE_SIZE)
+		if (write(file->fd, &glc_size, GLC_SIZE_SIZE) != GLC_SIZE_SIZE)
 			return ENOSTR;
-		if (fwrite(state->read_data, 1, state->read_size, file->to) != state->read_size)
+		if (write(file->fd, state->read_data, state->read_size) != state->read_size)
 			return ENOSTR;
 	}
 
