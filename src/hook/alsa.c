@@ -229,7 +229,7 @@ void get_real_alsa()
 	if (alsa_loaded)
 		return;
 
-	alsa.libasound_handle = lib.dlopen("libasound.so", RTLD_LAZY);
+	alsa.libasound_handle = lib.dlopen("libasound.so.2", RTLD_LAZY);
 	if (!alsa.libasound_handle)
 		goto err;
 

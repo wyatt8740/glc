@@ -216,7 +216,7 @@ void signal_handler(int signum)
 	         (mpriv.sigterm_handler != NULL))
 		mpriv.sigterm_handler(signum);
 
-	fprintf(stderr, "(glc:main) got C-c, will now exit...");
+	fprintf(stderr, "(glc) got C-c, will now exit...");
 	exit(0); /* may cause lots of damage... */
 }
 
@@ -264,7 +264,7 @@ void lib_close()
 	free(mpriv.glc.log_file);
 	return;
 err:
-	fprintf(stderr, "glc: cleanup and finish failed\n%s (%d)\n", strerror(ret), ret);
+	fprintf(stderr, "(glc) cleanup and finish failed\n%s (%d)\n", strerror(ret), ret);
 	return;
 }
 

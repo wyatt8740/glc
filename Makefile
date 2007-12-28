@@ -109,7 +109,7 @@ $(BUILD)/libglc-core.so.$(RELEASE): $(CORE_OBJS)
 # capture library
 $(BUILD)/libglc-capture.so.$(RELEASE): $(CAPTURE_OBJS) $(BUILD)/libglc-core.so.$(RELEASE)
 	$(LD) $(LDFLAGS) -Wl,-soname,libglc-capture.so.$(VERSION) -shared \
-		-L$(BUILD) -lGL -ldl -lasound -lXxf86vm -lglc-core \
+		-L$(BUILD) -lGL -ldl -lasound -lX11 -lXxf86vm -lglc-core \
 		$(CAPTURE_OBJS) -o $(BUILD)/libglc-capture.so.$(RELEASE)
 	ln -sf libglc-capture.so.$(RELEASE) $(BUILD)/libglc-capture.so.$(VERSION)
 	ln -sf libglc-capture.so.$(RELEASE) $(BUILD)/libglc-capture.so

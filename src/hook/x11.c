@@ -165,7 +165,7 @@ void get_real_x11()
 	if (!lib.dlopen)
 		get_real_dlsym();
 
-	x11.libX11_handle = lib.dlopen("libX11.so", RTLD_LAZY);
+	x11.libX11_handle = lib.dlopen("libX11.so.6", RTLD_LAZY);
 	if (!x11.libX11_handle)
 		goto err;
 
@@ -226,7 +226,7 @@ void get_real_x11()
 		goto err;
 
 	x11.XF86VidModeSetGamma = NULL;
-	x11.libXxf86vm_handle = lib.dlopen("libXxf86vm.so", RTLD_LAZY);
+	x11.libXxf86vm_handle = lib.dlopen("libXxf86vm.so.1", RTLD_LAZY);
 	if (x11.libXxf86vm_handle) {
 		x11.XF86VidModeSetGamma =
 		  (Bool (*)(Display *, int, XF86VidModeGamma *))
