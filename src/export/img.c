@@ -24,6 +24,13 @@
 #include "../common/util.h"
 #include "img.h"
 
+struct img_private_s;
+typedef int (*img_write_proc)(struct img_private_s *img,
+			      const unsigned char *pic,
+			      unsigned int w,
+			      unsigned int h,
+			      const char *filename);
+
 struct img_private_s {
 	glc_t *glc;
 	glc_utime_t fps;
@@ -31,15 +38,23 @@ struct img_private_s {
 
 	unsigned int w, h;
 	unsigned int row;
-	char *prev_pic;
+	unsigned char *prev_pic;
 	glc_utime_t time;
-	int i, total;
+	int i;
+
+	img_write_proc write_proc;
 };
 
 void img_finish_callback(void *ptr, int err);
 int img_read_callback(glc_thread_state_t *state);
 
-int write_pic(struct img_private_s *img, char *pic, unsigned int w, unsigned int h, int num);
+int img_ctx_msg(struct img_private_s *img, glc_ctx_message_t *ctx_msg);
+int img_pic(struct img_private_s *img, glc_picture_header_t *pic_hdr,
+	    const unsigned char *pic, size_t pic_size);
+
+int img_write_bmp(struct img_private_s *img, const unsigned char *pic,
+		  unsigned int w, unsigned int h,
+		  const char *filename);
 
 void *img_init(glc_t *glc, ps_buffer_t *from)
 {
@@ -48,7 +63,7 @@ void *img_init(glc_t *glc, ps_buffer_t *from)
 
 	img->glc = glc;
 	img->fps = 1000000 / img->glc->fps;
-	img->total = 0;
+	img->write_proc = &img_write_bmp;
 
 	img->thread.flags = GLC_THREAD_READ;
 	img->thread.ptr = img;
@@ -76,7 +91,7 @@ void img_finish_callback(void *ptr, int err)
 {
 	struct img_private_s *img = (struct img_private_s *) ptr;
 
-	util_log(img->glc, GLC_INFORMATION, "img", "%d images written", img->total);
+	util_log(img->glc, GLC_INFORMATION, "img", "%d images written", img->i);
 
 	if (err)
 		util_log(img->glc, GLC_ERROR, "img", "%s (%d)", strerror(err), err);
@@ -90,68 +105,84 @@ int img_read_callback(glc_thread_state_t *state)
 	struct img_private_s *img = state->ptr;
 	int ret = 0;
 
-	glc_picture_header_t *pic_hdr;
-	glc_ctx_message_t *ctx_msg;
-
 	if (state->header.type == GLC_MESSAGE_CTX) {
-		ctx_msg = (glc_ctx_message_t *) state->read_data;
-
-		if (ctx_msg->ctx != img->glc->export_ctx)
-			return 0;
-
-		if (!(ctx_msg->flags & GLC_CTX_BGR)) {
-			util_log(img->glc, GLC_ERROR, "img",
-				 "ctx %d is in unsupported format", ctx_msg->ctx);
-			return ENOTSUP;
-		}
-
-		img->w = ctx_msg->w;
-		img->h = ctx_msg->h;
-		img->row = img->w * 3;
-
-		if (ctx_msg->flags & GLC_CTX_DWORD_ALIGNED) {
-			if (img->row % 8 != 0)
-				img->row += 8 - img->row % 8;
-		}
-
-		if (img->prev_pic)
-			img->prev_pic = (char *) realloc(img->prev_pic, img->row * img->h);
-		else
-			img->prev_pic = (char *) malloc(img->row * img->h);
-		memset(img->prev_pic, 0, img->row * img->h);
+		ret = img_ctx_msg(img, (glc_ctx_message_t *) state->read_data);
 	} else if (state->header.type == GLC_MESSAGE_PICTURE) {
-		pic_hdr = (glc_picture_header_t *) state->read_data;
-
-		if (pic_hdr->ctx != img->glc->export_ctx)
-			return 0;
-
-		if (img->time < pic_hdr->timestamp) {
-			while (img->time + img->fps < pic_hdr->timestamp) {
-				write_pic(img, img->prev_pic, img->w, img->h, img->i++);
-				img->time += img->fps;
-			}
-			ret = write_pic(img, &state->read_data[GLC_PICTURE_HEADER_SIZE],
-			          img->w, img->h, img->i++);
-			img->time += img->fps;
-		}
-
-		memcpy(img->prev_pic, &state->read_data[GLC_PICTURE_HEADER_SIZE],
-		       state->read_size - GLC_PICTURE_HEADER_SIZE);
+		ret = img_pic(img, (glc_picture_header_t *) state->read_data,
+			      (const unsigned char *) &state->read_data[GLC_PICTURE_HEADER_SIZE],
+			      state->read_size);
 	}
 
 	return ret;
 }
 
-int write_pic(struct img_private_s *img, char *pic, unsigned int w, unsigned int h, int num)
+int img_ctx_msg(struct img_private_s *img, glc_ctx_message_t *ctx_msg)
 {
-	char fname[1024];
+	if (ctx_msg->ctx != img->glc->export_ctx)
+		return 0;
+
+	if (!(ctx_msg->flags & GLC_CTX_BGR)) {
+		util_log(img->glc, GLC_ERROR, "img",
+				"ctx %d is in unsupported format", ctx_msg->ctx);
+		return ENOTSUP;
+	}
+
+	img->w = ctx_msg->w;
+	img->h = ctx_msg->h;
+	img->row = img->w * 3;
+
+	if (ctx_msg->flags & GLC_CTX_DWORD_ALIGNED) {
+		if (img->row % 8 != 0)
+			img->row += 8 - img->row % 8;
+	}
+
+	if (img->prev_pic)
+		img->prev_pic = (unsigned char *) realloc(img->prev_pic, img->row * img->h);
+	else
+		img->prev_pic = (unsigned char *) malloc(img->row * img->h);
+	memset(img->prev_pic, 0, img->row * img->h);
+
+	return 0;
+}
+
+int img_pic(struct img_private_s *img, glc_picture_header_t *pic_hdr,
+	    const unsigned char *pic, size_t pic_size)
+{
+	int ret = 0;
+	char filename[1024];
+
+	if (pic_hdr->ctx != img->glc->export_ctx)
+		return 0;
+
+	if (img->time < pic_hdr->timestamp) {
+		/* write previous pic until we are 'fps' away from current time */
+		while (img->time + img->fps < pic_hdr->timestamp) {
+			img->time += img->fps;
+
+			snprintf(filename, sizeof(filename) - 1, img->glc->filename_format, img->i++);
+			img->write_proc(img, img->prev_pic, img->w, img->h, filename);
+		}
+
+		img->time += img->fps;
+
+		snprintf(filename, sizeof(filename) - 1, img->glc->filename_format, img->i++);
+		ret = img->write_proc(img, pic, img->w, img->h, filename);
+	}
+
+	memcpy(img->prev_pic, pic, pic_size);
+
+	return ret;
+}
+
+int img_write_bmp(struct img_private_s *img, const unsigned char *pic,
+		  unsigned int w, unsigned int h, const char *filename)
+{
 	FILE *fd;
 	unsigned int val;
 	unsigned int i;
-	snprintf(fname, sizeof(fname) - 1, img->glc->filename_format, num);
 
-	util_log(img->glc, GLC_INFORMATION, "img", "opening %s for writing", fname);
-	if (!(fd = fopen(fname, "w")))
+	util_log(img->glc, GLC_INFORMATION, "img", "opening %s for writing (BMP)", filename);
+	if (!(fd = fopen(filename, "w")))
 		return errno;
 
 	fwrite("BM", 1, 2, fd);
@@ -173,7 +204,6 @@ int write_pic(struct img_private_s *img, char *pic, unsigned int w, unsigned int
 
 	fclose(fd);
 
-	img->total++;
 	return 0;
 }
 
