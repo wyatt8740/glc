@@ -164,7 +164,7 @@ LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:../elfhacks/build:../packetstream/build" \
 	> /dev/null || die "Can't compile glc"
 if [ $BUILD64 == 1 ]; then
 	LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:../elfhacks/build32:../packetstream/build32" \
-		make \
+		make mlib \
 		CFLAGS="${CFLAGS} -m32 -I../elfhacks/src -I../packetstream/src " \
 		LDFLAGS="${LDFLAGS} -m32 -L../elfhacks/build32 -L../packetstream/build32" \
 		BUILD="build32" \
@@ -204,7 +204,7 @@ cd glc
 if [ $BUILD64 == 1 ]; then
 	$SUDOMAKE install MLIBDIR="lib64" DESTDIR="${DESTDIR}" > /dev/null \
 		|| die "Can't install 64-bit glc"
-	$SUDOMAKE install-libs MLIBDIR="lib32" DESTDIR="${DESTDIR}" BUILD="build32" > /dev/null \
+	$SUDOMAKE install-mlib MLIBDIR="lib32" DESTDIR="${DESTDIR}" BUILD="build32" > /dev/null \
 		|| die "Can't install 32-bit glc"
 else
 	$SUDOMAKE install MLIBDIR="lib" DESTDIR="${DESTDIR}" > /dev/null \
