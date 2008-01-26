@@ -85,17 +85,39 @@ HOOK_OBJS = $(BUILD)/main.o \
 	    $(BUILD)/x11.o
 
 
-all: $(BUILD) \
-     $(BUILD)/libglc-core.so.$(RELEASE) \
-     $(BUILD)/libglc-capture.so.$(RELEASE) \
-     $(BUILD)/libglc-play.so.$(RELEASE) \
-     $(BUILD)/libglc-export.so.$(RELEASE) \
-     $(BUILD)/libglc-hook.so.$(RELEASE) \
-     $(BUILD)/glc-play \
-     $(BUILD)/glc-capture
+# NOTE for multilib capture, you need only core, capture and hook
+all: core \
+     capture \
+     play \
+     export \
+     hook \
+     binaries
+
+mlib: core \
+      capture \
+      hook
 
 $(BUILD):
 	mkdir $(BUILD)
+
+core: $(BUILD) \
+      $(BUILD)/libglc-core.so.$(RELEASE)
+
+capture: $(BUILD) \
+	 $(BUILD)/libglc-capture.so.$(RELEASE)
+
+play: $(BUILD) \
+      $(BUILD)/libglc-play.so.$(RELEASE)
+
+export: $(BUILD) \
+	$(BUILD)/libglc-export.so.$(RELEASE)
+
+hook: $(BUILD) \
+      $(BUILD)/libglc-hook.so.$(RELEASE)
+
+binaries: $(BUILD) \
+     $(BUILD)/glc-play \
+     $(BUILD)/glc-capture
 
 
 # core library
@@ -240,39 +262,53 @@ $(QUICKLZ_OBJ): $(QUICKLZ)quicklz.c $(QUICKLZ)quicklz.h
 	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(QUICKLZ_OBJ) -c $(QUICKLZ)quicklz.c
 
 
-install-scripts: $(SCRIPTS)/encode.sh $(SCRIPTS)/capture.sh $(SCRIPTS)/play.sh
-	install -Dm 0644 $(SCRIPTS)/encode.sh $(DESTDIR)/usr/share/glc/encode.sh
-	install -Dm 0644 $(SCRIPTS)/capture.sh $(DESTDIR)/usr/share/glc/capture.sh
-	install -Dm 0644 $(SCRIPTS)/play.sh $(DESTDIR)/usr/share/glc/play.sh
-
-install-libs: $(BUILD)/libglc-core.so.$(RELEASE) \
-	      $(BUILD)/libglc-capture.so.$(RELEASE) \
-	      $(BUILD)/libglc-play.so.$(RELEASE) \
-	      $(BUILD)/libglc-export.so.$(RELEASE) \
-	      $(BUILD)/libglc-hook.so.$(RELEASE)
+install-core: $(BUILD)/libglc-core.so.$(RELEASE)
 	install -Dm 0755 $(BUILD)/libglc-core.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-core.so.$(RELEASE)
 	ln -sf libglc-core.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-core.so.$(VERSION)
 	ln -sf libglc-core.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-core.so
 
+install-capture: $(BUILD)/libglc-capture.so.$(RELEASE)
 	install -Dm 0755 $(BUILD)/libglc-capture.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-capture.so.$(RELEASE)
 	ln -sf libglc-capture.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-capture.so.$(VERSION)
 	ln -sf libglc-capture.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-capture.so
 
+install-play: $(BUILD)/libglc-play.so.$(RELEASE)
 	install -Dm 0755 $(BUILD)/libglc-play.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-play.so.$(RELEASE)
 	ln -sf libglc-play.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-play.so.$(VERSION)
 	ln -sf libglc-play.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-play.so
 
+install-export: $(BUILD)/libglc-export.so.$(RELEASE)
 	install -Dm 0755 $(BUILD)/libglc-export.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-export.so.$(RELEASE)
 	ln -sf libglc-export.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-export.so.$(VERSION)
 	ln -sf libglc-export.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-export.so
 
+install-hook: $(BUILD)/libglc-hook.so.$(RELEASE)
 	install -Dm 0755 $(BUILD)/libglc-hook.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-hook.so.$(RELEASE)
 	ln -sf libglc-hook.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-hook.so.$(VERSION)
 	ln -sf libglc-hook.so.$(RELEASE) $(DESTDIR)/usr/$(MLIBDIR)/libglc-hook.so
 
-install: install-libs $(BUILD)/glc-play
+install-binaries: $(BUILD)/glc-capture \
+		  $(BUILD)/glc-play
 	install -Dm 0755 $(BUILD)/glc-play $(DESTDIR)/usr/bin/glc-play
 	install -Dm 0755 $(BUILD)/glc-capture $(DESTDIR)/usr/bin/glc-capture
+
+install-scripts: $(SCRIPTS)/encode.sh \
+		 $(SCRIPTS)/capture.sh \
+		 $(SCRIPTS)/play.sh
+	install -Dm 0644 $(SCRIPTS)/encode.sh $(DESTDIR)/usr/share/glc/encode.sh
+	install -Dm 0644 $(SCRIPTS)/capture.sh $(DESTDIR)/usr/share/glc/capture.sh
+	install -Dm 0644 $(SCRIPTS)/play.sh $(DESTDIR)/usr/share/glc/play.sh
+
+install: install-core \
+	 install-capture \
+	 install-play \
+	 install-export \
+	 install-hook \
+	 install-binaries
+
+install-mlib: install-core \
+	      install-capture \
+	      install-hook
 
 clean:
 	rm -f $(CORE_OBJS) \
