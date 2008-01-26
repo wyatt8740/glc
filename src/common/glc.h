@@ -115,6 +115,8 @@ typedef u_int32_t glc_flags_t;
 #define GLC_OVERRIDE_COLOR_CORRECTION   0x20000
 /** scale to specified size */
 #define GLC_SCALE_SIZE                  0x40000
+/** export as png instead of bmp */
+#define GLC_EXPORT_PNG                  0x80000
 
 /**
  * \brief stream info structure
@@ -148,6 +150,7 @@ typedef struct {
 
 /**
  * \brief global settings
+ * \todo separate flags into global, capture, export...
  */
 typedef struct {
 	/** active flags */

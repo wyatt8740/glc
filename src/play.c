@@ -50,7 +50,8 @@ int main(int argc, char *argv[])
 	struct option long_options[] = {
 		{"info",		1, NULL, 'i'},
 		{"wav",			1, NULL, 'a'},
-		{"bmp",			1, NULL, 'p'},
+		{"bmp",			1, NULL, 'b'},
+		{"png",			1, NULL, 'p'},
 		{"yuv4mpeg",		1, NULL, 'y'},
 		{"out",			1, NULL, 'o'},
 		{"fps",			1, NULL, 'f'},
@@ -93,7 +94,7 @@ int main(int argc, char *argv[])
 	glc.green_gamma = 1.0;
 	glc.blue_gamma = 1.0;
 
-	while ((opt = getopt_long(argc, argv, "i:a:p:y:o:f:r:g:l:d:c:u:s:v:h",
+	while ((opt = getopt_long(argc, argv, "i:a:b:p:y:o:f:r:g:l:d:c:u:s:v:h",
 				  long_options, &optind)) != -1) {
 		switch (opt) {
 		case 'i':
@@ -109,6 +110,8 @@ int main(int argc, char *argv[])
 			action = wav;
 			break;
 		case 'p':
+			glc.flags |= GLC_EXPORT_PNG;
+		case 'b':
 			glc.export_ctx = atoi(optarg);
 			if (glc.export_ctx < 1)
 				goto usage;
@@ -250,8 +253,9 @@ usage:
 	printf("  -i, --info=LEVEL         show stream information, LEVEL must be\n"
 	       "                             greater than 0\n"
 	       "  -a, --wav=NUM            save audio stream NUM in wav format\n"
-	       "  -p, --bmp=NUM            save pictures as bmp files\n"
+	       "  -b, --bmp=NUM            save frames from stream NUM as bmp files\n"
 	       "                             (use -o pic-%%010d.bmp f.ex.)\n"
+	       "  -p, --png=NUM            save frames from stream NUM as png files\n"
 	       "  -y, --yuv4mpeg=NUM       save video stream NUM in yuv4mpeg format\n"
 	       "  -o, --out=FILE           write to FILE\n"
 	       "  -f, --fps=FPS            save images or video at FPS\n"

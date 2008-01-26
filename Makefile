@@ -147,7 +147,7 @@ $(BUILD)/libglc-play.so.$(RELEASE): $(PLAY_OBJS) $(BUILD)/libglc-core.so.$(RELEA
 # export library
 $(BUILD)/libglc-export.so.$(RELEASE): $(EXPORT_OBJS) $(BUILD)/libglc-core.so.$(RELEASE)
 	$(LD) $(LDFLAGS) -Wl,-soname,libglc-export.so.$(VERSION) -shared \
-		-L$(BUILD) -lglc-core \
+		-L$(BUILD) -lpng -lglc-core \
 		$(EXPORT_OBJS) -o $(BUILD)/libglc-export.so.$(RELEASE)
 	ln -sf libglc-export.so.$(RELEASE) $(BUILD)/libglc-export.so.$(VERSION)
 	ln -sf libglc-export.so.$(RELEASE) $(BUILD)/libglc-export.so

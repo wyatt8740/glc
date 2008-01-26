@@ -13,10 +13,13 @@
  *  \{
  */
 
+/** \todo employ threads in image compression */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <png.h>
 #include <packetstream.h>
 
 #include "../common/glc.h"
@@ -55,6 +58,9 @@ int img_pic(struct img_private_s *img, glc_picture_header_t *pic_hdr,
 int img_write_bmp(struct img_private_s *img, const unsigned char *pic,
 		  unsigned int w, unsigned int h,
 		  const char *filename);
+int img_write_png(struct img_private_s *img, const unsigned char *pic,
+		  unsigned int w, unsigned int h,
+		  const char *filename);
 
 void *img_init(glc_t *glc, ps_buffer_t *from)
 {
@@ -63,7 +69,11 @@ void *img_init(glc_t *glc, ps_buffer_t *from)
 
 	img->glc = glc;
 	img->fps = 1000000 / img->glc->fps;
-	img->write_proc = &img_write_bmp;
+
+	if (img->glc->flags & GLC_EXPORT_PNG)
+		img->write_proc = &img_write_png;
+	else
+		img->write_proc = &img_write_bmp;
 
 	img->thread.flags = GLC_THREAD_READ;
 	img->thread.ptr = img;
@@ -181,7 +191,8 @@ int img_write_bmp(struct img_private_s *img, const unsigned char *pic,
 	unsigned int val;
 	unsigned int i;
 
-	util_log(img->glc, GLC_INFORMATION, "img", "opening %s for writing (BMP)", filename);
+	util_log(img->glc, GLC_INFORMATION, "img",
+		 "opening %s for writing (BMP)", filename);
 	if (!(fd = fopen(filename, "w")))
 		return errno;
 
@@ -201,6 +212,45 @@ int img_write_bmp(struct img_private_s *img, const unsigned char *pic,
 		if ((w * 3) % 4 != 0)
 			fwrite("\x00\x00\x00\x00", 1, 4 - ((w * 3) % 4), fd);
 	}
+
+	fclose(fd);
+
+	return 0;
+}
+
+int img_write_png(struct img_private_s *img, const unsigned char *pic,
+		  unsigned int w, unsigned int h,
+		  const char *filename)
+{
+	png_structp png_ptr;
+	png_infop info_ptr;
+	png_bytep *row_pointers;
+	unsigned int i;
+	FILE *fd;
+
+	util_log(img->glc, GLC_INFORMATION, "img",
+		 "opening %s for writing (PNG)", filename);
+	if (!(fd = fopen(filename, "w")))
+		return errno;
+
+	png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING,
+					  (png_voidp) NULL, NULL, NULL);
+	info_ptr = png_create_info_struct(png_ptr);
+	setjmp(png_jmpbuf(png_ptr));
+	png_init_io(png_ptr, fd);
+	png_set_IHDR(png_ptr, info_ptr, w, h, 8, PNG_COLOR_TYPE_RGB,
+		     PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT,
+		     PNG_FILTER_TYPE_DEFAULT);
+	png_set_bgr(png_ptr);
+	row_pointers = (png_bytep *) png_malloc(png_ptr, h * sizeof(png_bytep));
+
+	for (i = 0; i < h; i++)
+		row_pointers[i] = (png_bytep) &pic[(h - i - 1) * img->row];
+
+	png_set_rows(png_ptr, info_ptr, row_pointers);
+	png_write_png(png_ptr, info_ptr, PNG_TRANSFORM_IDENTITY, NULL);
+	png_free(png_ptr, row_pointers);
+	png_destroy_write_struct(&png_ptr, &info_ptr);
 
 	fclose(fd);
 
