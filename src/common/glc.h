@@ -2,13 +2,13 @@
  * \file src/common/glc.h
  * \brief glc types and structures
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  */
 
 /* glc.h -- ALSA & OpenGL video capture tool
-  version 0.4.5, December 27th, 2007
+  version 0.4.6, January 26th, 2008
 
-  Copyright (C) 2007 Pyry Haulos <pyry.haulos@gmail.com>
+  Copyright (C) 2007-2008 Pyry Haulos <pyry.haulos@gmail.com>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -58,7 +58,7 @@
 /** file signature = "GLC" */
 #define GLC_SIGNATURE                0x00434c47
 /** glc version string */
-#define GLC_VERSION                     "0.4.5"
+#define GLC_VERSION                     "0.4.6"
 
 /** unsigned time in microseconds */
 typedef u_int64_t glc_utime_t;

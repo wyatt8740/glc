@@ -1,3 +1,9 @@
+0.4.6 (2008/01/26)
+   Better multilib support in Makefile.
+   Add support for exporting frames into PNG images.
+   Don't truncate output file if it can't be locked.
+   Fix sonames.
+
 0.4.5 (2007/12/27)
    Use synchronous IO which removes lag spikes caused by glibc flushing
     its output buffers to disk.
