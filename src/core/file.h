@@ -20,6 +20,14 @@
 __PUBLIC void *file_init(glc_t *glc, ps_buffer_t *from);
 __PUBLIC int file_wait(void *filepriv);
 
+/**
+ * \brief Read stream from file and write it into buffer.
+ *
+ * This function assumes that stream starts immediately at current
+ * read position.
+ * \param glc glc
+ * \param to buffer
+ */
 __PUBLIC int file_read(glc_t *glc, ps_buffer_t *to);
 
 #endif

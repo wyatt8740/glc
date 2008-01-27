@@ -144,43 +144,35 @@ int util_timediff(glc_t *glc, glc_stime_t diff)
  * \param filename where to read info from
  * \return 0 on success otherwise an error code
  */
-int util_load_info(glc_t *glc, const char *filename)
+int util_load_info(glc_t *glc)
 {
-	FILE *file = fopen(filename, "r");
-	if (!file) {
-		fprintf(stderr, "can't open %s: %s (%d)\n", filename, strerror(errno), errno);
-		return ENOENT;
-	}
-
 	util_create_info(glc);
-	if (fread(glc->info, 1, GLC_STREAM_INFO_SIZE, file) != GLC_STREAM_INFO_SIZE) {
+
+	if (read(glc->stream_fd, glc->info, GLC_STREAM_INFO_SIZE) != GLC_STREAM_INFO_SIZE) {
 		fprintf(stderr, "can't read stream information\n");
 		return ENOSTR;
 	}
 
 	if (glc->info->signature != GLC_SIGNATURE) {
 		fprintf(stderr, "signature does not match\n");
-		fclose(file);
 		return EINVAL;
 	}
 
 	if (glc->info->version != GLC_STREAM_VERSION) {
 		fprintf(stderr, "unsupported stream version 0x%02x\n", glc->info->version);
-		fclose(file);
 		return ENOTSUP;
 	}
 
 	if (glc->info->name_size > 0) {
 		glc->info_name = (char *) malloc(glc->info->name_size);
-		fread(glc->info_name, 1, glc->info->name_size, file);
+		read(glc->stream_fd, glc->info_name, glc->info->name_size);
 	}
 
 	if (glc->info->date_size > 0) {
 		glc->info_date = (char *) malloc(glc->info->date_size);
-		fread(glc->info_date, 1, glc->info->date_size, file);
+		read(glc->stream_fd, glc->info_date, glc->info->date_size);
 	}
 
-	fclose(file);
 	return 0;
 }
 

@@ -136,70 +136,44 @@ int file_read_callback(glc_thread_state_t *state)
 
 		if (write(file->fd, &container->header, GLC_MESSAGE_HEADER_SIZE)
 		    != GLC_MESSAGE_HEADER_SIZE)
-			return ENOSTR;
+			goto err;
 		if (write(file->fd, &container->size, GLC_SIZE_SIZE) != GLC_SIZE_SIZE)
-			return ENOSTR;
+			goto err;
 		if (write(file->fd, &state->read_data[GLC_CONTAINER_MESSAGE_SIZE], container->size)
 		    != container->size)
-			return ENOSTR;
+			goto err;
 	} else {
 		if (write(file->fd, &state->header, GLC_MESSAGE_HEADER_SIZE) != GLC_MESSAGE_HEADER_SIZE)
-			return ENOSTR;
+			goto err;
 		glc_size = state->read_size;
 		if (write(file->fd, &glc_size, GLC_SIZE_SIZE) != GLC_SIZE_SIZE)
-			return ENOSTR;
+			goto err;
 		if (write(file->fd, state->read_data, state->read_size) != state->read_size)
-			return ENOSTR;
+			goto err;
 	}
 
 	return 0;
+
+err:
+	util_log(file->glc, GLC_ERROR, "file", "%s (%d)", strerror(errno), errno);
+	return errno;
 }
 
 int file_read(glc_t *glc, ps_buffer_t *to)
 {
-	int fd, ret = 0;
-	glc_stream_info_t *info;
+	int ret = 0;
 	glc_message_header_t header;
 	size_t packet_size = 0;
 	ps_packet_t packet;
 	char *dma;
 	glc_size_t glc_ps;
 
-	fd = open(glc->stream_file, O_SYNC);
-	if (!fd) {
-		util_log(glc, GLC_ERROR, "file",
-			 "can't open %s: %s (%d)", glc->stream_file, strerror(errno), errno);
-		return -1;
-	}
-
-	info = (glc_stream_info_t *) malloc(sizeof(glc_stream_info_t));
-	memset(info, 0, sizeof(glc_stream_info_t));
-	read(fd, info, GLC_STREAM_INFO_SIZE);
-
-	if (info->signature != GLC_SIGNATURE) {
-		util_log(glc, GLC_ERROR, "file", "signature does not match");
-		goto err;
-	}
-
-	if (info->version != GLC_STREAM_VERSION) {
-		util_log(glc, GLC_ERROR, "file",
-			 "unsupported stream version 0x%02x", glc->info->version);
-		goto err;
-	}
-
-	if (info->name_size > 0)
-		lseek(fd, info->name_size, SEEK_CUR);
-	if (info->date_size > 0)
-		lseek(fd, info->date_size, SEEK_CUR);
-
-	free(info);
-
 	ps_packet_init(&packet, to);
 
 	do {
-		if (read(fd, &header, GLC_MESSAGE_HEADER_SIZE) != GLC_MESSAGE_HEADER_SIZE)
+		if (read(glc->stream_fd, &header, GLC_MESSAGE_HEADER_SIZE) != GLC_MESSAGE_HEADER_SIZE)
 			goto send_eof;
-		if (read(fd, &glc_ps, GLC_SIZE_SIZE) != GLC_SIZE_SIZE)
+		if (read(glc->stream_fd, &glc_ps, GLC_SIZE_SIZE) != GLC_SIZE_SIZE)
 			goto send_eof;
 
 		packet_size = glc_ps;
@@ -211,7 +185,7 @@ int file_read(glc_t *glc, ps_buffer_t *to)
 		if ((ret = ps_packet_dma(&packet, (void *) &dma, packet_size, PS_ACCEPT_FAKE_DMA)))
 			goto err;
 
-		if (read(fd, dma, packet_size) != packet_size)
+		if (read(glc->stream_fd, dma, packet_size) != packet_size)
 			goto read_fail;
 
 		if ((ret = ps_packet_close(&packet)))
@@ -220,7 +194,6 @@ int file_read(glc_t *glc, ps_buffer_t *to)
 
 finish:
 	ps_packet_destroy(&packet);
-	close(fd);
 
 	return 0;
 
@@ -241,7 +214,6 @@ err:
 
 	util_log(glc, GLC_ERROR, "file", "%s (%d)", strerror(ret), ret);
 	util_log(glc, GLC_DEBUG, "file", "packet size is %zd", packet_size);
-	close(fd);
 	ps_buffer_cancel(to);
 	return ret;
 }

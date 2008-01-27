@@ -157,6 +157,8 @@ typedef struct {
 	glc_flags_t flags;
 	/** stream file */
 	char *stream_file;
+	/** stream file descriptor */
+	int stream_fd;
 	/** log file */
 	char *log_file;
 	/** log verbosity */

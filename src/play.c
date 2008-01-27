@@ -12,6 +12,9 @@
 #include <getopt.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <sys/file.h>
+#include <fcntl.h>
 
 #include "common/glc.h"
 #include "common/util.h"
@@ -203,8 +206,16 @@ int main(int argc, char *argv[])
 		util_log_version(&glc);
 	}
 
+	/* open stream file */
+	glc.stream_fd = open(glc.stream_file, O_SYNC);
+	if (!glc.stream_fd) {
+		util_log(&glc, GLC_ERROR, "main",
+			 "can't open %s: %s (%d)", glc.stream_file, strerror(errno), errno);
+		return -1;
+	}
+
 	/* load information and check that the file is valid */
-	if (util_load_info(&glc, glc.stream_file))
+	if (util_load_info(&glc))
 		return EXIT_FAILURE;
 
 	/*
@@ -245,6 +256,7 @@ int main(int argc, char *argv[])
 	util_log_close(&glc);
 	util_free_info(&glc);
 	util_free(&glc);
+	close(glc.stream_fd);
 
 	return EXIT_SUCCESS;
 
