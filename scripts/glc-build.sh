@@ -66,6 +66,8 @@ echo "#include <stdio.h>
 	|| die "Missing OpenGL headers (Ubuntu users: apt-get install libgl1-mesa-dev)"
 [ -e "/usr/include/alsa/asoundlib.h" ] \
 	|| die "Missing ALSA headers (Ubuntu users: apt-get install libasound2-dev)"
+[ -e "/usr/include/png.h" ] \
+	|| die "Missing libpng headers (Ubuntu users: apt-get-install libpng12-dev)"
 
 if [ $BUILD64 == 1 ]; then
 	echo "#include <stdio.h>
