@@ -221,8 +221,8 @@ LD_LIBRARY_PATH_ADD="${DESTDIR}/usr/lib"
 
 if [ "${DESTDIR}" != "" ]; then
 	info "You may need to add following lines to your .bashrc:"
-	echo "PATH=\"\${PATH}:${DESTDIR}/usr/bin\""
-	echo "LD_LIBRARY_PATH=\"\$LD_LIBRARY_PATH:${LD_LIBRARY_PATH_ADD}\""
+	echo "export PATH=\"\${PATH}:${DESTDIR}/usr/bin\""
+	echo "export LD_LIBRARY_PATH=\"\${LD_LIBRARY_PATH}:${LD_LIBRARY_PATH_ADD}\""
 fi
 
 RM="rm"
