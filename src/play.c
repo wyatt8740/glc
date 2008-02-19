@@ -62,6 +62,7 @@ int main(int argc, char *argv[])
 		{"adjust",		1, NULL, 'g'},
 		{"silence",		1, NULL, 'l'},
 		{"alsa-device",		1, NULL, 'd'},
+		{"streaming",		0, NULL, 't'},
 		{"compressed",		1, NULL, 'c'},
 		{"uncompressed",	1, NULL, 'u'},
 		{"show",		1, NULL, 's'},
@@ -97,7 +98,7 @@ int main(int argc, char *argv[])
 	glc.green_gamma = 1.0;
 	glc.blue_gamma = 1.0;
 
-	while ((opt = getopt_long(argc, argv, "i:a:b:p:y:o:f:r:g:l:d:c:u:s:v:h",
+	while ((opt = getopt_long(argc, argv, "i:a:b:p:y:o:f:r:g:l:td:c:u:s:v:h",
 				  long_options, &optind)) != -1) {
 		switch (opt) {
 		case 'i':
@@ -160,6 +161,9 @@ int main(int argc, char *argv[])
 				glc.filename_format = "/dev/stdout";
 			else
 				glc.filename_format = optarg;
+			break;
+		case 't':
+			glc.flags |= GLC_EXPORT_STREAMING;
 			break;
 		case 'c':
 			glc.compressed_size = atoi(optarg) * 1024 * 1024;
@@ -278,6 +282,7 @@ usage:
 	       "                             default threshold is 0.2\n"
 	       "  -d, --alsa-device=DEV    alsa playback device name\n"
 	       "                             default is 'default'\n"
+	       "  -t, --streaming          streaming mode (eg. don't interpolate data)\n"
 	       "  -c, --compressed=SIZE    compressed stream buffer size in MiB\n"
 	       "                             default is 10 MiB\n"
 	       "  -u, --uncompressed=SIZE  uncompressed stream buffer size in MiB\n"

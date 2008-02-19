@@ -84,6 +84,9 @@ void yuv4mpeg_finish_callback(void *priv, int err)
 
 	if (err)
 		util_log(yuv4mpeg->glc, GLC_ERROR, "yuv4mpeg", "%s (%d)", strerror(err), err);
+
+	if (yuv4mpeg->prev_pic)
+		free(yuv4mpeg->prev_pic);
 }
 
 int yuv4mpeg_read_callback(glc_thread_state_t *state)
@@ -127,15 +130,17 @@ int yuv4mpeg_handle_hdr(struct yuv4mpeg_private_s *yuv4mpeg, glc_ctx_message_t *
 
 	yuv4mpeg->size = ctx_msg->w * ctx_msg->h + (ctx_msg->w * ctx_msg->h) / 2;
 
-	if (yuv4mpeg->prev_pic)
-		yuv4mpeg->prev_pic = (char *) realloc(yuv4mpeg->prev_pic, yuv4mpeg->size);
-	else
-		yuv4mpeg->prev_pic = (char *) malloc(yuv4mpeg->size);
+	if (!(yuv4mpeg->glc->flags & GLC_EXPORT_STREAMING)) {
+		if (yuv4mpeg->prev_pic)
+			yuv4mpeg->prev_pic = (char *) realloc(yuv4mpeg->prev_pic, yuv4mpeg->size);
+		else
+			yuv4mpeg->prev_pic = (char *) malloc(yuv4mpeg->size);
 
-	/* Set Y' 0 */
-	memset(yuv4mpeg->prev_pic, 0, ctx_msg->w * ctx_msg->h);
-	/* Set CbCr 128 */
-	memset(&yuv4mpeg->prev_pic[ctx_msg->w * ctx_msg->h], 128, (ctx_msg->w * ctx_msg->h) / 2);
+		/* Set Y' 0 */
+		memset(yuv4mpeg->prev_pic, 0, ctx_msg->w * ctx_msg->h);
+		/* Set CbCr 128 */
+		memset(&yuv4mpeg->prev_pic[ctx_msg->w * ctx_msg->h], 128, (ctx_msg->w * ctx_msg->h) / 2);
+	}
 
 	/* calculate fps in p/q */
 	/** \todo something more intelligent perhaps... */
@@ -157,14 +162,16 @@ int yuv4mpeg_handle_pic(struct yuv4mpeg_private_s *yuv4mpeg, glc_picture_header_
 
 	if (yuv4mpeg->time < pic_hdr->timestamp) {
 		while (yuv4mpeg->time + yuv4mpeg->fps < pic_hdr->timestamp) {
-			yuv4mpeg_write_pic(yuv4mpeg, yuv4mpeg->prev_pic);
+			if (!(yuv4mpeg->glc->flags & GLC_EXPORT_STREAMING))
+				yuv4mpeg_write_pic(yuv4mpeg, yuv4mpeg->prev_pic);
 			yuv4mpeg->time += yuv4mpeg->fps;
 		}
 		yuv4mpeg_write_pic(yuv4mpeg, data);
 		yuv4mpeg->time += yuv4mpeg->fps;
 	}
 
-	memcpy(yuv4mpeg->prev_pic, data, yuv4mpeg->size);
+	if (!(yuv4mpeg->glc->flags & GLC_EXPORT_STREAMING))
+		memcpy(yuv4mpeg->prev_pic, data, yuv4mpeg->size);
 
 	return 0;
 }

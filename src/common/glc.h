@@ -117,6 +117,8 @@ typedef u_int32_t glc_flags_t;
 #define GLC_SCALE_SIZE                  0x40000
 /** export as png instead of bmp */
 #define GLC_EXPORT_PNG                  0x80000
+/** streaming mode: do not interpolate frames/audio */
+#define GLC_EXPORT_STREAMING           0x100000
 
 /**
  * \brief stream info structure

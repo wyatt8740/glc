@@ -217,11 +217,13 @@ int wav_write_audio(struct wav_private_s *wav, glc_audio_header_t *audio_hdr, ch
 		need_silence -= need_silence % (wav->sample_size * wav->channels);
 
 		wav->time += (need_silence * 1000000) / wav->bps;
-		util_log(wav->glc, GLC_WARNING, "wav", "writing %zd bytes of silence", need_silence);
-		while (need_silence > 0) {
-			write_silence = need_silence > wav->silence_size ? wav->silence_size : need_silence;
-			fwrite(wav->silence, 1, write_silence, wav->to);
-			need_silence -= write_silence;
+		if (!(wav->glc->flags & GLC_EXPORT_STREAMING)) {
+			util_log(wav->glc, GLC_WARNING, "wav", "writing %zd bytes of silence", need_silence);
+			while (need_silence > 0) {
+				write_silence = need_silence > wav->silence_size ? wav->silence_size : need_silence;
+				fwrite(wav->silence, 1, write_silence, wav->to);
+				need_silence -= write_silence;
+			}
 		}
 	}
 
