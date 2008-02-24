@@ -142,6 +142,21 @@ __PUBLIC int gl_capture_destroy(gl_capture_t gl_capture);
 
 /**
  * \brief process full frame
+ *
+ * Call this function when selected read buffer contains ready
+ * frame for capturing. If gl_capture is not in capturing state,
+ * this function does nothing.
+ * \Example
+ * \code
+ * // init
+ * ...
+ * gl_capture_set_read_buffer(gl_capture, GL_FRONT);
+ * gl_capture_start(gl_capture);
+ * ...
+ * // main loop
+ * glXSwapBuffers(dpy, drawable);
+ * gl_capture_frame(gl_capture, dpy, drawable);
+ * \endcode
  * \param gl_capture gl_capture object
  * \param dpy X Display
  * \param drawable GLX Drawable
