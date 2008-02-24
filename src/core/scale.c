@@ -19,16 +19,19 @@
 #include <unistd.h>
 #include <packetstream.h>
 #include <pthread.h>
+#include <errno.h>
 
 #include "../common/glc.h"
 #include "../common/thread.h"
 #include "../common/util.h"
 #include "scale.h"
 
-struct scale_ctx_s;
-struct scale_private_s;
+#define SCALE_RUNNING      0x1
+#define SCALE_SIZE         0x2
 
-typedef void (*scale_proc)(struct scale_private_s *scale,
+struct scale_ctx_s;
+
+typedef void (*scale_proc)(scale_t scale,
 			   struct scale_ctx_s *ctx,
 			   unsigned char *from,
 			   unsigned char *to);
@@ -52,68 +55,113 @@ struct scale_ctx_s {
 	struct scale_ctx_s *next;
 };
 
-struct scale_private_s {
+struct scale_s {
 	glc_t *glc;
+	glc_flags_t flags;
 	struct scale_ctx_s *ctx;
 	glc_thread_t thread;
+
+	double scale;
+	unsigned int width, height;
 };
 
 int scale_read_callback(glc_thread_state_t *state);
 int scale_write_callback(glc_thread_state_t *state);
 void scale_finish_callback(void *ptr, int err);
 
-int scale_pic_msg(struct scale_private_s *scale, struct scale_ctx_s *ctx, unsigned char *from, unsigned char *to);
-int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg, glc_thread_state_t *state);
-int scale_get_ctx(struct scale_private_s *scale, glc_ctx_i ctx_i, struct scale_ctx_s **ctx);
+int scale_pic_msg(scale_t scale, struct scale_ctx_s *ctx, unsigned char *from, unsigned char *to);
+int scale_ctx_msg(scale_t scale, glc_ctx_message_t *ctx_msg, glc_thread_state_t *state);
+int scale_get_ctx(scale_t scale, glc_ctx_i ctx_i, struct scale_ctx_s **ctx);
 
-int scale_generate_rgb_map(struct scale_private_s *scale, struct scale_ctx_s *ctx);
-int scale_generate_ycbcr_map(struct scale_private_s *scale, struct scale_ctx_s *ctx);
+int scale_generate_rgb_map(scale_t scale, struct scale_ctx_s *ctx);
+int scale_generate_ycbcr_map(scale_t scale, struct scale_ctx_s *ctx);
 
-void scale_rgb_convert(struct scale_private_s *scale, struct scale_ctx_s *ctx,
+void scale_rgb_convert(scale_t scale, struct scale_ctx_s *ctx,
 		       unsigned char *from, unsigned char *to);
-void scale_rgb_half(struct scale_private_s *scale, struct scale_ctx_s *ctx,
+void scale_rgb_half(scale_t scale, struct scale_ctx_s *ctx,
 		    unsigned char *from, unsigned char *to);
-void scale_rgb_scale(struct scale_private_s *scale, struct scale_ctx_s *ctx,
+void scale_rgb_scale(scale_t scale, struct scale_ctx_s *ctx,
 		     unsigned char *from, unsigned char *to);
 
-void scale_ycbcr_half(struct scale_private_s *scale, struct scale_ctx_s *ctx,
+void scale_ycbcr_half(scale_t scale, struct scale_ctx_s *ctx,
 		      unsigned char *from, unsigned char *to);
-void scale_ycbcr_scale(struct scale_private_s *scale, struct scale_ctx_s *ctx,
+void scale_ycbcr_scale(scale_t scale, struct scale_ctx_s *ctx,
 		       unsigned char *from, unsigned char *to);
 
-void *scale_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
+int scale_init(scale_t *scale, glc_t *glc)
 {
-	struct scale_private_s *scale = malloc(sizeof(struct scale_private_s));
-	memset(scale, 0, sizeof(struct scale_private_s));
+	*scale = malloc(sizeof(struct scale_s));
+	memset(*scale, 0, sizeof(struct scale_s));
 
-	scale->glc = glc;
+	(*scale)->glc = glc;
 
-	scale->thread.flags = GLC_THREAD_READ | GLC_THREAD_WRITE;
-	scale->thread.read_callback = &scale_read_callback;
-	scale->thread.write_callback = &scale_write_callback;
-	scale->thread.finish_callback = &scale_finish_callback;
-	scale->thread.ptr = scale;
-	scale->thread.threads = util_cpus();
+	(*scale)->thread.flags = GLC_THREAD_READ | GLC_THREAD_WRITE;
+	(*scale)->thread.read_callback = &scale_read_callback;
+	(*scale)->thread.write_callback = &scale_write_callback;
+	(*scale)->thread.finish_callback = &scale_finish_callback;
+	(*scale)->thread.ptr = scale;
+	(*scale)->thread.threads = util_cpus();
+	(*scale)->scale = 1.0;
 
-	if (glc_thread_create(glc, &scale->thread, from, to))
-		return NULL;
 
-	return scale;
+	return 0;
 }
 
-int scale_wait(void *scalepriv)
+int scale_destroy(scale_t scale)
 {
-	struct scale_private_s *scale = scalepriv;
-
-	glc_thread_wait(&scale->thread);
 	free(scale);
+	return 0;
+}
+
+int scale_set_scale(scale_t scale, double factor)
+{
+	if (factor <= 0)
+		return EINVAL;
+
+	scale->scale = factor;
+	scale->flags &= ~SCALE_SIZE;
+	return 0;
+}
+
+int scale_set_size(scale_t scale, unsigned int width, unsigned int height)
+{
+	if ((!width) | (!height))
+		return EINVAL;
+
+	scale->width = width;
+	scale->height = height;
+	scale->flags |= SCALE_SIZE;
+	return 0;
+}
+
+int scale_process_start(scale_t scale, ps_buffer_t *from, ps_buffer_t *to)
+{
+	int ret;
+	if (scale->flags & SCALE_RUNNING)
+		return EAGAIN;
+
+	if ((ret = glc_thread_create(scale->glc, &scale->thread, from, to)))
+		return ret;
+	scale->flags |= SCALE_RUNNING;
+
+	return 0;
+}
+
+int scale_process_wait(scale_t scale)
+{
+	if (!(scale->flags & SCALE_RUNNING))
+		return EAGAIN;
+
+	/* finish callback frees ctx stuff */
+	glc_thread_wait(&scale->thread);
+	scale->flags &= ~SCALE_RUNNING;
 
 	return 0;
 }
 
 void scale_finish_callback(void *ptr, int err)
 {
-	struct scale_private_s *scale = ptr;
+	scale_t scale = ptr;
 	struct scale_ctx_s *del;
 
 	if (err)
@@ -134,7 +182,7 @@ void scale_finish_callback(void *ptr, int err)
 }
 
 int scale_read_callback(glc_thread_state_t *state) {
-	struct scale_private_s *scale = (struct scale_private_s *) state->ptr;
+	scale_t scale = (scale_t) state->ptr;
 	struct scale_ctx_s *ctx;
 	glc_picture_header_t *pic_header;
 
@@ -161,7 +209,7 @@ int scale_read_callback(glc_thread_state_t *state) {
 }
 
 int scale_write_callback(glc_thread_state_t *state) {
-	struct scale_private_s *scale = (struct scale_private_s *) state->ptr;
+	scale_t scale = (scale_t) state->ptr;
 	struct scale_ctx_s *ctx = state->threadptr;
 
 	memcpy(state->write_data, state->read_data, GLC_PICTURE_HEADER_SIZE);
@@ -173,7 +221,7 @@ int scale_write_callback(glc_thread_state_t *state) {
 	return 0;
 }
 
-int scale_get_ctx(struct scale_private_s *scale, glc_ctx_i ctx_i, struct scale_ctx_s **ctx)
+int scale_get_ctx(scale_t scale, glc_ctx_i ctx_i, struct scale_ctx_s **ctx)
 {
 	struct scale_ctx_s *list = scale->ctx;
 
@@ -197,7 +245,7 @@ int scale_get_ctx(struct scale_private_s *scale, glc_ctx_i ctx_i, struct scale_c
 	return 0;
 }
 
-void scale_rgb_convert(struct scale_private_s *scale, struct scale_ctx_s *ctx,
+void scale_rgb_convert(scale_t scale, struct scale_ctx_s *ctx,
 		       unsigned char *from, unsigned char *to)
 {
 	unsigned int x, y, ox, oy, op, tp;
@@ -222,7 +270,7 @@ void scale_rgb_convert(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 	}
 }
 
-void scale_rgb_half(struct scale_private_s *scale, struct scale_ctx_s *ctx,
+void scale_rgb_half(scale_t scale, struct scale_ctx_s *ctx,
 		    unsigned char *from, unsigned char *to)
 {
 	unsigned int ox, oy, op1, op2, op3, op4;
@@ -251,12 +299,12 @@ void scale_rgb_half(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 	}
 }
 
-void scale_rgb_scale(struct scale_private_s *scale, struct scale_ctx_s *ctx,
+void scale_rgb_scale(scale_t scale, struct scale_ctx_s *ctx,
 		     unsigned char *from, unsigned char *to)
 {
 	unsigned int x, y, tp, sp;
 
-	if (scale->glc->flags & GLC_SCALE_SIZE)
+	if (scale->flags & SCALE_SIZE)
 		memset(to, 0, ctx->size);
 
 	for (y = 0; y < ctx->sh; y++) {
@@ -280,7 +328,7 @@ void scale_rgb_scale(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 	}
 }
 
-void scale_ycbcr_half(struct scale_private_s *scale, struct scale_ctx_s *ctx,
+void scale_ycbcr_half(scale_t scale, struct scale_ctx_s *ctx,
 		      unsigned char *from, unsigned char *to)
 {
 	unsigned int x, y, ox, oy, cw_from, ch_from, cw_to, ch_to, op1, op2, op3, op4;
@@ -340,7 +388,7 @@ void scale_ycbcr_half(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 	}
 }
 
-void scale_ycbcr_scale(struct scale_private_s *scale, struct scale_ctx_s *ctx,
+void scale_ycbcr_scale(scale_t scale, struct scale_ctx_s *ctx,
 		       unsigned char *from, unsigned char *to)
 {
 	unsigned int x, y, sp, cw, ch;
@@ -357,7 +405,7 @@ void scale_ycbcr_scale(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 	Cb_to = &to[ctx->rw * ctx->rh];
 	Cr_to = &Cb_to[(ctx->rw / 2) * (ctx->rh / 2)];
 
-	if (scale->glc->flags & GLC_SCALE_SIZE) {
+	if (scale->flags & SCALE_SIZE) {
 		memset(Y_to, 0, ctx->rw * ctx->rh);
 		memset(Cb_to, 128, (ctx->rw / 2) * (ctx->rh / 2));
 		memset(Cr_to, 128, (ctx->rw / 2) * (ctx->rh / 2));
@@ -394,7 +442,7 @@ void scale_ycbcr_scale(struct scale_private_s *scale, struct scale_ctx_s *ctx,
 	}
 }
 
-int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg, glc_thread_state_t *state)
+int scale_ctx_msg(scale_t scale, glc_ctx_message_t *ctx_msg, glc_thread_state_t *state)
 {
 	struct scale_ctx_s *ctx;
 	glc_flags_t old_flags;
@@ -407,9 +455,9 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg, glc
 	ctx->w = ctx_msg->w;
 	ctx->h = ctx_msg->h;
 
-	if (scale->glc->flags & GLC_SCALE_SIZE) {
-		ctx->rw = scale->glc->scale_width;
-		ctx->rh = scale->glc->scale_height;
+	if (scale->flags & SCALE_SIZE) {
+		ctx->rw = scale->width;
+		ctx->rh = scale->height;
 
 		if ((float) ctx->rw / (float) ctx->w < (float) ctx->rh / (float) ctx->h)
 			ctx->scale = (float) ctx->rw / (float) ctx->w;
@@ -424,7 +472,7 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg, glc
 			 "real size is %ux%u, scaled picture starts at %ux%u",
 			 ctx->rw, ctx->rh, ctx->rx, ctx->ry);
 	} else {
-		ctx->scale = scale->glc->scale;
+		ctx->scale = scale->scale;
 		ctx->sw = ctx->scale * ctx->w;
 		ctx->sh = ctx->scale * ctx->h;
 
@@ -451,7 +499,7 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg, glc
 	ctx->proc = NULL; /* do not try anything stupid... */
 
 	if ((ctx_msg->flags & GLC_CTX_BGR) | (ctx_msg->flags & GLC_CTX_BGRA)) {
-		if ((ctx->scale == 0.5) && !(scale->glc->flags & GLC_SCALE_SIZE)) {
+		if ((ctx->scale == 0.5) && !(scale->flags & SCALE_SIZE)) {
 			util_log(scale->glc, GLC_DEBUG, "scale",
 				 "scaling RGB data to half-size (from %ux%u to %ux%u)",
 				 ctx->w, ctx->h, ctx->sw, ctx->sh);
@@ -473,7 +521,7 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg, glc
 		ctx_msg->h = ctx->rh;
 		ctx->size = ctx->rw * ctx->rh * 3;
 
-		if ((scale->glc->flags & GLC_SCALE_SIZE) &&
+		if ((scale->flags & SCALE_SIZE) &&
 		    (ctx_msg->flags & GLC_CTX_UPDATE) &&
 		    ((old_flags & ~(GLC_CTX_CREATE | GLC_CTX_UPDATE)) ==
 		     (ctx_msg->flags & ~(GLC_CTX_CREATE | GLC_CTX_UPDATE))))
@@ -487,7 +535,7 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg, glc
 		ctx_msg->h = ctx->rh;
 		ctx->size = ctx->rw * ctx->rh + 2 * ((ctx->rw / 2) * (ctx->rh / 2));
 
-		if ((ctx->scale == 0.5) && !(scale->glc->flags & GLC_SCALE_SIZE)) {
+		if ((ctx->scale == 0.5) && !(scale->flags & SCALE_SIZE)) {
 			util_log(scale->glc, GLC_DEBUG, "scale",
 				 "scaling Y'CbCr data to half-size (from %ux%u to %ux%u)",
 				 ctx->w, ctx->h, ctx->sw, ctx->sh);
@@ -500,7 +548,7 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg, glc
 			scale_generate_ycbcr_map(scale, ctx);
 		}
 
-		if ((scale->glc->flags & GLC_SCALE_SIZE) &&
+		if ((scale->flags & SCALE_SIZE) &&
 		    (ctx_msg->flags & GLC_CTX_UPDATE) &&
 		    ((old_flags & ~(GLC_CTX_CREATE | GLC_CTX_UPDATE)) ==
 		     (ctx_msg->flags & ~(GLC_CTX_CREATE | GLC_CTX_UPDATE))))
@@ -513,7 +561,7 @@ int scale_ctx_msg(struct scale_private_s *scale, glc_ctx_message_t *ctx_msg, glc
 	return 0;
 }
 
-int scale_generate_rgb_map(struct scale_private_s *scale, struct scale_ctx_s *ctx)
+int scale_generate_rgb_map(scale_t scale, struct scale_ctx_s *ctx)
 {
 	float ofx, ofy, fx0, fx1, fy0, fy1;
 	unsigned int tp, x, y, r;
@@ -572,7 +620,7 @@ int scale_generate_rgb_map(struct scale_private_s *scale, struct scale_ctx_s *ct
 	return 0;
 }
 
-int scale_generate_ycbcr_map(struct scale_private_s *scale, struct scale_ctx_s *ctx)
+int scale_generate_ycbcr_map(scale_t scale, struct scale_ctx_s *ctx)
 {
 	float ofx, ofy, fx0, fx1, fy0, fy1;
 	unsigned int tp, x, y, r, cw, ch;
