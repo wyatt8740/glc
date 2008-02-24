@@ -27,7 +27,7 @@
 #include "../common/util.h"
 #include "audio_capture.h"
 
-struct audio_capture_private_s {
+struct audio_capture_s {
 	glc_t *glc;
 	ps_buffer_t *to;
 	glc_audio_i id;
@@ -53,48 +53,44 @@ struct audio_capture_private_s {
 	int stop_capture;
 };
 
-int audio_capture_open(struct audio_capture_private_s *audio_capture);
-int audio_capture_init_hw(struct audio_capture_private_s *audio_capture, snd_pcm_hw_params_t *hw_params);
-int audio_capture_init_sw(struct audio_capture_private_s *audio_capture, snd_pcm_sw_params_t *sw_params);
+int audio_capture_open(audio_capture_t audio_capture);
+int audio_capture_init_hw(audio_capture_t audio_capture, snd_pcm_hw_params_t *hw_params);
+int audio_capture_init_sw(audio_capture_t audio_capture, snd_pcm_sw_params_t *sw_params);
 
 void audio_capture_async_callback(snd_async_handler_t *async_handler);
 void *audio_capture_thread(void *argptr);
 
 glc_flags_t audio_capture_fmt_flags(snd_pcm_format_t pcm_fmt);
 
-int audio_capture_xrun(struct audio_capture_private_s *audio_capture, int err);
-int audio_capture_stop(struct audio_capture_private_s *audio_capture);
+int audio_capture_xrun(audio_capture_t audio_capture, int err);
+int audio_capture_stop(audio_capture_t audio_capture);
 
-void *audio_capture_init(glc_t *glc, ps_buffer_t *to, const char *device, unsigned int rate, unsigned int channels)
+int audio_capture_init(audio_capture_t *audio_capture, glc_t *glc)
 {
-	struct audio_capture_private_s *audio_capture = malloc(sizeof(struct audio_capture_private_s));
-	memset(audio_capture, 0, sizeof(struct audio_capture_private_s));
+	*audio_capture = (audio_capture_t) malloc(sizeof(struct audio_capture_s));
+	memset(*audio_capture, 0, sizeof(struct audio_capture_s));
 	pthread_attr_t attr;
 
-	audio_capture->glc = glc;
-	audio_capture->to = to;
-	audio_capture->device = device;
-	audio_capture->channels = channels;
-	audio_capture->rate = rate;
-	audio_capture->min_periods = 2;
-	audio_capture->id = util_audio_stream_id(audio_capture->glc);
+	(*audio_capture)->glc = glc;
+	(*audio_capture)->device = "default";
+	(*audio_capture)->channels = 2;
+	(*audio_capture)->rate = 44100;
+	(*audio_capture)->min_periods = 2;
+	(*audio_capture)->id = util_audio_stream_id((*audio_capture)->glc);
+	(*audio_capture)->skip_data = 1;
 
-	sem_init(&audio_capture->capture, 0, 0);
+	sem_init(&(*audio_capture)->capture, 0, 0);
 
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-	pthread_create(&audio_capture->capture_thread, &attr, audio_capture_thread, audio_capture);
+	pthread_create(&(*audio_capture)->capture_thread, &attr, audio_capture_thread, (void *) *audio_capture);
 	pthread_attr_destroy(&attr);
 
-	if (audio_capture_open(audio_capture))
-		return NULL;
-
-	return audio_capture;
+	return 0;
 }
 
-int audio_capture_close(void *audiopriv)
+int audio_capture_destroy(audio_capture_t audio_capture)
 {
-	struct audio_capture_private_s *audio_capture = audiopriv;
 	if (audio_capture == NULL)
 		return EINVAL;
 
@@ -110,31 +106,72 @@ int audio_capture_close(void *audiopriv)
 	return 0;
 }
 
-int audio_capture_pause(void *audiopriv)
+int audio_capture_set_device(audio_capture_t audio_capture, const char *device)
 {
-	struct audio_capture_private_s *audio_capture = audiopriv;
-	if (audio_capture == NULL)
-		return EINVAL;
+	if (audio_capture->pcm)
+		return EALREADY;
 
-	util_log(audio_capture->glc, GLC_DEBUG, "audio_capture", "pausing device %s",
-		 audio_capture->device);
-	audio_capture->skip_data = 1;
+	audio_capture->device = device;
 	return 0;
 }
 
-int audio_capture_resume(void *audiopriv)
+int audio_capture_set_rate(audio_capture_t audio_capture, unsigned int rate)
 {
-	struct audio_capture_private_s *audio_capture = audiopriv;
+	if (audio_capture->pcm)
+		return EALREADY;
+
+	audio_capture->rate = rate;
+	return 0;
+}
+
+int audio_capture_set_channels(audio_capture_t audio_capture, unsigned int channels)
+{
+	if (audio_capture->pcm)
+		return EALREADY;
+
+	audio_capture->channels = channels;
+	return 0;
+}
+
+int audio_capture_start(audio_capture_t audio_capture)
+{
+	int ret;
 	if (audio_capture == NULL)
 		return EINVAL;
 
-	util_log(audio_capture->glc, GLC_DEBUG, "audio_capture", "resuming device %s",
-		 audio_capture->device);
+	if (audio_capture->skip_data)
+		util_log(audio_capture->glc, GLC_WARNING, "audio_capture",
+			 "device %s already started", audio_capture->device);
+	else
+		util_log(audio_capture->glc, GLC_INFORMATION, "audio_capture",
+			 "starting device %s", audio_capture->device);
+
+	if (!audio_capture->pcm) {
+		if ((ret = audio_capture_open(audio_capture)))
+			return ret;
+	}
+
 	audio_capture->skip_data = 0;
 	return 0;
 }
 
-int audio_capture_open(struct audio_capture_private_s *audio_capture)
+int audio_capture_stop(audio_capture_t audio_capture)
+{
+	if (audio_capture == NULL)
+		return EINVAL;
+
+	if (audio_capture->skip_data)
+		util_log(audio_capture->glc, GLC_INFORMATION, "audio_capture",
+			 "stopping device %s", audio_capture->device);
+	else
+		util_log(audio_capture->glc, GLC_WARNING, "audio_capture",
+			 "device %s already stopped", audio_capture->device);
+
+	audio_capture->skip_data = 1;
+	return 0;
+}
+
+int audio_capture_open(audio_capture_t audio_capture)
 {
 	snd_pcm_hw_params_t *hw_params = NULL;
 	snd_pcm_sw_params_t *sw_params = NULL;
@@ -240,7 +277,7 @@ glc_flags_t audio_capture_fmt_flags(snd_pcm_format_t pcm_fmt)
 	}
 }
 
-int audio_capture_init_hw(struct audio_capture_private_s *audio_capture, snd_pcm_hw_params_t *hw_params)
+int audio_capture_init_hw(audio_capture_t audio_capture, snd_pcm_hw_params_t *hw_params)
 {
 	snd_pcm_format_mask_t *formats = NULL;
 	snd_pcm_uframes_t max_buffer_size;
@@ -289,7 +326,7 @@ err:
 	return -ret;
 }
 
-int audio_capture_init_sw(struct audio_capture_private_s *audio_capture, snd_pcm_sw_params_t *sw_params)
+int audio_capture_init_sw(audio_capture_t audio_capture, snd_pcm_sw_params_t *sw_params)
 {
 	int ret = 0;
 
@@ -311,14 +348,14 @@ void audio_capture_async_callback(snd_async_handler_t *async_handler)
 
 	 http://www.kaourantin.net/2006/08/pthreads-and-signals.html
 	 */
-	struct audio_capture_private_s *audio_capture =
+	audio_capture_t audio_capture =
 		snd_async_handler_get_callback_private(async_handler);
 	sem_post(&audio_capture->capture);
 }
 
 void *audio_capture_thread(void *argptr)
 {
-	struct audio_capture_private_s *audio_capture = argptr;
+	audio_capture_t audio_capture = argptr;
 	snd_pcm_sframes_t avail, read;
 	glc_utime_t time, delay_usec = 0;
 	glc_audio_header_t hdr;
@@ -408,7 +445,7 @@ cancel:
 	return NULL;
 }
 
-int audio_capture_xrun(struct audio_capture_private_s *audio_capture, int err)
+int audio_capture_xrun(audio_capture_t audio_capture, int err)
 {
 	util_log(audio_capture->glc, GLC_DEBUG, "audio_capture", "xrun");
 
