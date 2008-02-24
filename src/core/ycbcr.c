@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include <packetstream.h>
 #include <pthread.h>
+#include <errno.h>
 
 #include "../common/glc.h"
 #include "../common/thread.h"

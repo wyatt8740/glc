@@ -16,7 +16,6 @@
 
 #include "../common/glc.h"
 #include <packetstream.h>
-#include <errno.h>
 
 /**
  * \brief ycbcr object
@@ -41,6 +40,11 @@ __PUBLIC int ycbcr_set_scale(ycbcr_t ycbcr, double scale);
 
 /**
  * \brief process data and transfer between buffers
+ *
+ * ycbcr process converts all BGR and BGRA frames into
+ * YCBCR_420JPEG and optionally does rescaling. Downscaling
+ * is cheap operation and mostly makes actual conversion much
+ * faster since smaller amount of data has to be converted.
  *
  * This returns immediately. Actual processing is done in
  * different thread.
