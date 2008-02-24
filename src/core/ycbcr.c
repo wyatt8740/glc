@@ -115,7 +115,7 @@ int ycbcr_init(ycbcr_t *ycbcr, glc_t *glc)
 	(*ycbcr)->thread.read_callback = &ycbcr_read_callback;
 	(*ycbcr)->thread.write_callback = &ycbcr_write_callback;
 	(*ycbcr)->thread.finish_callback = &ycbcr_finish_callback;
-	(*ycbcr)->thread.ptr = ycbcr;
+	(*ycbcr)->thread.ptr = *ycbcr;
 	(*ycbcr)->thread.threads = util_cpus();
 	(*ycbcr)->scale = 1.0;
 

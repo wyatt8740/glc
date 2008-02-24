@@ -99,10 +99,9 @@ int scale_init(scale_t *scale, glc_t *glc)
 	(*scale)->thread.read_callback = &scale_read_callback;
 	(*scale)->thread.write_callback = &scale_write_callback;
 	(*scale)->thread.finish_callback = &scale_finish_callback;
-	(*scale)->thread.ptr = scale;
+	(*scale)->thread.ptr = *scale;
 	(*scale)->thread.threads = util_cpus();
 	(*scale)->scale = 1.0;
-
 
 	return 0;
 }
