@@ -81,16 +81,10 @@ typedef u_int32_t glc_flags_t;
 #define GLC_CAPTURE                         0x1
 /** glc is cancelled */
 #define GLC_CANCEL                          0x2
-/** scaling (ycbcr or scale) is active */
-#define GLC_SCALE                           0x4
-/** do colorspace conversion to Y'CbCr 420jpeg */
-#define GLC_CONVERT_420JPEG               0x200
 /** compress stream with LZO */
 #define GLC_COMPRESS_LZO                 0x1000
 /** compress stream with QuickLZ */
 #define GLC_COMPRESS_QUICKLZ             0x2000
-/** cap fps */
-#define GLC_LOCK_FPS                     0x4000
 /** enable log */
 #define GLC_LOG                          0x8000
 /** disable writing errors to stderr */
