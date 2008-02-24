@@ -301,6 +301,7 @@ int gl_capture_start(gl_capture_t gl_capture)
 			 "starting capturing");
 
 	gl_capture->flags |= GL_CAPTURE_CAPTURING;
+	gl_capture_refresh_color_correction(gl_capture);
 	return 0;
 }
 
@@ -822,6 +823,9 @@ cancel:
 int gl_capture_refresh_color_correction(gl_capture_t gl_capture)
 {
 	struct gl_capture_ctx_s *ctx;
+
+	if (!(gl_capture->flags & GL_CAPTURE_CAPTURING))
+		return 0; /* capturing not active */
 
 	util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 		 "refreshing color correction");
