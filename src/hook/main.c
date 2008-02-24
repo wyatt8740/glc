@@ -101,6 +101,7 @@ void init_glc()
 	if (mpriv.glc.flags & GLC_CAPTURE) {
 		if ((ret = start_glc()))
 			goto err;
+		alsa_capture_start();
 		opengl_capture_start();
 	}
 
