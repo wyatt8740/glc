@@ -33,22 +33,30 @@
 
 #include "play/demux.h"
 
-enum glc_play_action_t {play, info, img, yuv4mpeg, wav, val};
+enum play_action {action_play, action_info, action_img, action_yuv4mpeg, action_wav, action_val};
 
-int show_info_value(glc_t *glc, const char *value);
+struct play_s {
+	glc_t glc;
+	enum play_action action;
 
-int play_stream(glc_t *glc);
-int stream_info(glc_t *glc);
-int export_img(glc_t *glc);
-int export_yuv4mpeg(glc_t *glc);
-int export_wav(glc_t *glc);
+	double scale;
+	unsigned int scale_width, scale_height;
+};
+
+int show_info_value(struct play_s *play, const char *value);
+
+int play_stream(struct play_s *play);
+int stream_info(struct play_s *play);
+int export_img(struct play_s *play);
+int export_yuv4mpeg(struct play_s *play);
+int export_wav(struct play_s *play);
 
 int main(int argc, char *argv[])
 {
-	glc_t glc;
+	struct play_s play;
+	play.action = action_play;
 	const char *val_str = NULL;
 	int opt, option_index;
-	enum glc_play_action_t action = play;
 
 	struct option long_options[] = {
 		{"info",		1, NULL, 'i'},
@@ -73,117 +81,117 @@ int main(int argc, char *argv[])
 	option_index = 0;
 
 	/* initialize glc with some sane values */
-	glc.flags = 0;
-	glc.fps = 0;
-	glc.filename_format = NULL; /* user has to specify */
+	play.glc.flags = 0;
+	play.glc.fps = 0;
+	play.glc.filename_format = NULL; /* user has to specify */
 
-	glc.silence_threshold = 200000; /* 0.2 sec accuracy */
-	glc.alsa_playback_device = "default";
+	play.glc.silence_threshold = 200000; /* 0.2 sec accuracy */
+	play.glc.alsa_playback_device = "default";
 
 	/* don't scale by default */
-	glc.scale = 1;
-	glc.scale_width = glc.scale_height = 0;
+	play.scale = 1;
+	play.scale_width = play.scale_height = 0;
 
 	/* default buffer size is 10MiB */
-	glc.compressed_size = 10 * 1024 * 1024;
-	glc.uncompressed_size = 10 * 1024 * 1024;
+	play.glc.compressed_size = 10 * 1024 * 1024;
+	play.glc.uncompressed_size = 10 * 1024 * 1024;
 
 	/* log to stderr */
-	glc.log_file = "/dev/stderr";
-	glc.log_level = 0;
+	play.glc.log_file = "/dev/stderr";
+	play.glc.log_level = 0;
 
 	/* global color correction */
-	glc.brightness = glc.contrast = 0;
-	glc.red_gamma = 1.0;
-	glc.green_gamma = 1.0;
-	glc.blue_gamma = 1.0;
+	play.glc.brightness = play.glc.contrast = 0;
+	play.glc.red_gamma = 1.0;
+	play.glc.green_gamma = 1.0;
+	play.glc.blue_gamma = 1.0;
 
 	while ((opt = getopt_long(argc, argv, "i:a:b:p:y:o:f:r:g:l:td:c:u:s:v:h",
 				  long_options, &optind)) != -1) {
 		switch (opt) {
 		case 'i':
-			glc.info_level = atoi(optarg);
-			if (glc.info_level < 1)
+			play.glc.info_level = atoi(optarg);
+			if (play.glc.info_level < 1)
 				goto usage;
-			action = info;
+			play.action = action_info;
 			break;
 		case 'a':
-			glc.export_audio = atoi(optarg);
-			if (glc.export_audio < 1)
+			play.glc.export_audio = atoi(optarg);
+			if (play.glc.export_audio < 1)
 				goto usage;
-			action = wav;
+			play.action = action_wav;
 			break;
 		case 'p':
-			glc.flags |= GLC_EXPORT_PNG;
+			play.glc.flags |= GLC_EXPORT_PNG;
 		case 'b':
-			glc.export_ctx = atoi(optarg);
-			if (glc.export_ctx < 1)
+			play.glc.export_ctx = atoi(optarg);
+			if (play.glc.export_ctx < 1)
 				goto usage;
-			action = img;
+			play.action = action_img;
 			break;
 		case 'y':
-			glc.export_ctx = atoi(optarg);
-			if (glc.export_ctx < 1)
+			play.glc.export_ctx = atoi(optarg);
+			if (play.glc.export_ctx < 1)
 				goto usage;
-			action = yuv4mpeg;
+			play.action = action_yuv4mpeg;
 			break;
 		case 'f':
-			glc.fps = atof(optarg);
-			if (glc.fps <= 0)
+			play.glc.fps = atof(optarg);
+			if (play.glc.fps <= 0)
 				goto usage;
 			break;
 		case 'r':
 			if (strstr(optarg, "x")) {
-				sscanf(optarg, "%ux%u", &glc.scale_width, &glc.scale_height);
-				if ((!glc.scale_width) | (!glc.scale_height))
+				sscanf(optarg, "%ux%u", &play.scale_width, &play.scale_height);
+				if ((!play.scale_width) | (!play.scale_height))
 					goto usage;
-				glc.flags |= GLC_SCALE_SIZE;
+				play.glc.flags |= GLC_SCALE_SIZE; /** \todo remove */
 			} else {
-				glc.scale = atof(optarg);
-				if (glc.scale <= 0)
+				play.scale = atof(optarg);
+				if (play.scale <= 0)
 					goto usage;
 			}
 			break;
 		case 'g':
-			glc.flags |= GLC_OVERRIDE_COLOR_CORRECTION;
-			sscanf(optarg, "%f;%f;%f;%f;%f", &glc.brightness, &glc.contrast,
-			       &glc.red_gamma, &glc.green_gamma, &glc.blue_gamma);
+			play.glc.flags |= GLC_OVERRIDE_COLOR_CORRECTION;
+			sscanf(optarg, "%f;%f;%f;%f;%f", &play.glc.brightness, &play.glc.contrast,
+			       &play.glc.red_gamma, &play.glc.green_gamma, &play.glc.blue_gamma);
 			break;
 		case 'l':
 			/* glc_utime_t so always positive */
-			glc.silence_threshold = atof(optarg) * 1000000;
+			play.glc.silence_threshold = atof(optarg) * 1000000;
 			break;
 		case 'd':
-			glc.alsa_playback_device = optarg;
+			play.glc.alsa_playback_device = optarg;
 			break;
 		case 'o':
 			if (!strcmp(optarg, "-")) /** \todo fopen(1) ? */
-				glc.filename_format = "/dev/stdout";
+				play.glc.filename_format = "/dev/stdout";
 			else
-				glc.filename_format = optarg;
+				play.glc.filename_format = optarg;
 			break;
 		case 't':
-			glc.flags |= GLC_EXPORT_STREAMING;
+			play.glc.flags |= GLC_EXPORT_STREAMING;
 			break;
 		case 'c':
-			glc.compressed_size = atoi(optarg) * 1024 * 1024;
-			if (glc.compressed_size <= 0)
+			play.glc.compressed_size = atoi(optarg) * 1024 * 1024;
+			if (play.glc.compressed_size <= 0)
 				goto usage;
 			break;
 		case 'u':
-			glc.uncompressed_size = atoi(optarg) * 1024 * 1024;
-			if (glc.uncompressed_size <= 0)
+			play.glc.uncompressed_size = atoi(optarg) * 1024 * 1024;
+			if (play.glc.uncompressed_size <= 0)
 				goto usage;
 			break;
 		case 's':
 			val_str = optarg;
-			action = val;
+			play.action = action_val;
 			break;
 		case 'v':
-			glc.log_level = atoi(optarg);
-			if (glc.log_level < 0)
+			play.glc.log_level = atoi(optarg);
+			if (play.glc.log_level < 0)
 				goto usage;
-			glc.flags |= GLC_LOG | GLC_NOERR;
+			play.glc.flags |= GLC_LOG | GLC_NOERR;
 			break;
 		case 'h':
 		default:
@@ -191,76 +199,81 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	/** \todo remove */
+	play.glc.scale = play.scale;
+	play.glc.scale_width = play.scale_width;
+	play.glc.scale_height = play.scale_height;
+
 	/* stream file is mandatory */
 	if (optind >= argc)
 		goto usage;
-	glc.stream_file = argv[optind];
+	play.glc.stream_file = argv[optind];
 
 	/* same goes to output file */
-	if (((action == img) |
-	     (action == wav) |
-	     (action == yuv4mpeg)) &&
-	    (glc.filename_format == NULL))
+	if (((play.action == action_img) |
+	     (play.action == action_wav) |
+	     (play.action == action_yuv4mpeg)) &&
+	    (play.glc.filename_format == NULL))
 		goto usage;
 
 	/* we do global initialization */
-	util_init(&glc);
-	if (glc.flags & GLC_LOG) {
-		util_log_init(&glc);
-		util_log_version(&glc);
+	util_init(&play.glc);
+	if (play.glc.flags & GLC_LOG) {
+		util_log_init(&play.glc);
+		util_log_version(&play.glc);
 	}
 
 	/* open stream file */
-	glc.stream_fd = open(glc.stream_file, O_SYNC);
-	if (!glc.stream_fd) {
-		util_log(&glc, GLC_ERROR, "main",
-			 "can't open %s: %s (%d)", glc.stream_file, strerror(errno), errno);
+	play.glc.stream_fd = open(play.glc.stream_file, O_SYNC);
+	if (!play.glc.stream_fd) {
+		util_log(&play.glc, GLC_ERROR, "main",
+			 "can't open %s: %s (%d)", play.glc.stream_file, strerror(errno), errno);
 		return -1;
 	}
 
 	/* load information and check that the file is valid */
-	if (util_load_info(&glc))
+	if (util_load_info(&play.glc))
 		return EXIT_FAILURE;
 
 	/*
 	 If the fps hasn't been specified read it from the
 	 stream information.
 	*/
-	if (glc.fps == 0)
-		glc.fps = glc.info->fps;
+	if (play.glc.fps == 0)
+		play.glc.fps = play.glc.info->fps;
 
-	switch (action) {
-	case play:
-		if (play_stream(&glc))
+	switch (play.action) {
+	case action_play:
+		if (play_stream(&play))
 			return EXIT_FAILURE;
 		break;
-	case wav:
-		if (export_wav(&glc))
+	case action_wav:
+		if (export_wav(&play))
 			return EXIT_FAILURE;
 		break;
-	case yuv4mpeg:
-		if (export_yuv4mpeg(&glc))
+	case action_yuv4mpeg:
+		if (export_yuv4mpeg(&play))
 			return EXIT_FAILURE;
 		break;
-	case img:
-		if (export_img(&glc))
+	case action_img:
+		if (export_img(&play))
 			return EXIT_FAILURE;
 		break;
-	case info:
-		if (stream_info(&glc))
+	case action_info:
+		if (stream_info(&play))
 			return EXIT_FAILURE;
 		break;
-	case val:
-		if (show_info_value(&glc, val_str))
+	case action_val:
+		if (show_info_value(&play, val_str))
 			return EXIT_FAILURE;
 		break;
 	}
 
 	/* our cleanup */
-	util_log_close(&glc);
-	util_free_info(&glc);
-	util_free(&glc);
-	close(glc.stream_fd);
+	util_log_close(&play.glc);
+	util_free_info(&play.glc);
+	util_free(&play.glc);
+	close(play.glc.stream_fd);
 
 	return EXIT_SUCCESS;
 
@@ -296,36 +309,36 @@ usage:
 	return EXIT_FAILURE;
 }
 
-int show_info_value(glc_t *glc, const char *value)
+int show_info_value(struct play_s *play, const char *value)
 {
 	if (!strcmp("all", value)) {
-		printf("  signature   = 0x%08x\n", glc->info->signature);
-		printf("  version     = 0x%02x\n", glc->info->version);
-		printf("  flags       = %d\n", glc->info->flags);
-		printf("  fps         = %f\n", glc->info->fps);
-		printf("  pid         = %d\n", glc->info->pid);
-		printf("  name        = %s\n", glc->info_name);
-		printf("  date        = %s\n", glc->info_date);
+		printf("  signature   = 0x%08x\n", play->glc.info->signature);
+		printf("  version     = 0x%02x\n", play->glc.info->version);
+		printf("  flags       = %d\n", play->glc.info->flags);
+		printf("  fps         = %f\n", play->glc.info->fps);
+		printf("  pid         = %d\n", play->glc.info->pid);
+		printf("  name        = %s\n", play->glc.info_name);
+		printf("  date        = %s\n", play->glc.info_date);
 	} else if (!strcmp("signature", value))
-		printf("0x%08x\n", glc->info->signature);
+		printf("0x%08x\n", play->glc.info->signature);
 	else if (!strcmp("version", value))
-		printf("0x%02x\n", glc->info->version);
+		printf("0x%02x\n", play->glc.info->version);
 	else if (!strcmp("flags", value))
-		printf("%d\n", glc->info->flags);
+		printf("%d\n", play->glc.info->flags);
 	else if (!strcmp("fps", value))
-		printf("%f\n", glc->info->fps);
+		printf("%f\n", play->glc.info->fps);
 	else if (!strcmp("pid", value))
-		printf("%d\n", glc->info->pid);
+		printf("%d\n", play->glc.info->pid);
 	else if (!strcmp("name", value))
-		printf("%s\n", glc->info_name);
+		printf("%s\n", play->glc.info_name);
 	else if (!strcmp("date", value))
-		printf("%s\n", glc->info_date);
+		printf("%s\n", play->glc.info_date);
 	else
 		return ENOTSUP;
 	return 0;
 }
 
-int play_stream(glc_t *glc)
+int play_stream(struct play_s *play)
 {
 	/*
 	 Playback uses following pipeline:
@@ -355,13 +368,13 @@ int play_stream(glc_t *glc)
 	 'compressed_buffer' buffer holds raw data from file and
 	 has its own size.
 	*/
-	if ((ret = ps_bufferattr_setsize(&attr, glc->compressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->glc.compressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&compressed_buffer, &attr)))
 		goto err;
 
 	/* rest use 'uncompressed_buffer' size */
-	if ((ret = ps_bufferattr_setsize(&attr, glc->uncompressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->glc.uncompressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&uncompressed_buffer, &attr)))
 		goto err;
@@ -377,19 +390,19 @@ int play_stream(glc_t *glc)
 		goto err;
 
 	/* construct a pipeline for playback */
-	if ((unpack = unpack_init(glc, &compressed_buffer, &uncompressed_buffer)) == NULL)
+	if ((unpack = unpack_init(&play->glc, &compressed_buffer, &uncompressed_buffer)) == NULL)
 		goto err;
-	if ((rgb = rgb_init(glc, &uncompressed_buffer, &rgb_buffer)) == NULL)
+	if ((rgb = rgb_init(&play->glc, &uncompressed_buffer, &rgb_buffer)) == NULL)
 		goto err;
-	if ((scale = scale_init(glc, &rgb_buffer, &scale_buffer)) == NULL)
+	if ((scale = scale_init(&play->glc, &rgb_buffer, &scale_buffer)) == NULL)
 		goto err;
-	if ((color = color_init(glc, &scale_buffer, &color_buffer)) == NULL)
+	if ((color = color_init(&play->glc, &scale_buffer, &color_buffer)) == NULL)
 		goto err;
-	if ((demux = demux_init(glc, &color_buffer)) == NULL)
+	if ((demux = demux_init(&play->glc, &color_buffer)) == NULL)
 		goto err;
 
 	/* the pipeline is ready - lets give it some data */
-	if ((ret = file_read(glc, &compressed_buffer)))
+	if ((ret = file_read(&play->glc, &compressed_buffer)))
 		goto err;
 
 	/* we've done our part - just wait for the threads */
@@ -422,7 +435,7 @@ err:
 	}
 }
 
-int stream_info(glc_t *glc)
+int stream_info(struct play_s *play)
 {
 	/*
 	 Info uses following pipeline:
@@ -441,12 +454,12 @@ int stream_info(glc_t *glc)
 		goto err;
 
 	/* initialize buffers */
-	if ((ret = ps_bufferattr_setsize(&attr, glc->compressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->glc.compressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&compressed_buffer, &attr)))
 		goto err;
 
-	if ((ret = ps_bufferattr_setsize(&attr, glc->uncompressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->glc.uncompressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&uncompressed_buffer, &attr)))
 		goto err;
@@ -455,11 +468,11 @@ int stream_info(glc_t *glc)
 		goto err;
 
 	/* run it */
-	if ((info = unpack_init(glc, &compressed_buffer, &uncompressed_buffer)) == NULL)
+	if ((info = unpack_init(&play->glc, &compressed_buffer, &uncompressed_buffer)) == NULL)
 		goto err;
-	if ((unpack = info_init(glc, &uncompressed_buffer)) == NULL)
+	if ((unpack = info_init(&play->glc, &uncompressed_buffer)) == NULL)
 		goto err;
-	if ((ret = file_read(glc, &compressed_buffer)))
+	if ((ret = file_read(&play->glc, &compressed_buffer)))
 		goto err;
 
 	/* wait for threads and do cleanup */
@@ -482,7 +495,7 @@ err:
 	}
 }
 
-int export_img(glc_t *glc)
+int export_img(struct play_s *play)
 {
 	/*
 	 Export img uses following pipeline:
@@ -505,12 +518,12 @@ int export_img(glc_t *glc)
 		goto err;
 
 	/* buffers */
-	if ((ret = ps_bufferattr_setsize(&attr, glc->compressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->glc.compressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&compressed_buffer, &attr)))
 		goto err;
 
-	if ((ret = ps_bufferattr_setsize(&attr, glc->uncompressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->glc.uncompressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&uncompressed_buffer, &attr)))
 		goto err;
@@ -525,19 +538,19 @@ int export_img(glc_t *glc)
 		goto err;
 
 	/* pipeline... */
-	if ((unpack = unpack_init(glc, &compressed_buffer, &uncompressed_buffer)) == NULL)
+	if ((unpack = unpack_init(&play->glc, &compressed_buffer, &uncompressed_buffer)) == NULL)
 		goto err;
-	if ((rgb = rgb_init(glc, &uncompressed_buffer, &rgb_buffer)) == NULL)
+	if ((rgb = rgb_init(&play->glc, &uncompressed_buffer, &rgb_buffer)) == NULL)
 		goto err;
-	if ((scale = scale_init(glc, &rgb_buffer, &scale_buffer)) == NULL)
+	if ((scale = scale_init(&play->glc, &rgb_buffer, &scale_buffer)) == NULL)
 		goto err;
-	if ((color = color_init(glc, &scale_buffer, &color_buffer)) == NULL)
+	if ((color = color_init(&play->glc, &scale_buffer, &color_buffer)) == NULL)
 		goto err;
-	if ((img = img_init(glc, &color_buffer)) == NULL)
+	if ((img = img_init(&play->glc, &color_buffer)) == NULL)
 		goto err;
 
 	/* ok, read the file */
-	if ((ret = file_read(glc, &compressed_buffer)))
+	if ((ret = file_read(&play->glc, &compressed_buffer)))
 		goto err;
 
 	/* wait 'till its done and clean up the mess... */
@@ -569,7 +582,7 @@ err:
 	}
 }
 
-int export_yuv4mpeg(glc_t *glc)
+int export_yuv4mpeg(struct play_s *play)
 {
 	/*
 	 Export yuv4mpeg uses following pipeline:
@@ -585,19 +598,20 @@ int export_yuv4mpeg(glc_t *glc)
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer,
 		    ycbcr_buffer, color_buffer, scale_buffer;
-	void *unpack, *ycbcr, *color, *scale, *yuv4mpeg;
+	void *unpack, *color, *scale, *yuv4mpeg;
+	ycbcr_t ycbcr;
 	int ret = 0;
 
 	if ((ret = ps_bufferattr_init(&attr)))
 		goto err;
 
 	/* buffers */
-	if ((ret = ps_bufferattr_setsize(&attr, glc->compressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->glc.compressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&compressed_buffer, &attr)))
 		goto err;
 
-	if ((ret = ps_bufferattr_setsize(&attr, glc->uncompressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->glc.uncompressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&uncompressed_buffer, &attr)))
 		goto err;
@@ -611,20 +625,24 @@ int export_yuv4mpeg(glc_t *glc)
 	if ((ret = ps_bufferattr_destroy(&attr)))
 		goto err;
 
+	/* initialize filters */
+	if ((ret = ycbcr_init(&ycbcr, &play->glc)))
+		goto err;
+
 	/* construct the pipeline */
-	if ((unpack = unpack_init(glc, &compressed_buffer, &uncompressed_buffer)) == NULL)
+	if ((unpack = unpack_init(&play->glc, &compressed_buffer, &uncompressed_buffer)) == NULL)
 		goto err;
-	if ((scale = scale_init(glc, &uncompressed_buffer, &scale_buffer)) == NULL)
+	if ((scale = scale_init(&play->glc, &uncompressed_buffer, &scale_buffer)) == NULL)
 		goto err;
-	if ((color = color_init(glc, &scale_buffer, &color_buffer)) == NULL)
+	if ((color = color_init(&play->glc, &scale_buffer, &color_buffer)) == NULL)
 		goto err;
-	if ((ycbcr = ycbcr_init(glc, &color_buffer, &ycbcr_buffer)) == NULL)
+	if ((ret = ycbcr_process_start(ycbcr, &color_buffer, &ycbcr_buffer)))
 		goto err;
-	if ((yuv4mpeg = yuv4mpeg_init(glc, &ycbcr_buffer)) == NULL)
+	if ((yuv4mpeg = yuv4mpeg_init(&play->glc, &ycbcr_buffer)) == NULL)
 		goto err;
 
 	/* feed it with data */
-	if ((ret = file_read(glc, &compressed_buffer)))
+	if ((ret = file_read(&play->glc, &compressed_buffer)))
 		goto err;
 
 	/* threads will do the dirty work... */
@@ -634,7 +652,7 @@ int export_yuv4mpeg(glc_t *glc)
 		goto err;
 	if ((ret = scale_wait(scale)))
 		goto err;
-	if ((ret = ycbcr_wait(ycbcr)))
+	if ((ret = ycbcr_process_wait(ycbcr)))
 		goto err;
 	if ((ret = unpack_wait(unpack)))
 		goto err;
@@ -644,6 +662,8 @@ int export_yuv4mpeg(glc_t *glc)
 	ps_buffer_destroy(&color_buffer);
 	ps_buffer_destroy(&scale_buffer);
 	ps_buffer_destroy(&ycbcr_buffer);
+
+	ycbcr_destroy(ycbcr);
 
 	return 0;
 err:
@@ -656,7 +676,7 @@ err:
 	}
 }
 
-int export_wav(glc_t *glc)
+int export_wav(struct play_s *play)
 {
 	/*
 	 Export wav uses following pipeline:
@@ -675,12 +695,12 @@ int export_wav(glc_t *glc)
 		goto err;
 
 	/* buffers */
-	if ((ret = ps_bufferattr_setsize(&attr, glc->compressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->glc.compressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&compressed_buffer, &attr)))
 		goto err;
 
-	if ((ret = ps_bufferattr_setsize(&attr, glc->uncompressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->glc.uncompressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&uncompressed_buffer, &attr)))
 		goto err;
@@ -689,11 +709,11 @@ int export_wav(glc_t *glc)
 		goto err;
 
 	/* start the threads */
-	if ((unpack = unpack_init(glc, &compressed_buffer, &uncompressed_buffer)) == NULL)
+	if ((unpack = unpack_init(&play->glc, &compressed_buffer, &uncompressed_buffer)) == NULL)
 		goto err;
-	if ((wav = wav_init(glc, &uncompressed_buffer)) == NULL)
+	if ((wav = wav_init(&play->glc, &uncompressed_buffer)) == NULL)
 		goto err;
-	if ((ret = file_read(glc, &compressed_buffer)))
+	if ((ret = file_read(&play->glc, &compressed_buffer)))
 		goto err;
 
 	/* wait and clean up */
