@@ -30,7 +30,6 @@ typedef struct gl_capture_s* gl_capture_t;
  * Function initializes gl_capture object and binds it into given glc.
  * \param gl_capture gl_capture object
  * \param glc glc
- * \param to target buffer
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int gl_capture_init(gl_capture_t *gl_capture, glc_t *glc);
@@ -80,7 +79,7 @@ __PUBLIC int gl_capture_try_pbo(gl_capture_t gl_capture, int try_pbo);
 /**
  * \brief set pixel format
  * \param gl_capture gl_capture object
- * \param GLenum format
+ * \param format pixel format (currently GL_BGR and GL_BGRA are supported)
  * \return 0 on succcess otherwise an error code
  */
 __PUBLIC int gl_capture_set_pixel_format(gl_capture_t gl_capture, GLenum format);
@@ -146,7 +145,6 @@ __PUBLIC int gl_capture_destroy(gl_capture_t gl_capture);
  * Call this function when selected read buffer contains ready
  * frame for capturing. If gl_capture is not in capturing state,
  * this function does nothing.
- * \Example
  * \code
  * // init
  * ...

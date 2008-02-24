@@ -141,7 +141,6 @@ int util_timediff(glc_t *glc, glc_stime_t diff)
  * Loads stream information from file and initializes
  * global stream information structure (glc.info).
  * \param glc glc
- * \param filename where to read info from
  * \return 0 on success otherwise an error code
  */
 int util_load_info(glc_t *glc)

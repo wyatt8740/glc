@@ -77,7 +77,6 @@ __PUBLIC int audio_hook_destroy(audio_hook_t audio_hook);
  * \brief hook function for snd_pcm_open()
  *
  * Call after calling real snd_pcm_open().
- * \Example
  * \code
  * if (snd_pcm_open(pcmp, name, stream, mode) == 0)
  * 	audio_hook_alsa_open(audio_hook, *pcmp, nome, stream, mode);
@@ -85,7 +84,7 @@ __PUBLIC int audio_hook_destroy(audio_hook_t audio_hook);
  * \param audio_hook audio_hook object
  * \param pcm pcm pointer given by snd_pcm_open()
  * \param name pcm name
- * \param stream pcm stream
+ * \param pcm_stream pcm stream
  * \param mode open mode
  * \return 0 on success otherwise an error code
  */
@@ -94,7 +93,6 @@ __PUBLIC int audio_hook_alsa_open(audio_hook_t audio_hook, snd_pcm_t *pcm, const
 
 /**
  * \brief hook function for snd_pcm_close()
- * \Example
  * \code
  * snd_pcm_close(pcm);
  * audio_hook_alsa_close(audio_hook, pcm);
@@ -107,7 +105,6 @@ __PUBLIC int audio_hook_alsa_close(audio_hook_t audio_hook, snd_pcm_t *pcm);
 
 /**
  * \brief hook function for snd_pcm_hw_params()
- * \Example
  * \code
  * if (snd_pcm_hw_params(pcm, params))
  * 	audio_hook_alsa_hw_params(audio_hook, pcm, params);
@@ -121,7 +118,6 @@ __PUBLIC int audio_hook_alsa_hw_params(audio_hook_t audio_hook, snd_pcm_t *pcm, 
 
 /**
  * \brief hook function for snd_pcm_writei()
- * \Example
  * \code
  * snd_pcm_sframes_t ret = snd_pcm_writei(pcm, buffer, size);
  * if (ret > 0)
@@ -137,7 +133,6 @@ __PUBLIC int audio_hook_alsa_i(audio_hook_t audio_hook, snd_pcm_t *pcm, const vo
 
 /**
  * \brief hook function for snd_pcm_writen()
- * \Example
  * \code
  * snd_pcm_sframes_t ret = snd_pcm_writen(pcm, bufs, size);
  * if (ret > 0)
@@ -153,7 +148,6 @@ __PUBLIC int audio_hook_alsa_n(audio_hook_t audio_hook, snd_pcm_t *pcm, void **b
 
 /**
  * \brief hook function for snd_pcm_mmap_begin()
- * \Example
  * \code
  * if (snd_pcm_mmap_begin(pcm, areas, offset, frames))
  * 	audio_hook_alsa_mmap_begin(audio_hook, pcm, *areas, *offset, *frames);
@@ -173,7 +167,6 @@ __PUBLIC int audio_hook_alsa_mmap_begin(audio_hook_t audio_hook, snd_pcm_t *pcm,
  * \brief hook function for snd_pcm_mmap_commit()
  *
  * Must be called before calling real snd_pcm_mmap_commit().
- * \Example
  * \code
  * audio_hook_alsa_mmap_commit(audio_hook, pcm, offset, frames);
  * snd_pcm_mmap_commit(pcm, offset, frames);
