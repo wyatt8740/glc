@@ -32,7 +32,6 @@ typedef struct {
 	int initialized;
 	int running;
 	pthread_mutex_t init_lock;
-	void *gl;
 } glc_lib_t;
 
 #define INIT_GLC \
@@ -68,6 +67,9 @@ __PRIVATE int alsa_unhook_so(const char *soname);
  */
 __PRIVATE int opengl_init(glc_t *glc);
 __PRIVATE int opengl_start(ps_buffer_t *buffer);
+__PRIVATE int opengl_capture_start();
+__PRIVATE int opengl_capture_stop();
+__PRIVATE int opengl_refresh_color_correction();
 __PRIVATE int opengl_close();
 /**  \} */
 

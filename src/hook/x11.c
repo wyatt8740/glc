@@ -136,6 +136,7 @@ void x11_event(Display *dpy, XEvent *event)
 
 			if (x11.glc->flags & GLC_CAPTURE) { /* stop */
 				alsa_pause();
+				opengl_capture_stop();
 				x11.glc->flags &= ~GLC_CAPTURE;
 				x11.stop = util_time(x11.glc);
 				util_log(x11.glc, GLC_INFORMATION, "x11", "stopped capturing");
@@ -147,8 +148,11 @@ void x11_event(Display *dpy, XEvent *event)
 							 strerror(ret), ret);
 						return; /* don't set GLC_CAPTURE flag */
 					}
-				} else
+					opengl_capture_start();
+				} else {
 					alsa_resume();
+					opengl_capture_start();
+				}
 
 				util_timediff(x11.glc, util_time(x11.glc) - x11.stop);
 				x11.glc->flags |= GLC_CAPTURE;
@@ -395,7 +399,7 @@ Bool __x11_XF86VidModeSetGamma(Display *display, int screen, XF86VidModeGamma *G
 		return False; /* might not be present */
 
 	Bool ret = x11.XF86VidModeSetGamma(display, screen, Gamma);
-	gl_capture_refresh_color(lib.gl);
+	opengl_refresh_color_correction();
 
 	return ret;
 }

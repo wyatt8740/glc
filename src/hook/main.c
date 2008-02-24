@@ -52,7 +52,6 @@ __PRIVATE glc_lib_t lib = {NULL, /* dlopen */
 			   0, /* initialized */
 			   0, /* running */
 			   PTHREAD_MUTEX_INITIALIZER, /* init_lock */
-			   NULL, /* gl */
 			   };
 __PRIVATE struct main_private_s mpriv;
 
@@ -102,6 +101,7 @@ void init_glc()
 	if (mpriv.glc.flags & GLC_CAPTURE) {
 		if ((ret = start_glc()))
 			goto err;
+		opengl_capture_start();
 	}
 
 	atexit(lib_close);
