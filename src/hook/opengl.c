@@ -29,9 +29,9 @@ struct opengl_private_s {
 
 	gl_capture_t gl_capture;
 	ycbcr_t ycbcr;
+	scale_t scale;
 
 	ps_buffer_t *unscaled, *buffer;
-	void *scale_p;
 	size_t unscaled_size;
 
 	void *libGL_handle;
@@ -161,14 +161,15 @@ int opengl_start(ps_buffer_t *buffer)
 		opengl.unscaled = (ps_buffer_t *) malloc(sizeof(ps_buffer_t));
 		ps_buffer_init(opengl.unscaled, &attr);
 
-		/** \todo convert these */
-		opengl.glc->scale = opengl.scale_factor;
 		if (opengl.convert_ycbcr_420jpeg) {
 			ycbcr_init(&opengl.ycbcr, opengl.glc);
 			ycbcr_set_scale(opengl.ycbcr, opengl.scale_factor);
 			ycbcr_process_start(opengl.ycbcr, opengl.unscaled, buffer);
-		} else
-			opengl.scale_p = scale_init(opengl.glc, opengl.unscaled, buffer);
+		} else {
+			scale_init(&opengl.scale, opengl.glc);
+			scale_set_scale(opengl.scale, opengl.scale_factor);
+			scale_process_start(opengl.scale, opengl.unscaled, buffer);
+		}
 
 		gl_capture_set_buffer(opengl.gl_capture, opengl.unscaled);
 	} else {
@@ -205,8 +206,10 @@ int opengl_close()
 		if (opengl.convert_ycbcr_420jpeg) {
 			ycbcr_process_wait(opengl.ycbcr);
 			ycbcr_destroy(opengl.ycbcr);
-		} else
-			scale_wait(opengl.scale_p);
+		} else {
+			scale_process_wait(opengl.scale);
+			scale_destroy(opengl.scale);
+		}
 	} else if (lib.running) {
 		if ((ret = util_write_end_of_stream(opengl.glc, opengl.buffer))) {
 			util_log(opengl.glc, GLC_ERROR, "opengl",

@@ -39,7 +39,7 @@ struct play_s {
 	glc_t glc;
 	enum play_action action;
 
-	double scale;
+	double scale_factor;
 	unsigned int scale_width, scale_height;
 };
 
@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
 	play.glc.alsa_playback_device = "default";
 
 	/* don't scale by default */
-	play.scale = 1;
+	play.scale_factor = 1;
 	play.scale_width = play.scale_height = 0;
 
 	/* default buffer size is 10MiB */
@@ -145,10 +145,9 @@ int main(int argc, char *argv[])
 				sscanf(optarg, "%ux%u", &play.scale_width, &play.scale_height);
 				if ((!play.scale_width) | (!play.scale_height))
 					goto usage;
-				play.glc.flags |= GLC_SCALE_SIZE; /** \todo remove */
 			} else {
-				play.scale = atof(optarg);
-				if (play.scale <= 0)
+				play.scale_factor = atof(optarg);
+				if (play.scale_factor <= 0)
 					goto usage;
 			}
 			break;
@@ -198,11 +197,6 @@ int main(int argc, char *argv[])
 			goto usage;
 		}
 	}
-
-	/** \todo remove */
-	play.glc.scale = play.scale;
-	play.glc.scale_width = play.scale_width;
-	play.glc.scale_height = play.scale_height;
 
 	/* stream file is mandatory */
 	if (optind >= argc)
@@ -358,7 +352,8 @@ int play_stream(struct play_s *play)
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer,
 		    rgb_buffer, color_buffer, scale_buffer;
-	void *unpack, *color, *scale, *rgb, *demux;
+	void *unpack, *color, *rgb, *demux;
+	scale_t scale;
 	int ret = 0;
 
 	if ((ret = ps_bufferattr_init(&attr)))
@@ -389,12 +384,20 @@ int play_stream(struct play_s *play)
 	if ((ret = ps_bufferattr_destroy(&attr)))
 		goto err;
 
+	/* init filters */
+	if ((ret = scale_init(&scale, &play->glc)))
+		goto err;
+	if (play->scale_width && play->scale_height)
+		scale_set_size(scale, play->scale_width, play->scale_height);
+	else
+		scale_set_scale(scale, play->scale_factor);
+
 	/* construct a pipeline for playback */
 	if ((unpack = unpack_init(&play->glc, &compressed_buffer, &uncompressed_buffer)) == NULL)
 		goto err;
 	if ((rgb = rgb_init(&play->glc, &uncompressed_buffer, &rgb_buffer)) == NULL)
 		goto err;
-	if ((scale = scale_init(&play->glc, &rgb_buffer, &scale_buffer)) == NULL)
+	if ((ret = scale_process_start(scale, &rgb_buffer, &scale_buffer)))
 		goto err;
 	if ((color = color_init(&play->glc, &scale_buffer, &color_buffer)) == NULL)
 		goto err;
@@ -410,7 +413,7 @@ int play_stream(struct play_s *play)
 		goto err; /* wait for demux, since when it quits, others should also */
 	if ((ret = color_wait(color)))
 		goto err;
-	if ((ret = scale_wait(scale)))
+	if ((ret = scale_process_wait(scale)))
 		goto err;
 	if ((ret = rgb_wait(rgb)))
 		goto err;
@@ -423,6 +426,8 @@ int play_stream(struct play_s *play)
 	ps_buffer_destroy(&color_buffer);
 	ps_buffer_destroy(&scale_buffer);
 	ps_buffer_destroy(&rgb_buffer);
+
+	scale_destroy(scale);
 
 	return 0;
 err:
@@ -511,7 +516,8 @@ int export_img(struct play_s *play)
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer,
 		    rgb_buffer, color_buffer, scale_buffer;
-	void *unpack, *rgb, *color, *scale, *img;
+	void *unpack, *rgb, *color, *img;
+	scale_t scale;
 	int ret = 0;
 
 	if ((ret = ps_bufferattr_init(&attr)))
@@ -537,12 +543,19 @@ int export_img(struct play_s *play)
 	if ((ret = ps_bufferattr_destroy(&attr)))
 		goto err;
 
+	if ((ret = scale_init(&scale, &play->glc)))
+		goto err;
+	if (play->scale_width && play->scale_height)
+		scale_set_size(scale, play->scale_width, play->scale_height);
+	else
+		scale_set_scale(scale, play->scale_factor);
+
 	/* pipeline... */
 	if ((unpack = unpack_init(&play->glc, &compressed_buffer, &uncompressed_buffer)) == NULL)
 		goto err;
 	if ((rgb = rgb_init(&play->glc, &uncompressed_buffer, &rgb_buffer)) == NULL)
 		goto err;
-	if ((scale = scale_init(&play->glc, &rgb_buffer, &scale_buffer)) == NULL)
+	if ((ret = scale_process_start(scale, &rgb_buffer, &scale_buffer)))
 		goto err;
 	if ((color = color_init(&play->glc, &scale_buffer, &color_buffer)) == NULL)
 		goto err;
@@ -558,7 +571,7 @@ int export_img(struct play_s *play)
 		goto err;
 	if ((ret = color_wait(color)))
 		goto err;
-	if ((ret = scale_wait(scale)))
+	if ((ret = scale_process_wait(scale)))
 		goto err;
 	if ((ret = rgb_wait(rgb)))
 		goto err;
@@ -570,6 +583,8 @@ int export_img(struct play_s *play)
 	ps_buffer_destroy(&color_buffer);
 	ps_buffer_destroy(&scale_buffer);
 	ps_buffer_destroy(&rgb_buffer);
+
+	scale_destroy(scale);
 
 	return 0;
 err:
@@ -598,8 +613,9 @@ int export_yuv4mpeg(struct play_s *play)
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer,
 		    ycbcr_buffer, color_buffer, scale_buffer;
-	void *unpack, *color, *scale, *yuv4mpeg;
+	void *unpack, *color, *yuv4mpeg;
 	ycbcr_t ycbcr;
+	scale_t scale;
 	int ret = 0;
 
 	if ((ret = ps_bufferattr_init(&attr)))
@@ -628,11 +644,17 @@ int export_yuv4mpeg(struct play_s *play)
 	/* initialize filters */
 	if ((ret = ycbcr_init(&ycbcr, &play->glc)))
 		goto err;
+	if ((ret = scale_init(&scale, &play->glc)))
+		goto err;
+	if (play->scale_width && play->scale_height)
+		scale_set_size(scale, play->scale_width, play->scale_height);
+	else
+		scale_set_scale(scale, play->scale_factor);
 
 	/* construct the pipeline */
 	if ((unpack = unpack_init(&play->glc, &compressed_buffer, &uncompressed_buffer)) == NULL)
 		goto err;
-	if ((scale = scale_init(&play->glc, &uncompressed_buffer, &scale_buffer)) == NULL)
+	if ((ret = scale_process_start(scale, &uncompressed_buffer, &scale_buffer)))
 		goto err;
 	if ((color = color_init(&play->glc, &scale_buffer, &color_buffer)) == NULL)
 		goto err;
@@ -650,7 +672,7 @@ int export_yuv4mpeg(struct play_s *play)
 		goto err;
 	if ((ret = color_wait(color)))
 		goto err;
-	if ((ret = scale_wait(scale)))
+	if ((ret = scale_process_wait(scale)))
 		goto err;
 	if ((ret = ycbcr_process_wait(ycbcr)))
 		goto err;
@@ -664,6 +686,7 @@ int export_yuv4mpeg(struct play_s *play)
 	ps_buffer_destroy(&ycbcr_buffer);
 
 	ycbcr_destroy(ycbcr);
+	scale_destroy(scale);
 
 	return 0;
 err:
