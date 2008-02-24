@@ -55,7 +55,7 @@ Y', Cb, Cr      in {0, 1, 2, ..., 255}
 struct ycbcr_ctx_s;
 struct ycbcr_private_s;
 
-typedef void (*ycbcr_convert_proc)(struct ycbcr_private_s *ycbcr,
+typedef void (*ycbcr_convert_proc)(ycbcr_t ycbcr,
 				   struct ycbcr_ctx_s *ctx,
 				   unsigned char *from,
 				   unsigned char *to);
@@ -78,9 +78,11 @@ struct ycbcr_ctx_s {
 	struct ycbcr_ctx_s *next;
 };
 
-struct ycbcr_private_s {
+struct ycbcr_s {
 	glc_t *glc;
 	glc_thread_t thread;
+	int running;
+	double scale;
 
 	struct ycbcr_ctx_s *ctx;
 };
@@ -89,51 +91,81 @@ int ycbcr_read_callback(glc_thread_state_t *state);
 int ycbcr_write_callback(glc_thread_state_t *state);
 void ycbcr_finish_callback(void *ptr, int err);
 
-int ycbcr_ctx_msg(struct ycbcr_private_s *ycbcr, glc_ctx_message_t *ctx_msg);
-void ycbcr_get_ctx(struct ycbcr_private_s *ycbcr, glc_ctx_i ctx_i, struct ycbcr_ctx_s **ctx);
+int ycbcr_ctx_msg(ycbcr_t ycbcr, glc_ctx_message_t *ctx_msg);
+void ycbcr_get_ctx(ycbcr_t ycbcr, glc_ctx_i ctx_i, struct ycbcr_ctx_s **ctx);
 
-int ycbcr_generate_map(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx);
+int ycbcr_generate_map(ycbcr_t ycbcr, struct ycbcr_ctx_s *ctx);
 
-void ycbcr_bgr_to_jpeg420(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx,
+void ycbcr_bgr_to_jpeg420(ycbcr_t ycbcr, struct ycbcr_ctx_s *ctx,
 			  unsigned char *from, unsigned char *to);
-void ycbcr_bgr_to_jpeg420_half(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx,
+void ycbcr_bgr_to_jpeg420_half(ycbcr_t ycbcr, struct ycbcr_ctx_s *ctx,
 			       unsigned char *from, unsigned char *to);
-void ycbcr_bgr_to_jpeg420_scale(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx,
+void ycbcr_bgr_to_jpeg420_scale(ycbcr_t ycbcr, struct ycbcr_ctx_s *ctx,
 				unsigned char *from, unsigned char *to);
 
-void *ycbcr_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
+int ycbcr_init(ycbcr_t *ycbcr, glc_t *glc)
 {
-	struct ycbcr_private_s *ycbcr = malloc(sizeof(struct ycbcr_private_s));
-	memset(ycbcr, 0, sizeof(struct ycbcr_private_s));
+	*ycbcr = malloc(sizeof(struct ycbcr_s));
+	memset(*ycbcr, 0, sizeof(struct ycbcr_s));
 
-	ycbcr->glc = glc;
+	(*ycbcr)->glc = glc;
 
-	ycbcr->thread.flags = GLC_THREAD_READ | GLC_THREAD_WRITE;
-	ycbcr->thread.read_callback = &ycbcr_read_callback;
-	ycbcr->thread.write_callback = &ycbcr_write_callback;
-	ycbcr->thread.finish_callback = &ycbcr_finish_callback;
-	ycbcr->thread.ptr = ycbcr;
-	ycbcr->thread.threads = util_cpus();
+	(*ycbcr)->thread.flags = GLC_THREAD_READ | GLC_THREAD_WRITE;
+	(*ycbcr)->thread.read_callback = &ycbcr_read_callback;
+	(*ycbcr)->thread.write_callback = &ycbcr_write_callback;
+	(*ycbcr)->thread.finish_callback = &ycbcr_finish_callback;
+	(*ycbcr)->thread.ptr = ycbcr;
+	(*ycbcr)->thread.threads = util_cpus();
+	(*ycbcr)->scale = 1.0;
 
-	if (glc_thread_create(glc, &ycbcr->thread, from, to))
-		return NULL;
-
-	return ycbcr;
+	return 0;
 }
 
-int ycbcr_wait(void *ycbcrpriv)
+int ycbcr_destroy(ycbcr_t ycbcr)
 {
-	struct ycbcr_private_s *ycbcr = ycbcrpriv;
+	free(ycbcr);
+	return 0;
+}
+
+int ycbcr_set_scale(ycbcr_t ycbcr, double scale)
+{
+	if (scale <= 0)
+		return EINVAL;
+
+	ycbcr->scale = scale;
+	return 0;
+}
+
+int ycbcr_process_start(ycbcr_t ycbcr, ps_buffer_t *from, ps_buffer_t *to)
+{
+	int ret;
+
+	if (ycbcr->running)
+		return EAGAIN;
+
+	if ((ret = glc_thread_create(ycbcr->glc, &ycbcr->thread, from, to)))
+		return ret;
+	ycbcr->running = 1;
+
+	return 0;
+}
+
+int ycbcr_process_wait(ycbcr_t ycbcr)
+{
+	/* finish callback takes care of old ctx data */
+
+	if (!ycbcr->running)
+		return EAGAIN;
 
 	glc_thread_wait(&ycbcr->thread);
-	free(ycbcr);
+	ycbcr->running = 0;
 
 	return 0;
 }
 
 void ycbcr_finish_callback(void *ptr, int err)
 {
-	struct ycbcr_private_s *ycbcr = ptr;
+	ycbcr_t ycbcr = ptr;
 	struct ycbcr_ctx_s *del;
 
 	if (err)
@@ -155,7 +187,7 @@ void ycbcr_finish_callback(void *ptr, int err)
 
 int ycbcr_read_callback(glc_thread_state_t *state)
 {
-	struct ycbcr_private_s *ycbcr = state->ptr;
+	ycbcr_t ycbcr = state->ptr;
 	struct ycbcr_ctx_s *ctx;
 	glc_picture_header_t *pic_hdr;
 
@@ -183,7 +215,7 @@ int ycbcr_read_callback(glc_thread_state_t *state)
 
 int ycbcr_write_callback(glc_thread_state_t *state)
 {
-	struct ycbcr_private_s *ycbcr = state->ptr;
+	ycbcr_t ycbcr = state->ptr;
 	struct ycbcr_ctx_s *ctx = state->threadptr;
 
 	memcpy(state->write_data, state->read_data, GLC_PICTURE_HEADER_SIZE);
@@ -195,7 +227,7 @@ int ycbcr_write_callback(glc_thread_state_t *state)
 	return 0;
 }
 
-void ycbcr_get_ctx(struct ycbcr_private_s *ycbcr, glc_ctx_i ctx_i, struct ycbcr_ctx_s **ctx)
+void ycbcr_get_ctx(ycbcr_t ycbcr, glc_ctx_i ctx_i, struct ycbcr_ctx_s **ctx)
 {
 	*ctx = ycbcr->ctx;
 
@@ -216,7 +248,7 @@ void ycbcr_get_ctx(struct ycbcr_private_s *ycbcr, glc_ctx_i ctx_i, struct ycbcr_
 	}
 }
 
-void ycbcr_bgr_to_jpeg420(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx,
+void ycbcr_bgr_to_jpeg420(ycbcr_t ycbcr, struct ycbcr_ctx_s *ctx,
 			  unsigned char *from, unsigned char *to)
 {
 	unsigned int Ypix;
@@ -276,7 +308,7 @@ void ycbcr_bgr_to_jpeg420(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx
 	Gd = (from[op1 + 1] + from[op2 + 1] + from[op3 + 1] + from[op4 + 1]) >> 2; \
 	Bd = (from[op1 + 0] + from[op2 + 0] + from[op3 + 0] + from[op4 + 0]) >> 2;
 
-void ycbcr_bgr_to_jpeg420_half(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx,
+void ycbcr_bgr_to_jpeg420_half(ycbcr_t ycbcr, struct ycbcr_ctx_s *ctx,
 			       unsigned char *from, unsigned char *to)
 {
 	unsigned int Ypix;
@@ -322,7 +354,7 @@ void ycbcr_bgr_to_jpeg420_half(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s
 
 #undef CALC_BILINEAR_RGB
 
-void ycbcr_bgr_to_jpeg420_scale(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx,
+void ycbcr_bgr_to_jpeg420_scale(ycbcr_t ycbcr, struct ycbcr_ctx_s *ctx,
 				unsigned char *from, unsigned char *to)
 {
 	unsigned int Cpix;
@@ -381,7 +413,7 @@ void ycbcr_bgr_to_jpeg420_scale(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_
 #undef Bd
 }
 
-int ycbcr_ctx_msg(struct ycbcr_private_s *ycbcr, glc_ctx_message_t *ctx_msg)
+int ycbcr_ctx_msg(ycbcr_t ycbcr, glc_ctx_message_t *ctx_msg)
 {
 	struct ycbcr_ctx_s *ctx;
 
@@ -408,7 +440,7 @@ int ycbcr_ctx_msg(struct ycbcr_private_s *ycbcr, glc_ctx_message_t *ctx_msg)
 			ctx->row += 8 - ctx->row % 8;
 	}
 
-	ctx->scale = ycbcr->glc->scale;
+	ctx->scale = ycbcr->scale;
 	ctx->yw = ctx->w * ctx->scale;
 	ctx->yh = ctx->h * ctx->scale;
 	ctx->yw -= ctx->yw % 2; /* safer and faster             */
@@ -448,7 +480,7 @@ int ycbcr_ctx_msg(struct ycbcr_private_s *ycbcr, glc_ctx_message_t *ctx_msg)
  * \todo smaller map is sometimes possible, should inflict better
  *       cache utilization => implement
  */
-int ycbcr_generate_map(struct ycbcr_private_s *ycbcr, struct ycbcr_ctx_s *ctx)
+int ycbcr_generate_map(ycbcr_t ycbcr, struct ycbcr_ctx_s *ctx)
 {
 	size_t scale_maps_size;
 	unsigned int tp, x, y, r;
