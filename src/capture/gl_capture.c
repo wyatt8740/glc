@@ -32,6 +32,13 @@
 #include "../common/util.h"
 #include "gl_capture.h"
 
+#define GL_CAPTURE_TRY_PBO          0x1
+#define GL_CAPTURE_USE_PBO          0x2
+#define GL_CAPTURE_CAPTURING        0x4
+#define GL_CAPTURE_DRAW_INDICATOR   0x8
+#define GL_CAPTURE_CROP            0x10
+#define GL_CAPTURE_LOCK_FPS        0x20
+
 typedef void (*FuncPtr)(void);
 typedef FuncPtr (*GLXGetProcAddressProc)(const GLubyte *procName);
 typedef void (*glGenBuffersProc)(GLsizei n,
@@ -71,8 +78,10 @@ struct gl_capture_ctx_s {
 	int pbo_active;
 };
 
-struct gl_capture_private_s {
+struct gl_capture_s {
 	glc_t *glc;
+	glc_flags_t flags;
+
 	GLenum capture_buffer;
 	glc_utime_t fps;
 
@@ -82,13 +91,14 @@ struct gl_capture_private_s {
 
 	ps_buffer_t *to;
 
-	int init_pbo;
-	int use_pbo;
 	pthread_mutex_t init_pbo_mutex;
 
 	unsigned int bpp;
 	GLenum format;
-	unsigned int pack_alignment;
+	GLint pack_alignment;
+
+	unsigned int crop_x, crop_y;
+	unsigned int crop_w, crop_h;
 
 	void *libGL_handle;
 	GLXGetProcAddressProc glXGetProcAddress;
@@ -100,75 +110,215 @@ struct gl_capture_private_s {
 	glUnmapBufferProc glUnmapBuffer;
 };
 
-int gl_capture_get_ctx(struct gl_capture_private_s *gl_capture,
+int gl_capture_get_ctx(gl_capture_t gl_capture,
 		       struct gl_capture_ctx_s **ctx, Display *dpy, GLXDrawable drawable);
-int gl_capture_update_ctx(struct gl_capture_private_s *gl_capture,
+int gl_capture_update_ctx(gl_capture_t gl_capture,
 			  struct gl_capture_ctx_s *ctx);
 
-int gl_capture_get_geometry(struct gl_capture_private_s *gl_capture,
+int gl_capture_get_geometry(gl_capture_t gl_capture,
 			    Display *dpy, GLXDrawable drawable, unsigned int *w, unsigned int *h);
-int gl_capture_calc_geometry(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx,
+int gl_capture_calc_geometry(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx,
 			     unsigned int w, unsigned int h);
-int gl_capture_update_screen(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
-int gl_capture_update_color(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
+int gl_capture_update_screen(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx);
+int gl_capture_update_color(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx);
 
-int gl_capture_get_pixels(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx, char *to);
-int gl_capture_gen_indicator_list(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
+int gl_capture_get_pixels(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx, char *to);
+int gl_capture_gen_indicator_list(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx);
 
-int gl_capture_init_pbo(struct gl_capture_private_s *gl);
-int gl_capture_create_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
-int gl_capture_destroy_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
-int gl_capture_start_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
-int gl_capture_read_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx);
+int gl_capture_init_pbo(gl_capture_t gl);
+int gl_capture_create_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx);
+int gl_capture_destroy_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx);
+int gl_capture_start_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx);
+int gl_capture_read_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx);
 
-void *gl_capture_init(glc_t *glc, ps_buffer_t *to)
+int gl_capture_init(gl_capture_t *gl_capture, glc_t *glc)
 {
-	struct gl_capture_private_s *gl_capture = (struct gl_capture_private_s *) malloc(sizeof(struct gl_capture_private_s));
-	memset(gl_capture, 0, sizeof(struct gl_capture_private_s));
-	
-	gl_capture->glc = glc;
-	gl_capture->fps = 1000000 / gl_capture->glc->fps;
-	gl_capture->to = to;
+	*gl_capture = (gl_capture_t) malloc(sizeof(struct gl_capture_s));
+	memset(*gl_capture, 0, sizeof(struct gl_capture_s));
 
-	if (gl_capture->glc->flags & GLC_CAPTURE_DWORD_ALIGNED)
-		gl_capture->pack_alignment = 8;
-	else
-		gl_capture->pack_alignment = 1;
-	
-	if (gl_capture->glc->flags & GLC_TRY_PBO)
-		gl_capture->init_pbo = 1;
+	(*gl_capture)->glc = glc;
+	(*gl_capture)->fps = 1000000 / 30;		/* default fps is 30 */
+	(*gl_capture)->pack_alignment = 8;		/* read as dword aligned by default */
+	(*gl_capture)->flags |= GL_CAPTURE_TRY_PBO;	/* try pbo by default */
+	(*gl_capture)->format = GL_BGRA;		/* capture as BGRA data by default */
 
-	if (gl_capture->glc->flags & GLC_CAPTURE_BGRA) {
-		gl_capture->format = GL_BGRA;
+	pthread_mutex_init(&(*gl_capture)->init_pbo_mutex, NULL);
+	pthread_rwlock_init(&(*gl_capture)->ctxlist_lock, NULL);
+
+	return 0;
+}
+
+int gl_capture_set_buffer(gl_capture_t gl_capture, ps_buffer_t *buffer)
+{
+	if (gl_capture->to)
+		return EALREADY;
+
+	gl_capture->to = buffer;
+	return 0;
+}
+
+int gl_capture_set_read_buffer(gl_capture_t gl_capture, GLenum buffer)
+{
+	if (buffer == GL_FRONT)
+		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+			 "reading frames from GL_FRONT");
+	else if (buffer == GL_BACK)
+		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+			 "reading frames from GL_BACK");
+	else {
+		util_log(gl_capture->glc, GLC_ERROR, "gl_capture",
+			 "unknown read buffer 0x%02x", buffer);
+		return ENOTSUP;
+	}
+
+	gl_capture->capture_buffer = buffer;
+	return 0;
+}
+
+int gl_capture_set_fps(gl_capture_t gl_capture, double fps)
+{
+	if (fps <= 0)
+		return EINVAL;
+
+	gl_capture->fps = 1000000 / fps;
+	util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+		 "capturing at %f fps", fps);
+
+	return 0;
+}
+
+int gl_capture_set_pack_alignment(gl_capture_t gl_capture, GLint pack_alignment)
+{
+	if (pack_alignment == 1)
+		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+			 "reading data as byte aligned");
+	else if (pack_alignment == 8)
+		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+			 "reading data as dword aligned");
+	else {
+		util_log(gl_capture->glc, GLC_ERROR, "gl_capture",
+			 "unknown GL_PACK_ALIGNMENT %d", pack_alignment);
+		return ENOTSUP;
+	}
+
+	gl_capture->pack_alignment = pack_alignment;
+	return 0;
+}
+
+int gl_capture_try_pbo(gl_capture_t gl_capture, int try_pbo)
+{
+	if (try_pbo) {
+		gl_capture->flags |= GL_CAPTURE_TRY_PBO;
+	} else {
+		if (gl_capture->flags & GL_CAPTURE_USE_PBO) {
+			util_log(gl_capture->glc, GLC_WARNING, "gl_capture",
+				 "can't disable PBO; it is in use");
+			return EAGAIN;
+		}
+
+		util_log(gl_capture->glc, GLC_DEBUG, "gl_capture",
+			 "PBO disabled");
+		gl_capture->flags &= ~GL_CAPTURE_TRY_PBO;
+	}
+
+	return 0;
+}
+
+int gl_capture_set_pixel_format(gl_capture_t gl_capture, GLenum format)
+{
+	if (format == GL_BGRA) {
 		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 			 "reading frames in GL_BGRA format");
 		gl_capture->bpp = 4;
-	} else {
-		gl_capture->format = GL_BGR;
+	} else if (format == GL_BGR) {
 		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 			 "reading frames in GL_BGR format");
 		gl_capture->bpp = 3;
-	}
-	
-	if (gl_capture->glc->flags & GLC_CAPTURE_FRONT) {
-		gl_capture->capture_buffer = GL_FRONT;
-		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
-			 "reading frames from GL_FRONT");
 	} else {
-		gl_capture->capture_buffer = GL_BACK;
-		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
-			 "reading frames from GL_BACK");
+		util_log(gl_capture->glc, GLC_ERROR, "gl_capture",
+			 "unsupported pixel format 0x%02x", format);
+		return ENOTSUP;
 	}
 
-	pthread_mutex_init(&gl_capture->init_pbo_mutex, NULL);
-	pthread_rwlock_init(&gl_capture->ctxlist_lock, NULL);
-	
-	return (void *) gl_capture;
+	gl_capture->format = format;
+	return 0;
 }
 
-void gl_capture_close(void *glpriv)
+int gl_capture_draw_indicator(gl_capture_t gl_capture, int draw_indicator)
 {
-	struct gl_capture_private_s *gl_capture = (struct gl_capture_private_s *) glpriv;
+	if (draw_indicator) {
+		gl_capture->flags |= GL_CAPTURE_DRAW_INDICATOR;
+
+		if (gl_capture->capture_buffer == GL_FRONT)
+			util_log(gl_capture->glc, GLC_WARNING, "gl_capture",
+				 "indicator doesn't work well when capturing from GL_FRONT");
+	} else
+		gl_capture->flags &= ~GL_CAPTURE_DRAW_INDICATOR;
+
+	return 0;
+}
+
+int gl_capture_crop(gl_capture_t gl_capture, unsigned int x, unsigned int y,
+			     unsigned int width, unsigned int height)
+{
+	if ((!x) && (!y) && (!width) && (!height)) {
+		gl_capture->flags &= ~GL_CAPTURE_CROP;
+		return 0;
+	}
+
+	gl_capture->crop_x = x;
+	gl_capture->crop_y = y;
+	gl_capture->crop_w = width;
+	gl_capture->crop_h = height;
+	gl_capture->flags |= GL_CAPTURE_CROP;
+
+	return 0;
+}
+
+int gl_capture_lock_fps(gl_capture_t gl_capture, int lock_fps)
+{
+	if (lock_fps)
+		gl_capture->flags |= GL_CAPTURE_LOCK_FPS;
+	else
+		gl_capture->flags &= ~GL_CAPTURE_LOCK_FPS;
+
+	return 0;
+}
+
+int gl_capture_start(gl_capture_t gl_capture)
+{
+	if (!gl_capture->to) {
+		util_log(gl_capture->glc, GLC_ERROR, "gl_capture",
+			 "no target buffer specified");
+		return EAGAIN;
+	}
+
+	if (gl_capture->flags & GL_CAPTURE_CAPTURING)
+		util_log(gl_capture->glc, GLC_WARNING, "gl_capture",
+			 "capturing is already active");
+	else
+		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+			 "starting capturing");
+
+	gl_capture->flags |= GL_CAPTURE_CAPTURING;
+	return 0;
+}
+
+int gl_capture_stop(gl_capture_t gl_capture)
+{
+	if (gl_capture->flags & GL_CAPTURE_CAPTURING)
+		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+			 "stopping capturing");
+	else
+		util_log(gl_capture->glc, GLC_WARNING, "gl_capture",
+			 "capturing is already stopped");
+
+	gl_capture->flags &= ~GL_CAPTURE_CAPTURING;
+	return 0;
+}
+
+int gl_capture_destroy(gl_capture_t gl_capture)
+{
 	struct gl_capture_ctx_s *del;
 
 	while (gl_capture->ctx != NULL) {
@@ -191,9 +341,11 @@ void gl_capture_close(void *glpriv)
 	if (gl_capture->libGL_handle)
 		dlclose(gl_capture->libGL_handle);
 	free(gl_capture);
+
+	return 0;
 }
 
-int gl_capture_get_geometry(struct gl_capture_private_s *gl_capture, Display *dpy, GLXDrawable drawable,
+int gl_capture_get_geometry(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable,
                     unsigned int *w, unsigned int *h)
 {
 	Window rootWindow;
@@ -205,40 +357,40 @@ int gl_capture_get_geometry(struct gl_capture_private_s *gl_capture, Display *dp
 	return 0;
 }
 
-int gl_capture_update_screen(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
+int gl_capture_update_screen(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
 {
 	/** \todo figure out real screen */
 	ctx->screen = DefaultScreen(ctx->dpy);
 	return 0;
 }
 
-int gl_capture_calc_geometry(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx,
+int gl_capture_calc_geometry(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx,
 			     unsigned int w, unsigned int h)
 {
 	ctx->w = w;
 	ctx->h = h;
 
 	/* calculate image area when cropping */
-	if (gl_capture->glc->flags & GLC_CROP) {
-		if (gl_capture->glc->crop_x > ctx->w)
+	if (gl_capture->flags & GL_CAPTURE_CROP) {
+		if (gl_capture->crop_x > ctx->w)
 			ctx->cx = 0;
 		else
-			ctx->cx = gl_capture->glc->crop_x;
+			ctx->cx = gl_capture->crop_x;
 
-		if (gl_capture->glc->crop_y > ctx->h)
+		if (gl_capture->crop_y > ctx->h)
 			ctx->cy = 0;
 		else
-			ctx->cy = gl_capture->glc->crop_y;
+			ctx->cy = gl_capture->crop_y;
 
-		if (gl_capture->glc->crop_width + ctx->cx > ctx->w)
+		if (gl_capture->crop_w + ctx->cx > ctx->w)
 			ctx->cw = ctx->w - ctx->cx;
 		else
-			ctx->cw = gl_capture->glc->crop_width;
+			ctx->cw = gl_capture->crop_w;
 
-		if (gl_capture->glc->crop_height + ctx->cy > ctx->h)
+		if (gl_capture->crop_h + ctx->cy > ctx->h)
 			ctx->ch = ctx->h - ctx->cy;
 		else
-			ctx->ch = gl_capture->glc->crop_height;
+			ctx->ch = gl_capture->crop_h;
 
 		/* we need to recalc y coord for OpenGL */
 		ctx->cy = ctx->h - ctx->ch - ctx->cy;
@@ -259,7 +411,7 @@ int gl_capture_calc_geometry(struct gl_capture_private_s *gl_capture, struct gl_
 	return 0;
 }
 
-int gl_capture_get_pixels(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx, char *to)
+int gl_capture_get_pixels(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx, char *to)
 {
 	glPushAttrib(GL_PIXEL_MODE_BIT);
 	glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);
@@ -274,7 +426,7 @@ int gl_capture_get_pixels(struct gl_capture_private_s *gl_capture, struct gl_cap
 	return 0;
 }
 
-int gl_capture_gen_indicator_list(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
+int gl_capture_gen_indicator_list(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
 {
 	int size;
 	if (!ctx->indicator_list)
@@ -304,7 +456,7 @@ int gl_capture_gen_indicator_list(struct gl_capture_private_s *gl_capture, struc
 	return 0;
 }
 
-int gl_capture_init_pbo(struct gl_capture_private_s *gl_capture)
+int gl_capture_init_pbo(gl_capture_t gl_capture)
 {
 	const char *gl_extensions = (const char *) glGetString(GL_EXTENSIONS);
 
@@ -360,7 +512,7 @@ int gl_capture_init_pbo(struct gl_capture_private_s *gl_capture)
 	return 0;
 }
 
-int gl_capture_create_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
+int gl_capture_create_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
 {
 	GLint binding;
 
@@ -379,7 +531,7 @@ int gl_capture_create_pbo(struct gl_capture_private_s *gl_capture, struct gl_cap
 	return 0;
 }
 
-int gl_capture_destroy_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
+int gl_capture_destroy_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
 {
 	util_log(gl_capture->glc, GLC_DEBUG, "gl_capture", "destroying PBO");
 
@@ -387,7 +539,7 @@ int gl_capture_destroy_pbo(struct gl_capture_private_s *gl_capture, struct gl_ca
 	return 0;
 }
 
-int gl_capture_start_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
+int gl_capture_start_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
 {
 	GLint binding;
 
@@ -413,7 +565,7 @@ int gl_capture_start_pbo(struct gl_capture_private_s *gl_capture, struct gl_capt
 	return 0;
 }
 
-int gl_capture_read_pbo(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
+int gl_capture_read_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
 {
 	GLvoid *buf;
 	GLint binding;
@@ -438,7 +590,7 @@ int gl_capture_read_pbo(struct gl_capture_private_s *gl_capture, struct gl_captu
 	return 0;
 }
 
-int gl_capture_get_ctx(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s **ctx, Display *dpy, GLXDrawable drawable)
+int gl_capture_get_ctx(gl_capture_t gl_capture, struct gl_capture_ctx_s **ctx, Display *dpy, GLXDrawable drawable)
 {
 	struct gl_capture_ctx_s *fctx;
 
@@ -474,18 +626,23 @@ int gl_capture_get_ctx(struct gl_capture_private_s *gl_capture, struct gl_captur
 	return 0;
 }
 
-int gl_capture_update_ctx(struct gl_capture_private_s *gl_capture,
+int gl_capture_update_ctx(gl_capture_t gl_capture,
 			  struct gl_capture_ctx_s *ctx)
 {
 	glc_message_header_t msg;
 	glc_ctx_message_t ctx_msg;
 	unsigned int w, h;
 
-	if (gl_capture->init_pbo) {
+	/* initialize PBO if not already done */
+	if ((!(gl_capture->flags & GL_CAPTURE_USE_PBO)) &&
+	    (gl_capture->flags & GL_CAPTURE_TRY_PBO)) {
 		pthread_mutex_lock(&gl_capture->init_pbo_mutex);
+
 		if (!gl_capture_init_pbo(gl_capture))
-			gl_capture->use_pbo = 1;
-		gl_capture->init_pbo = 0;
+			gl_capture->flags |= GL_CAPTURE_USE_PBO;
+		else
+			gl_capture->flags &= ~GL_CAPTURE_TRY_PBO;
+
 		pthread_mutex_unlock(&gl_capture->init_pbo_mutex);
 	}
 
@@ -500,12 +657,14 @@ int gl_capture_update_ctx(struct gl_capture_private_s *gl_capture,
 
 		ctx->flags |= GLC_CTX_CREATE;
 
-		if (gl_capture->glc->flags & GLC_CAPTURE_BGRA)
+		if (gl_capture->format == GL_BGRA)
 			ctx->flags |= GLC_CTX_BGRA;
-		else
+		else if (gl_capture->format == GL_BGR)
 			ctx->flags |= GLC_CTX_BGR;
+		else
+			return EINVAL;
 
-		if (gl_capture->glc->flags & GLC_CAPTURE_DWORD_ALIGNED)
+		if (gl_capture->pack_alignment == 8)
 			ctx->flags |= GLC_CTX_DWORD_ALIGNED;
 	} else if (ctx->flags & GLC_CTX_CREATE) {
 		ctx->flags &= ~GLC_CTX_CREATE;
@@ -536,64 +695,64 @@ int gl_capture_update_ctx(struct gl_capture_private_s *gl_capture,
 		/* how about color correction? */
 		gl_capture_update_color(gl_capture, ctx);
 
-		if (gl_capture->use_pbo) {
+		if (gl_capture->flags & GL_CAPTURE_USE_PBO) {
 			if (ctx->pbo)
 				gl_capture_destroy_pbo(gl_capture, ctx);
 
-			if (gl_capture_create_pbo(gl_capture, ctx))
-				gl_capture->use_pbo = 0;
+			if (gl_capture_create_pbo(gl_capture, ctx)) {
+				gl_capture->flags &= ~(GL_CAPTURE_TRY_PBO | GL_CAPTURE_USE_PBO);
+				/** \todo destroy pbo stuff? */
+				/** \todo race condition? */
+			}
 		}
 	}
 
-	return 0;
-}
 
-int gl_capture_frame(void *glpriv, Display *dpy, GLXDrawable drawable)
-{
-	struct gl_capture_private_s *gl_capture = glpriv;
-	struct gl_capture_ctx_s *ctx;
-
-	gl_capture_get_ctx(gl_capture, &ctx, dpy, drawable);
+	if ((gl_capture->flags & GL_CAPTURE_DRAW_INDICATOR) &&
+	    (!ctx->indicator_list))
+		gl_capture_gen_indicator_list(gl_capture, ctx);
 
 	return 0;
 }
 
-int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
+int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable)
 {
-	struct gl_capture_private_s *gl_capture = (struct gl_capture_private_s *) glpriv;
 	struct gl_capture_ctx_s *ctx;
 	glc_message_header_t msg;
 	glc_picture_header_t pic;
 	glc_utime_t now;
 	char *dma;
 	int ret = 0;
-	
+
+	if (!(gl_capture->flags & GL_CAPTURE_CAPTURING))
+		return 0; /* capturing not active */
+
 	gl_capture_get_ctx(gl_capture, &ctx, dpy, drawable);
-	
+
 	msg.type = GLC_MESSAGE_PICTURE;
 	pic.ctx = ctx->ctx_i;
 
 	now = util_time(gl_capture->glc);
-	if (gl_capture->use_pbo)
+	if (gl_capture->flags & GL_CAPTURE_USE_PBO)
 		pic.timestamp = ctx->pbo_timestamp;
 	else
 		pic.timestamp = now;
 
 	/* has gl_capture->fps microseconds elapsed since last capture */
 	if ((now - ctx->last < gl_capture->fps) &&
-	    !(gl_capture->glc->flags & GLC_LOCK_FPS))
+	    !(gl_capture->flags & GL_CAPTURE_LOCK_FPS))
 		goto finish;
 
 	/* not really needed until now */
 	gl_capture_update_ctx(gl_capture, ctx);
 
-	if ((gl_capture->use_pbo) && (!ctx->pbo_active)) {
+	if ((gl_capture->flags & GL_CAPTURE_USE_PBO) && (!ctx->pbo_active)) {
 		ret = gl_capture_start_pbo(gl_capture, ctx);
 		ctx->pbo_timestamp = util_time(gl_capture->glc);
 		goto finish;
 	}
 
-	if (ps_packet_open(&ctx->packet, gl_capture->glc->flags & GLC_LOCK_FPS ?
+	if (ps_packet_open(&ctx->packet, gl_capture->flags & GL_CAPTURE_LOCK_FPS ?
 					 PS_PACKET_WRITE :
 					 PS_PACKET_WRITE | PS_PACKET_TRY))
 		goto finish;
@@ -602,7 +761,7 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 	if ((ret = ps_packet_write(&ctx->packet, &pic, GLC_PICTURE_HEADER_SIZE)))
 		goto cancel;
 
-	if (gl_capture->use_pbo) {
+	if (gl_capture->flags & GL_CAPTURE_USE_PBO) {
 		/* is this safe, what happens if this is called simultaneously? */
 		if ((ret = ps_packet_setsize(&ctx->packet, ctx->row * ctx->ch
 								+ GLC_MESSAGE_HEADER_SIZE
@@ -622,7 +781,7 @@ int gl_capture(void *glpriv, Display *dpy, GLXDrawable drawable)
 		ret = gl_capture_get_pixels(gl_capture, ctx, dma);
 	}
 
-	if (gl_capture->glc->flags & GLC_LOCK_FPS) {
+	if (gl_capture->flags & GL_CAPTURE_LOCK_FPS) {
 		now = util_time(gl_capture->glc);
 
 		if (now - ctx->last < gl_capture->fps)
@@ -646,11 +805,8 @@ finish:
 		util_log(gl_capture->glc, GLC_ERROR, "gl_capture",
 			 "%s (%d)", strerror(ret), ret);
 
-	if (gl_capture->glc->flags & GLC_DRAW_INDICATOR) {
-		if (!ctx->indicator_list)
-			gl_capture_gen_indicator_list(gl_capture, ctx);
+	if (gl_capture->flags & GL_CAPTURE_DRAW_INDICATOR)
 		glCallList(ctx->indicator_list);
-	}
 
 	return ret;
 cancel:
@@ -663,9 +819,8 @@ cancel:
 	goto finish;
 }
 
-int gl_capture_refresh_color(void *glpriv)
+int gl_capture_refresh_color_correction(gl_capture_t gl_capture)
 {
-	struct gl_capture_private_s *gl_capture = glpriv;
 	struct gl_capture_ctx_s *ctx;
 
 	util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
@@ -684,7 +839,7 @@ int gl_capture_refresh_color(void *glpriv)
 }
 
 /** \todo support GammaRamp */
-int gl_capture_update_color(struct gl_capture_private_s *gl_capture, struct gl_capture_ctx_s *ctx)
+int gl_capture_update_color(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
 {
 	glc_message_header_t msg_hdr;
 	glc_color_message_t msg;

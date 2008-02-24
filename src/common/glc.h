@@ -83,24 +83,10 @@ typedef u_int32_t glc_flags_t;
 #define GLC_CANCEL                          0x2
 /** scaling (ycbcr or scale) is active */
 #define GLC_SCALE                           0x4
-/** capture from GL_BACK */
-#define GLC_CAPTURE_BACK                    0x8
-/** capture from GL_FRONT */
-#define GLC_CAPTURE_FRONT                  0x10
-/** draw indicator when capturing */
-#define GLC_DRAW_INDICATOR                 0x20
 /** allow skipping audio capture if not ready */
 #define GLC_AUDIO_ALLOW_SKIP               0x40
-/** capture as BGRA frames, convert to BGR/Y'CbCr */
-#define GLC_CAPTURE_BGRA                   0x80
-/** try GL_ARB_pixel_buffer_object */
-#define GLC_TRY_PBO                       0x100
 /** do colorspace conversion to Y'CbCr 420jpeg */
 #define GLC_CONVERT_420JPEG               0x200
-/** crop pictures */
-#define GLC_CROP                          0x400
-/** use GL_PACK_ALIGNMENT 8 for readback */
-#define GLC_CAPTURE_DWORD_ALIGNED         0x800
 /** compress stream with LZO */
 #define GLC_COMPRESS_LZO                 0x1000
 /** compress stream with QuickLZ */
@@ -179,15 +165,6 @@ typedef struct {
 	unsigned int scale_width;
 	/** scale height */
 	unsigned int scale_height;
-
-	/** crop width */
-	unsigned int crop_width;
-	/** crop height */
-	unsigned int crop_height;
-	/** crop upper left corner x coordinate */
-	unsigned int crop_x;
-	/** crop upper left corner y coordinate */
-	unsigned int crop_y;
 
 	/** global brightness */
 	float brightness;
