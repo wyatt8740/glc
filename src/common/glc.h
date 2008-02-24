@@ -83,8 +83,6 @@ typedef u_int32_t glc_flags_t;
 #define GLC_CANCEL                          0x2
 /** scaling (ycbcr or scale) is active */
 #define GLC_SCALE                           0x4
-/** allow skipping audio capture if not ready */
-#define GLC_AUDIO_ALLOW_SKIP               0x40
 /** do colorspace conversion to Y'CbCr 420jpeg */
 #define GLC_CONVERT_420JPEG               0x200
 /** compress stream with LZO */

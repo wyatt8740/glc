@@ -32,6 +32,9 @@
 #include "../common/util.h"
 #include "audio_hook.h"
 
+#define AUDIO_HOOK_CAPTURING    0x1
+#define AUDIO_HOOK_ALLOW_SKIP   0x2
+
 struct audio_hook_stream_s {
 	glc_audio_i audio_i;
 	snd_pcm_t *pcm;
@@ -70,8 +73,9 @@ struct audio_hook_stream_s {
 	struct audio_hook_stream_s *next;
 };
 
-struct audio_hook_private_s {
+struct audio_hook_s {
 	glc_t *glc;
+	glc_flags_t flags;
 	ps_buffer_t *to;
 
 	int started;
@@ -79,35 +83,93 @@ struct audio_hook_private_s {
 	struct audio_hook_stream_s *stream;
 };
 
-int audio_hook_get_stream_alsa(struct audio_hook_private_s *audio_hook, snd_pcm_t *pcm, struct audio_hook_stream_s **stream);
-int audio_hook_stream_init(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream);
+int audio_hook_init_streams(audio_hook_t audio_hook);
+int audio_hook_get_stream_alsa(audio_hook_t audio_hook, snd_pcm_t *pcm, struct audio_hook_stream_s **stream);
+int audio_hook_stream_init(audio_hook_t audio_hook, struct audio_hook_stream_s *stream);
 void *audio_hook_alsa_mmap_pos(const snd_pcm_channel_area_t *area, snd_pcm_uframes_t offset);
 int audio_hook_complex_to_interleaved(struct audio_hook_stream_s *stream, const snd_pcm_channel_area_t *areas, snd_pcm_uframes_t offset, snd_pcm_uframes_t frames, char *to);
 
-int audio_hook_wait_for_thread(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream);
-int audio_hook_lock_write(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream);
-int audio_hook_unlock_write(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream);
+int audio_hook_wait_for_thread(audio_hook_t audio_hook, struct audio_hook_stream_s *stream);
+int audio_hook_lock_write(audio_hook_t audio_hook, struct audio_hook_stream_s *stream);
+int audio_hook_unlock_write(audio_hook_t audio_hook, struct audio_hook_stream_s *stream);
 int audio_hook_set_data_size(struct audio_hook_stream_s *stream, size_t size);
 void *audio_hook_thread(void *argptr);
 
 glc_flags_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt);
 
-void *audio_hook_init(glc_t *glc)
+int audio_hook_init(audio_hook_t *audio_hook, glc_t *glc)
 {
-	struct audio_hook_private_s *audio_hook = malloc(sizeof(struct audio_hook_private_s));
-	memset(audio_hook, 0, sizeof(struct audio_hook_private_s));
+	*audio_hook = (audio_hook_t) malloc(sizeof(struct audio_hook_s));
+	memset(*audio_hook, 0, sizeof(struct audio_hook_s));
 
-	audio_hook->glc = glc;
+	(*audio_hook)->glc = glc;
 
-	return audio_hook;
+	return 0;
 }
 
-int audio_hook_start(void *audiopriv, ps_buffer_t *to)
+int audio_hook_set_buffer(audio_hook_t audio_hook, ps_buffer_t *buffer)
 {
-	struct audio_hook_private_s *audio_hook = audiopriv;
+	if (audio_hook->to)
+		return EALREADY;
+
+	audio_hook->to = buffer;
+	return 0;
+}
+
+int audio_hook_allow_skip(audio_hook_t audio_hook, int allow_skip)
+{
+	if (allow_skip)
+		audio_hook->flags |= AUDIO_HOOK_ALLOW_SKIP;
+	else
+		audio_hook->flags &= ~AUDIO_HOOK_ALLOW_SKIP;
+
+	return 0;
+}
+
+int audio_hook_start(audio_hook_t audio_hook)
+{
+	if (!audio_hook->to) {
+		util_log(audio_hook->glc, GLC_ERROR, "audio_hook",
+			 "target buffer not specified");
+		return EAGAIN;
+	}
+
+	if (!audio_hook->started)
+		audio_hook_init_streams(audio_hook);
+
+	if (audio_hook->flags & AUDIO_HOOK_CAPTURING)
+		util_log(audio_hook->glc, GLC_WARNING, "audio_hook",
+			 "capturing is already active");
+	else
+		util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
+			 "starting capturing");
+
+	audio_hook->flags |= AUDIO_HOOK_CAPTURING;
+	return 0;
+}
+
+int audio_hook_stop(audio_hook_t audio_hook)
+{
+	if (audio_hook->flags & AUDIO_HOOK_CAPTURING)
+		util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
+			 "stopping capturing");
+	else
+		util_log(audio_hook->glc, GLC_WARNING, "audio_hook",
+			 "capturing is already stopped");
+
+	audio_hook->flags &= ~AUDIO_HOOK_CAPTURING;
+	return 0;
+}
+
+int audio_hook_init_streams(audio_hook_t audio_hook)
+{
 	struct audio_hook_stream_s *stream = audio_hook->stream;
 
-	audio_hook->to = to;
+	if (!audio_hook->to)
+		return EAGAIN;
+
+	if (audio_hook->started)
+		return EALREADY;
 
 	/* initialize all pending streams */
 	while (stream != NULL) {
@@ -117,13 +179,11 @@ int audio_hook_start(void *audiopriv, ps_buffer_t *to)
 	}
 
 	audio_hook->started = 1;
-
 	return 0;
 }
 
-int audio_hook_close(void *audiopriv)
+int audio_hook_destroy(audio_hook_t audio_hook)
 {
-	struct audio_hook_private_s *audio_hook = audiopriv;
 	struct audio_hook_stream_s *del;
 
 	if (audio_hook == NULL)
@@ -175,7 +235,7 @@ glc_flags_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt)
 	}
 }
 
-int audio_hook_get_stream_alsa(struct audio_hook_private_s *audio_hook, snd_pcm_t *pcm, struct audio_hook_stream_s **stream)
+int audio_hook_get_stream_alsa(audio_hook_t audio_hook, snd_pcm_t *pcm, struct audio_hook_stream_s **stream)
 {
 	struct audio_hook_stream_s *find = audio_hook->stream;
 
@@ -242,7 +302,7 @@ void *audio_hook_thread(void *argptr)
 	return NULL;
 }
 
-int audio_hook_wait_for_thread(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream)
+int audio_hook_wait_for_thread(audio_hook_t audio_hook, struct audio_hook_stream_s *stream)
 {
 	if (stream->mode & SND_PCM_ASYNC) {
 		/**
@@ -250,7 +310,7 @@ int audio_hook_wait_for_thread(struct audio_hook_private_s *audio_hook, struct a
 		*       signal handler (f.ex. async mode)
 		*/
 		while (!stream->capture_ready) {
-			if (audio_hook->glc->flags & GLC_AUDIO_ALLOW_SKIP)
+			if (audio_hook->flags & AUDIO_HOOK_ALLOW_SKIP)
 				goto busy;
 			sched_yield();
 		}
@@ -264,7 +324,7 @@ busy:
 	return EBUSY;
 }
 
-int audio_hook_lock_write(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream)
+int audio_hook_lock_write(audio_hook_t audio_hook, struct audio_hook_stream_s *stream)
 {
 	int ret = 0;
 	if (stream->mode & SND_PCM_ASYNC)
@@ -274,7 +334,7 @@ int audio_hook_lock_write(struct audio_hook_private_s *audio_hook, struct audio_
 	return ret;
 }
 
-int audio_hook_unlock_write(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream)
+int audio_hook_unlock_write(audio_hook_t audio_hook, struct audio_hook_stream_s *stream)
 {
 	int ret = 0;
 	if (stream->mode & SND_PCM_ASYNC)
@@ -304,10 +364,9 @@ int audio_hook_set_data_size(struct audio_hook_stream_s *stream, size_t size)
 }
 
 
-int audio_hook_alsa_open(void *audiopriv, snd_pcm_t *pcm, const char *name,
+int audio_hook_alsa_open(audio_hook_t audio_hook, snd_pcm_t *pcm, const char *name,
 			 snd_pcm_stream_t pcm_stream, int mode)
 {
-	struct audio_hook_private_s *audio_hook = audiopriv;
 	struct audio_hook_stream_s *stream;
 
 	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
@@ -323,9 +382,8 @@ int audio_hook_alsa_open(void *audiopriv, snd_pcm_t *pcm, const char *name,
 	return 0;
 }
 
-int audio_hook_alsa_close(void *audiopriv, snd_pcm_t *pcm)
+int audio_hook_alsa_close(audio_hook_t audio_hook, snd_pcm_t *pcm)
 {
-	struct audio_hook_private_s *audio_hook = audiopriv;
 	struct audio_hook_stream_s *stream;
 
 	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
@@ -336,11 +394,13 @@ int audio_hook_alsa_close(void *audiopriv, snd_pcm_t *pcm)
 	return 0;
 }
 
-int audio_hook_alsa_i(void *audiopriv, snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size)
+int audio_hook_alsa_i(audio_hook_t audio_hook, snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size)
 {
-	struct audio_hook_private_s *audio_hook = (struct audio_hook_private_s *) audiopriv;
 	struct audio_hook_stream_s *stream;
 	int ret = 0;
+
+	if (!(audio_hook->flags & AUDIO_HOOK_CAPTURING))
+		return 0;
 
 	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
 
@@ -367,11 +427,13 @@ unlock:
 	return ret;
 }
 
-int audio_hook_alsa_n(void *audiopriv, snd_pcm_t *pcm, void **bufs, snd_pcm_uframes_t size)
+int audio_hook_alsa_n(audio_hook_t audio_hook, snd_pcm_t *pcm, void **bufs, snd_pcm_uframes_t size)
 {
-	struct audio_hook_private_s *audio_hook = (struct audio_hook_private_s *) audiopriv;
 	struct audio_hook_stream_s *stream;
 	int c, ret = 0;
+
+	if (!(audio_hook->flags & AUDIO_HOOK_CAPTURING))
+		return 0;
 
 	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
 
@@ -408,13 +470,15 @@ unlock:
 	return ret;
 }
 
-int audio_hook_alsa_mmap_begin(void *audiopriv, snd_pcm_t *pcm,
+int audio_hook_alsa_mmap_begin(audio_hook_t audio_hook, snd_pcm_t *pcm,
 			       const snd_pcm_channel_area_t *areas,
 			       snd_pcm_uframes_t offset, snd_pcm_uframes_t frames)
 {
-	struct audio_hook_private_s *audio_hook = (struct audio_hook_private_s *) audiopriv;
 	struct audio_hook_stream_s *stream;
 	int ret;
+
+	if (!(audio_hook->flags & AUDIO_HOOK_CAPTURING))
+		return 0;
 
 	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
 
@@ -434,13 +498,15 @@ int audio_hook_alsa_mmap_begin(void *audiopriv, snd_pcm_t *pcm,
 	return 0;
 }
 
-int audio_hook_alsa_mmap_commit(void *audiopriv, snd_pcm_t *pcm,
+int audio_hook_alsa_mmap_commit(audio_hook_t audio_hook, snd_pcm_t *pcm,
 				snd_pcm_uframes_t offset, snd_pcm_uframes_t frames)
 {
-	struct audio_hook_private_s *audio_hook = (struct audio_hook_private_s *) audiopriv;
 	struct audio_hook_stream_s *stream;
 	unsigned int c;
 	int ret = 0;
+
+	if (!(audio_hook->flags & AUDIO_HOOK_CAPTURING))
+		return 0;
 
 	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
 
@@ -519,9 +585,8 @@ int audio_hook_complex_to_interleaved(struct audio_hook_stream_s *stream, const 
 	return 0;
 }
 
-int audio_hook_alsa_hw_params(void *audiopriv, snd_pcm_t *pcm, snd_pcm_hw_params_t *params)
+int audio_hook_alsa_hw_params(audio_hook_t audio_hook, snd_pcm_t *pcm, snd_pcm_hw_params_t *params)
 {
-	struct audio_hook_private_s *audio_hook = audiopriv;
 	struct audio_hook_stream_s *stream;
 
 	snd_pcm_format_t format;
@@ -590,7 +655,7 @@ err:
 	return ret;
 }
 
-int audio_hook_stream_init(struct audio_hook_private_s *audio_hook, struct audio_hook_stream_s *stream)
+int audio_hook_stream_init(audio_hook_t audio_hook, struct audio_hook_stream_s *stream)
 {
 	glc_message_header_t msg_hdr;
 	glc_audio_format_message_t fmt_msg;
