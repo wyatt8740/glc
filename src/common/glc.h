@@ -148,8 +148,6 @@ typedef struct {
 	glc_audio_i export_audio;
 	/** exported video stream number */
 	glc_ctx_i export_ctx;
-	/** info level */
-	int info_level;
 
 	/** stream info structure */
 	glc_stream_info_t *info;
