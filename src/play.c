@@ -52,6 +52,7 @@ struct play_s {
 	int interpolate;
 	double fps;
 
+	const char *export_filename_format;
 	glc_ctx_i export_ctx;
 };
 
@@ -180,9 +181,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'o':
 			if (!strcmp(optarg, "-")) /** \todo fopen(1) ? */
-				play.glc.filename_format = "/dev/stdout";
+				play.export_filename_format = "/dev/stdout";
 			else
-				play.glc.filename_format = optarg;
+				play.export_filename_format = optarg;
 			break;
 		case 't':
 			play.interpolate = 0;
@@ -213,6 +214,9 @@ int main(int argc, char *argv[])
 			goto usage;
 		}
 	}
+
+	/** \todo remove */
+	play.glc.filename_format = play.export_filename_format;
 
 	/* stream file is mandatory */
 	if (optind >= argc)
@@ -718,6 +722,7 @@ int export_yuv4mpeg(struct play_s *play)
 	yuv4mpeg_set_fps(yuv4mpeg, play->fps);
 	yuv4mpeg_set_ctx(yuv4mpeg, play->export_ctx);
 	yuv4mpeg_set_interpolation(yuv4mpeg, play->interpolate);
+	yuv4mpeg_set_filename(yuv4mpeg, play->export_filename_format);
 
 	/* construct the pipeline */
 	if ((ret = unpack_process_start(unpack, &compressed_buffer, &uncompressed_buffer)))
