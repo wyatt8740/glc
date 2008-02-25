@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <packetstream.h>
+#include <errno.h>
 
 #include "../common/glc.h"
 #include "../common/thread.h"
@@ -87,9 +88,10 @@ struct rgb_ctx_s {
 	struct rgb_ctx_s *next;
 };
 
-struct rgb_private_s {
+struct rgb_s {
 	glc_t *glc;
 	glc_thread_t thread;
+	int running;
 
 	unsigned char *lookup_table;
 
@@ -100,52 +102,71 @@ int rgb_read_callback(glc_thread_state_t *state);
 int rgb_write_callback(glc_thread_state_t *state);
 void rgb_finish_callback(void *ptr, int err);
 
-void rgb_get_ctx(struct rgb_private_s *rgb, glc_ctx_i ctx_i,
+void rgb_get_ctx(rgb_t rgb, glc_ctx_i ctx_i,
 		struct rgb_ctx_s **ctx);
 
-int rgb_ctx_msg(struct rgb_private_s *rgb, glc_ctx_message_t *ctx_msg);
-int rgb_convert(struct rgb_private_s *rgb, struct rgb_ctx_s *ctx,
+int rgb_ctx_msg(rgb_t rgb, glc_ctx_message_t *ctx_msg);
+int rgb_convert(rgb_t rgb, struct rgb_ctx_s *ctx,
 		unsigned char *from, unsigned char *to);
 
-int rgb_init_lookup(struct rgb_private_s *rgb);
-int rgb_convert_lookup(struct rgb_private_s *rgb, struct rgb_ctx_s *ctx,
+int rgb_init_lookup(rgb_t rgb);
+int rgb_convert_lookup(rgb_t rgb, struct rgb_ctx_s *ctx,
 		       unsigned char *from, unsigned char *to);
 
-void *rgb_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
+int rgb_init(rgb_t *rgb, glc_t *glc)
 {
-	struct rgb_private_s *rgb = malloc(sizeof(struct rgb_private_s));
-	memset(rgb, 0, sizeof(struct rgb_private_s));
+	*rgb = (rgb_t) malloc(sizeof(struct rgb_s));
+	memset(*rgb, 0, sizeof(struct rgb_s));
 
-	rgb->glc = glc;
+	(*rgb)->glc = glc;
 
-	rgb_init_lookup(rgb);
+	rgb_init_lookup(*rgb);
 
-	rgb->thread.flags = GLC_THREAD_READ | GLC_THREAD_WRITE;
-	rgb->thread.read_callback = &rgb_read_callback;
-	rgb->thread.write_callback = &rgb_write_callback;
-	rgb->thread.finish_callback = &rgb_finish_callback;
-	rgb->thread.ptr = rgb;
-	rgb->thread.threads = util_cpus();
+	(*rgb)->thread.flags = GLC_THREAD_READ | GLC_THREAD_WRITE;
+	(*rgb)->thread.read_callback = &rgb_read_callback;
+	(*rgb)->thread.write_callback = &rgb_write_callback;
+	(*rgb)->thread.finish_callback = &rgb_finish_callback;
+	(*rgb)->thread.ptr = *rgb;
+	(*rgb)->thread.threads = util_cpus();
 
-	if (glc_thread_create(glc, &rgb->thread, from, to))
-		return NULL;
-
-	return rgb;
+	return 0;
 }
 
-int rgb_wait(void *rgbpriv)
+int rgb_destroy(rgb_t rgb)
 {
-	struct rgb_private_s *rgb = rgbpriv;
+	if (rgb->lookup_table)
+		free(rgb->lookup_table);
+	free(rgb);
+	return 0;
+}
+
+int rgb_process_start(rgb_t rgb, ps_buffer_t *from, ps_buffer_t *to)
+{
+	int ret;
+	if (rgb->running)
+		return EAGAIN;
+
+	if ((ret = glc_thread_create(rgb->glc, &rgb->thread, from, to)))
+		return ret;
+	rgb->running = 1;
+
+	return 0;
+}
+
+int rgb_process_wait(rgb_t rgb)
+{
+	if (!rgb->running)
+		return EAGAIN;
 
 	glc_thread_wait(&rgb->thread);
-	free(rgb);
+	rgb->running = 0;
 
 	return 0;
 }
 
 void rgb_finish_callback(void *ptr, int err)
 {
-	struct rgb_private_s *rgb = ptr;
+	rgb_t rgb = (rgb_t) ptr;
 	struct rgb_ctx_s *del;
 
 	if (err)
@@ -158,14 +179,11 @@ void rgb_finish_callback(void *ptr, int err)
 		pthread_rwlock_destroy(&del->update);
 		free(del);
 	}
-
-	if (rgb->lookup_table)
-		free(rgb->lookup_table);
 }
 
 int rgb_read_callback(glc_thread_state_t *state)
 {
-	struct rgb_private_s *rgb = state->ptr;
+	rgb_t rgb = (rgb_t) state->ptr;
 	struct rgb_ctx_s *ctx;
 	glc_picture_header_t *pic_hdr;
 
@@ -193,7 +211,7 @@ int rgb_read_callback(glc_thread_state_t *state)
 
 int rgb_write_callback(glc_thread_state_t *state)
 {
-	struct rgb_private_s *rgb = state->ptr;
+	rgb_t rgb = (rgb_t) state->ptr;
 	struct rgb_ctx_s *ctx = state->threadptr;
 
 	memcpy(state->write_data, state->read_data, GLC_PICTURE_HEADER_SIZE);
@@ -205,7 +223,7 @@ int rgb_write_callback(glc_thread_state_t *state)
 	return 0;
 }
 
-void rgb_get_ctx(struct rgb_private_s *rgb, glc_ctx_i ctx_i,
+void rgb_get_ctx(rgb_t rgb, glc_ctx_i ctx_i,
 		struct rgb_ctx_s **ctx)
 {
 	*ctx = rgb->ctx;
@@ -227,7 +245,7 @@ void rgb_get_ctx(struct rgb_private_s *rgb, glc_ctx_i ctx_i,
 	}
 }
 
-int rgb_ctx_msg(struct rgb_private_s *rgb, glc_ctx_message_t *ctx_msg)
+int rgb_ctx_msg(rgb_t rgb, glc_ctx_message_t *ctx_msg)
 {
 	struct rgb_ctx_s *ctx;
 	rgb_get_ctx(rgb, ctx_msg->ctx, &ctx);
@@ -250,7 +268,7 @@ int rgb_ctx_msg(struct rgb_private_s *rgb, glc_ctx_message_t *ctx_msg)
 	return 0;
 }
 
-int rgb_convert(struct rgb_private_s *rgb, struct rgb_ctx_s *ctx,
+int rgb_convert(rgb_t rgb, struct rgb_ctx_s *ctx,
 		unsigned char *from, unsigned char *to)
 {
 	unsigned int x, y, Cpix;
@@ -284,7 +302,7 @@ int rgb_convert(struct rgb_private_s *rgb, struct rgb_ctx_s *ctx,
 	return 0;
 }
 
-int rgb_init_lookup(struct rgb_private_s *rgb)
+int rgb_init_lookup(rgb_t rgb)
 {
 	unsigned int Y, Cb, Cr, color;
 	size_t lookup_size = (1 << LOOKUP_BITS) * (1 << LOOKUP_BITS) * (1 << LOOKUP_BITS) * 3;
@@ -307,7 +325,7 @@ int rgb_init_lookup(struct rgb_private_s *rgb)
 	return 0;
 }
 
-int rgb_convert_lookup(struct rgb_private_s *rgb, struct rgb_ctx_s *ctx,
+int rgb_convert_lookup(rgb_t rgb, struct rgb_ctx_s *ctx,
 		       unsigned char *from, unsigned char *to)
 {
 	unsigned int x, y, Cpix;

@@ -17,8 +17,44 @@
 #include <packetstream.h>
 #include "../common/glc.h"
 
-__PUBLIC void *rgb_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
-__PUBLIC int rgb_wait(void *rgbpriv);
+/**
+ * \brief rgb object
+ */
+typedef struct rgb_s* rgb_t;
+
+/**
+ * \brief initialize rgb object
+ * \param rgb rgb object
+ * \param glc glc
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int rgb_init(rgb_t *rgb, glc_t *glc);
+
+/**
+ * \brief destroy rgb object
+ * \param rgb rgb object
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int rgb_destroy(rgb_t rgb);
+
+/**
+ * \brief start rgb process
+ *
+ * rgb converts all Y'CbCr frames into RGB (BGR).
+ * No scaling is currently supported.
+ * \param rgb rgb object
+ * \param from source buffer
+ * \param to target buffer
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int rgb_process_start(rgb_t rgb, ps_buffer_t *from, ps_buffer_t *to);
+
+/**
+ * \brief block until process has finished
+ * \param rgb rgb object
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int rgb_process_wait(rgb_t rgb);
 
 #endif
 
