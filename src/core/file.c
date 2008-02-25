@@ -32,8 +32,16 @@
 #include "../common/util.h"
 #include "file.h"
 
-struct file_private_s {
+#define FILE_READING       0x1
+#define FILE_WRITING       0x2
+#define FILE_RUNNING       0x4
+#define FILE_INFO_WRITTEN  0x8
+#define FILE_INFO_READ    0x10
+#define FILE_INFO_VALID   0x20
+
+struct file_s {
 	glc_t *glc;
+	glc_flags_t flags;
 	glc_thread_t thread;
 	int fd;
 };
@@ -41,93 +49,158 @@ struct file_private_s {
 void file_finish_callback(void *ptr, int err);
 int file_read_callback(glc_thread_state_t *state);
 
-void *file_init(glc_t *glc, ps_buffer_t *from)
+int file_init(file_t *file, glc_t *glc)
 {
-	struct file_private_s *file;
+	*file = malloc(sizeof(struct file_s));
+	memset(*file, 0, sizeof(struct file_s));
 
-	file = malloc(sizeof(struct file_private_s));
-	memset(file, 0, sizeof(struct file_private_s));
+	(*file)->glc = glc;
+	(*file)->fd = -1;
 
-	file->glc = glc;
+	(*file)->thread.flags = GLC_THREAD_READ;
+	(*file)->thread.ptr = *file;
+	(*file)->thread.read_callback = &file_read_callback;
+	(*file)->thread.finish_callback = &file_finish_callback;
+	(*file)->thread.threads = 1;
+
+	return 0;
+}
+
+int file_destroy(file_t file)
+{
+	free(file);
+	return 0;
+}
+
+int file_open_target(file_t file, const char *filename)
+{
+	int fd, ret = 0;
+	if (file->fd >= 0)
+		return EBUSY;
 
 	util_log(file->glc, GLC_INFORMATION, "file",
-		 "opening %s for stream", file->glc->stream_file);
+		 "opening %s for writing stream", filename);
 
-	file->fd = open(file->glc->stream_file,
-			O_CREAT | O_WRONLY | O_SYNC, 0644);
+	fd = open(filename, O_CREAT | O_WRONLY | O_SYNC, 0644);
 
-	if (file->fd == -1) {
+	if (fd == -1) {
 		util_log(file->glc, GLC_ERROR, "file", "can't open %s: %s (%d)",
-			 file->glc->stream_file, strerror(errno), errno);
-		goto cancel;
+			 filename, strerror(errno), errno);
+		return errno;
 	}
 
-	if (flock(file->fd, LOCK_EX | LOCK_NB) == -1) {
-		util_log(file->glc, GLC_ERROR, "file", "can't lock %s: %s (%d)",
-			 file->glc->stream_file, strerror(errno), errno);
-		goto cancel;
+	if ((ret = file_set_target(file, fd)))
+		close(fd);
+
+	return ret;
+}
+
+int file_set_target(file_t file, int fd)
+{
+	if (file->fd >= 0)
+		return EBUSY;
+
+	if (flock(fd, LOCK_EX | LOCK_NB) == -1) {
+		util_log(file->glc, GLC_ERROR, "file",
+			 "can't lock file: %s (%d)", strerror(errno), errno);
+		return errno;
 	}
 
 	/* truncate file when we have locked it */
 	lseek(file->fd, 0, SEEK_SET);
 	ftruncate(file->fd, 0);
 
-	if (!file->glc->info) {
-		util_log(file->glc, GLC_ERROR, "file", "stream info not available");
-		goto cancel;
-	}
-
-	write(file->fd, file->glc->info, GLC_STREAM_INFO_SIZE);
-	write(file->fd, file->glc->info_name, file->glc->info->name_size);
-	write(file->fd, file->glc->info_date, file->glc->info->date_size);
-
-	file->thread.flags = GLC_THREAD_READ;
-	file->thread.ptr = file;
-	file->thread.read_callback = &file_read_callback;
-	file->thread.finish_callback = &file_finish_callback;
-	file->thread.threads = 1;
-
-	if (glc_thread_create(glc, &file->thread, from, NULL))
-		return NULL;
-
-	return file;
-
-cancel:
-	file->glc->flags |= GLC_CANCEL;
-	ps_buffer_cancel(from);
-	return NULL;
+	file->fd = fd;
+	file->flags |= FILE_WRITING;
+	return 0;
 }
 
-int file_wait(void *filepriv)
+int file_close_target(file_t file)
 {
-	struct file_private_s *file = filepriv;
+	if ((file->fd < 0) | (file->flags & FILE_RUNNING) |
+	    (!(file->flags & FILE_WRITING)))
+		return EAGAIN;
+
+	/* try to remove lock */
+	if (flock(file->fd, LOCK_UN) == -1)
+		util_log(file->glc, GLC_WARNING,
+			 "file", "can't unlock file: %s (%d)",
+			 strerror(errno), errno);
+
+	if (close(file->fd))
+		util_log(file->glc, GLC_ERROR, "file",
+			 "can't close file: %s (%d)",
+			 strerror(errno), errno);
+
+	file->fd = -1;
+	file->flags &= ~(FILE_RUNNING | FILE_WRITING | FILE_INFO_WRITTEN);
+
+	return 0;
+}
+
+int file_write_info(file_t file, glc_stream_info_t *info,
+		    const char *info_name, const char *info_date)
+{
+	if ((file->fd < 0) | (file->flags & FILE_RUNNING) |
+	    (!(file->flags & FILE_WRITING)))
+		return EAGAIN;
+
+	if (write(file->fd, info, GLC_STREAM_INFO_SIZE) != GLC_STREAM_INFO_SIZE)
+		goto err;
+	if (write(file->fd, info_name, info->name_size) != info->name_size)
+		goto err;
+	if (write(file->fd, info_date, info->date_size) != info->date_size)
+		goto err;
+
+	file->flags |= FILE_INFO_WRITTEN;
+	return 0;
+err:
+	util_log(file->glc, GLC_ERROR, "file",
+		 "can't write stream information: %s (%d)",
+		 strerror(errno), errno);
+	return errno;
+}
+
+int file_write_process_start(file_t file, ps_buffer_t *from)
+{
+	int ret;
+	if ((file->fd < 0) | (file->flags & FILE_RUNNING) |
+	    (!(file->flags & FILE_WRITING)) |
+	    (!(file->flags & FILE_INFO_WRITTEN)))
+		return EAGAIN;
+
+	if ((ret = glc_thread_create(file->glc, &file->thread, from, NULL)))
+		return ret;
+	/** \todo cancel buffer if this fails? */
+	file->flags |= FILE_RUNNING;
+
+	return 0;
+}
+
+int file_write_process_wait(file_t file)
+{
+	if ((file->fd < 0) | (!(file->flags & FILE_RUNNING)) |
+	    (!(file->flags & FILE_WRITING)) |
+	    (!(file->flags & FILE_INFO_WRITTEN)))
+		return EAGAIN;
 
 	glc_thread_wait(&file->thread);
-	free(file);
+	file->flags &= ~(FILE_RUNNING | FILE_INFO_WRITTEN);
 
 	return 0;
 }
 
 void file_finish_callback(void *ptr, int err)
 {
-	struct file_private_s *file = (struct file_private_s *) ptr;
+	file_t file = (file_t) ptr;
 
 	if (err)
 		util_log(file->glc, GLC_ERROR, "file", "%s (%d)", strerror(err), err);
-
-	/* try to remove lock */
-	if (flock(file->fd, LOCK_UN) == -1)
-		util_log(file->glc, GLC_WARNING, "file", "can't unlock file: %s (%d)",
-			 strerror(errno), errno);
-
-	if (close(file->fd))
-		util_log(file->glc, GLC_ERROR, "file",
-			 "can't close file: %s (%d)", strerror(errno), errno);
 }
 
 int file_read_callback(glc_thread_state_t *state)
 {
-	struct file_private_s *file = (struct file_private_s *) state->ptr;
+	file_t file = (file_t) state->ptr;
 	glc_container_message_t *container;
 	glc_size_t glc_size;
 
@@ -143,7 +216,8 @@ int file_read_callback(glc_thread_state_t *state)
 		    != container->size)
 			goto err;
 	} else {
-		if (write(file->fd, &state->header, GLC_MESSAGE_HEADER_SIZE) != GLC_MESSAGE_HEADER_SIZE)
+		if (write(file->fd, &state->header, GLC_MESSAGE_HEADER_SIZE)
+		    != GLC_MESSAGE_HEADER_SIZE)
 			goto err;
 		glc_size = state->read_size;
 		if (write(file->fd, &glc_size, GLC_SIZE_SIZE) != GLC_SIZE_SIZE)
@@ -159,7 +233,102 @@ err:
 	return errno;
 }
 
-int file_read(glc_t *glc, ps_buffer_t *to)
+int file_open_source(file_t file, const char *filename)
+{
+	int fd, ret = 0;
+	if (file->fd >= 0)
+		return EBUSY;
+
+	util_log(file->glc, GLC_INFORMATION, "file",
+		 "opening %s for reading stream", filename);
+
+	fd = open(filename, O_SYNC);
+
+	if (fd == -1) {
+		util_log(file->glc, GLC_ERROR, "file", "can't open %s: %s (%d)",
+			 filename, strerror(errno), errno);
+		return errno;
+	}
+
+	if ((ret = file_set_source(file, fd)))
+		close(fd);
+
+	return ret;
+}
+
+int file_set_source(file_t file, int fd)
+{
+	if (file->fd >= 0)
+		return EBUSY;
+
+	/* seek to beginning */
+	lseek(file->fd, 0, SEEK_SET);
+
+	file->fd = fd;
+	file->flags |= FILE_READING;
+	return 0;
+}
+
+int file_close_source(file_t file)
+{
+	if ((file->fd < 0) | (!(file->flags & FILE_READING)))
+		return EAGAIN;
+
+	if (close(file->fd))
+		util_log(file->glc, GLC_ERROR, "file",
+			 "can't close file: %s (%d)",
+			 strerror(errno), errno);
+
+	file->fd = -1;
+	file->flags &= ~(FILE_READING | FILE_INFO_READ | FILE_INFO_VALID);
+
+	return 0;	
+}
+
+int file_read_info(file_t file, glc_stream_info_t *info,
+		   char **info_name, char **info_date)
+{
+	if ((file->fd < 0) | (!(file->flags & FILE_READING)))
+		return EAGAIN;
+
+	if (read(file->fd, info, GLC_STREAM_INFO_SIZE) != GLC_STREAM_INFO_SIZE) {
+		util_log(file->glc, GLC_ERROR, "file",
+			 "can't read stream info header");
+		return errno;
+	}
+	file->flags |= FILE_INFO_READ;
+
+	if (info->signature != GLC_SIGNATURE) {
+		util_log(file->glc, GLC_ERROR, "file",
+			 "signature 0x%08x does not match 0x%08x",
+			 info->signature, GLC_SIGNATURE);
+		return EINVAL;
+	}
+
+	if (info->version != GLC_STREAM_VERSION) {
+		util_log(file->glc, GLC_ERROR, "file",
+			 "unsupported stream version 0x%02x (0x%02x is supported)",
+			 info->version, GLC_STREAM_VERSION);
+		return ENOTSUP;
+	}
+
+	if (info->name_size > 0) {
+		*info_name = (char *) malloc(info->name_size);
+		if (read(file->fd, *info_name, info->name_size) != info->name_size)
+			return errno;
+	}
+
+	if (info->date_size > 0) {
+		*info_date = (char *) malloc(info->date_size);
+		if (read(file->fd, *info_date, info->date_size) != info->date_size)
+			return errno;
+	}
+
+	file->flags |= FILE_INFO_VALID;
+	return 0;
+}
+
+int file_read(file_t file, ps_buffer_t *to)
 {
 	int ret = 0;
 	glc_message_header_t header;
@@ -168,12 +337,28 @@ int file_read(glc_t *glc, ps_buffer_t *to)
 	char *dma;
 	glc_size_t glc_ps;
 
+	if ((file->fd < 0) | (!(file->flags & FILE_READING)))
+		return EAGAIN;
+
+	if (!(file->flags & FILE_INFO_READ)) {
+		util_log(file->glc, GLC_ERROR, "file",
+			 "stream info header not read");
+		return EAGAIN;
+	}
+
+	if (!(file->flags & FILE_INFO_VALID)) {
+		util_log(file->glc, GLC_ERROR, "file",
+			 "stream info header not valid");
+		file->flags &= ~FILE_INFO_READ;
+		return EINVAL;
+	}
+
 	ps_packet_init(&packet, to);
 
 	do {
-		if (read(glc->stream_fd, &header, GLC_MESSAGE_HEADER_SIZE) != GLC_MESSAGE_HEADER_SIZE)
+		if (read(file->fd, &header, GLC_MESSAGE_HEADER_SIZE) != GLC_MESSAGE_HEADER_SIZE)
 			goto send_eof;
-		if (read(glc->stream_fd, &glc_ps, GLC_SIZE_SIZE) != GLC_SIZE_SIZE)
+		if (read(file->fd, &glc_ps, GLC_SIZE_SIZE) != GLC_SIZE_SIZE)
 			goto send_eof;
 
 		packet_size = glc_ps;
@@ -185,16 +370,18 @@ int file_read(glc_t *glc, ps_buffer_t *to)
 		if ((ret = ps_packet_dma(&packet, (void *) &dma, packet_size, PS_ACCEPT_FAKE_DMA)))
 			goto err;
 
-		if (read(glc->stream_fd, dma, packet_size) != packet_size)
+		if (read(file->fd, dma, packet_size) != packet_size)
 			goto read_fail;
 
 		if ((ret = ps_packet_close(&packet)))
 			goto err;
-	} while ((header.type != GLC_MESSAGE_CLOSE) && (!(glc->flags & GLC_CANCEL)));
+	} while ((header.type != GLC_MESSAGE_CLOSE) &&
+		 (!(file->glc->flags & GLC_CANCEL)));
 
 finish:
 	ps_packet_destroy(&packet);
 
+	file->flags &= ~(FILE_INFO_READ | FILE_INFO_VALID);
 	return 0;
 
 send_eof:
@@ -203,7 +390,7 @@ send_eof:
 	ps_packet_write(&packet, &header, GLC_MESSAGE_HEADER_SIZE);
 	ps_packet_close(&packet);
 
-	util_log(glc, GLC_ERROR, "file", "unexpected EOF");
+	util_log(file->glc, GLC_ERROR, "file", "unexpected EOF");
 	goto finish;
 
 read_fail:
@@ -212,9 +399,11 @@ err:
 	if (ret == EINTR)
 		goto finish; /* just cancel */
 
-	util_log(glc, GLC_ERROR, "file", "%s (%d)", strerror(ret), ret);
-	util_log(glc, GLC_DEBUG, "file", "packet size is %zd", packet_size);
+	util_log(file->glc, GLC_ERROR, "file", "%s (%d)", strerror(ret), ret);
+	util_log(file->glc, GLC_DEBUG, "file", "packet size is %zd", packet_size);
 	ps_buffer_cancel(to);
+
+	file->flags &= ~(FILE_INFO_READ | FILE_INFO_VALID);
 	return ret;
 }
 

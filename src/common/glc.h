@@ -82,9 +82,9 @@ typedef u_int32_t glc_flags_t;
 /** glc is cancelled */
 #define GLC_CANCEL                          0x2
 /** enable log */
-#define GLC_LOG                          0x8000
+#define GLC_LOG                             0x4
 /** disable writing errors to stderr */
-#define GLC_NOERR                       0x10000
+#define GLC_NOERR                           0x8
 /** override color correction values */
 #define GLC_OVERRIDE_COLOR_CORRECTION   0x20000
 /** export as png instead of bmp */
@@ -129,10 +129,6 @@ typedef struct {
 typedef struct {
 	/** active flags */
 	glc_flags_t flags;
-	/** stream file */
-	char *stream_file;
-	/** stream file descriptor */
-	int stream_fd;
 	/** log file */
 	char *log_file;
 	/** log verbosity */
