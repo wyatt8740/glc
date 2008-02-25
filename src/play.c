@@ -43,6 +43,10 @@ struct play_s {
 	unsigned int scale_width, scale_height;
 
 	size_t compressed_size, uncompressed_size;
+
+	int override_color_correction;
+	float brightness, contrast;
+	float red_gamma, green_gamma, blue_gamma;
 };
 
 int show_info_value(struct play_s *play, const char *value);
@@ -103,10 +107,11 @@ int main(int argc, char *argv[])
 	play.glc.log_level = 0;
 
 	/* global color correction */
-	play.glc.brightness = play.glc.contrast = 0;
-	play.glc.red_gamma = 1.0;
-	play.glc.green_gamma = 1.0;
-	play.glc.blue_gamma = 1.0;
+	play.override_color_correction = 0;
+	play.brightness = play.contrast = 0;
+	play.red_gamma = 1.0;
+	play.green_gamma = 1.0;
+	play.blue_gamma = 1.0;
 
 	while ((opt = getopt_long(argc, argv, "i:a:b:p:y:o:f:r:g:l:td:c:u:s:v:h",
 				  long_options, &optind)) != -1) {
@@ -154,9 +159,9 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case 'g':
-			play.glc.flags |= GLC_OVERRIDE_COLOR_CORRECTION;
-			sscanf(optarg, "%f;%f;%f;%f;%f", &play.glc.brightness, &play.glc.contrast,
-			       &play.glc.red_gamma, &play.glc.green_gamma, &play.glc.blue_gamma);
+			play.override_color_correction = 1;
+			sscanf(optarg, "%f;%f;%f;%f;%f", &play.brightness, &play.contrast,
+			       &play.red_gamma, &play.green_gamma, &play.blue_gamma);
 			break;
 		case 'l':
 			/* glc_utime_t so always positive */
@@ -354,7 +359,8 @@ int play_stream(struct play_s *play)
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer,
 		    rgb_buffer, color_buffer, scale_buffer;
-	void *color, *demux;
+	void *demux;
+	color_t color;
 	scale_t scale;
 	unpack_t unpack;
 	rgb_t rgb;
@@ -399,6 +405,11 @@ int play_stream(struct play_s *play)
 		scale_set_size(scale, play->scale_width, play->scale_height);
 	else
 		scale_set_scale(scale, play->scale_factor);
+	if ((ret = color_init(&color, &play->glc)))
+		goto err;
+	if (play->override_color_correction)
+		color_override(color, play->brightness, play->contrast,
+			       play->red_gamma, play->green_gamma, play->blue_gamma);
 
 	/* construct a pipeline for playback */
 	if ((ret = unpack_process_start(unpack, &compressed_buffer, &uncompressed_buffer)))
@@ -407,7 +418,7 @@ int play_stream(struct play_s *play)
 		goto err;
 	if ((ret = scale_process_start(scale, &rgb_buffer, &scale_buffer)))
 		goto err;
-	if ((color = color_init(&play->glc, &scale_buffer, &color_buffer)) == NULL)
+	if ((ret = color_process_start(color, &scale_buffer, &color_buffer)))
 		goto err;
 	if ((demux = demux_init(&play->glc, &color_buffer)) == NULL)
 		goto err;
@@ -419,7 +430,7 @@ int play_stream(struct play_s *play)
 	/* we've done our part - just wait for the threads */
 	if ((ret = demux_wait(demux)))
 		goto err; /* wait for demux, since when it quits, others should also */
-	if ((ret = color_wait(color)))
+	if ((ret = color_process_wait(color)))
 		goto err;
 	if ((ret = scale_process_wait(scale)))
 		goto err;
@@ -432,6 +443,7 @@ int play_stream(struct play_s *play)
 	unpack_destroy(unpack);
 	rgb_destroy(rgb);
 	scale_destroy(scale);
+	color_destroy(color);
 
 	ps_buffer_destroy(&compressed_buffer);
 	ps_buffer_destroy(&uncompressed_buffer);
@@ -533,7 +545,8 @@ int export_img(struct play_s *play)
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer,
 		    rgb_buffer, color_buffer, scale_buffer;
-	void *color, *img;
+	void *img;
+	color_t color;
 	scale_t scale;
 	unpack_t unpack;
 	rgb_t rgb;
@@ -573,6 +586,11 @@ int export_img(struct play_s *play)
 		scale_set_size(scale, play->scale_width, play->scale_height);
 	else
 		scale_set_scale(scale, play->scale_factor);
+	if ((ret = color_init(&color, &play->glc)))
+		goto err;
+	if (play->override_color_correction)
+		color_override(color, play->brightness, play->contrast,
+			       play->red_gamma, play->green_gamma, play->blue_gamma);
 
 	/* pipeline... */
 	if ((ret = unpack_process_start(unpack, &compressed_buffer, &uncompressed_buffer)))
@@ -581,7 +599,7 @@ int export_img(struct play_s *play)
 		goto err;
 	if ((ret = scale_process_start(scale, &rgb_buffer, &scale_buffer)))
 		goto err;
-	if ((color = color_init(&play->glc, &scale_buffer, &color_buffer)) == NULL)
+	if ((ret = color_process_start(color, &scale_buffer, &color_buffer)))
 		goto err;
 	if ((img = img_init(&play->glc, &color_buffer)) == NULL)
 		goto err;
@@ -593,7 +611,7 @@ int export_img(struct play_s *play)
 	/* wait 'till its done and clean up the mess... */
 	if ((ret = img_wait(img)))
 		goto err;
-	if ((ret = color_wait(color)))
+	if ((ret = color_process_wait(color)))
 		goto err;
 	if ((ret = scale_process_wait(scale)))
 		goto err;
@@ -605,6 +623,7 @@ int export_img(struct play_s *play)
 	unpack_destroy(unpack);
 	rgb_destroy(rgb);
 	scale_destroy(scale);
+	color_destroy(color);
 
 	ps_buffer_destroy(&compressed_buffer);
 	ps_buffer_destroy(&uncompressed_buffer);
@@ -639,10 +658,11 @@ int export_yuv4mpeg(struct play_s *play)
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer,
 		    ycbcr_buffer, color_buffer, scale_buffer;
-	void *color, *yuv4mpeg;
+	void *yuv4mpeg;
 	ycbcr_t ycbcr;
 	scale_t scale;
 	unpack_t unpack;
+	color_t color;
 	int ret = 0;
 
 	if ((ret = ps_bufferattr_init(&attr)))
@@ -679,13 +699,18 @@ int export_yuv4mpeg(struct play_s *play)
 		scale_set_size(scale, play->scale_width, play->scale_height);
 	else
 		scale_set_scale(scale, play->scale_factor);
+	if ((ret = color_init(&color, &play->glc)))
+		goto err;
+	if (play->override_color_correction)
+		color_override(color, play->brightness, play->contrast,
+			       play->red_gamma, play->green_gamma, play->blue_gamma);
 
 	/* construct the pipeline */
 	if ((ret = unpack_process_start(unpack, &compressed_buffer, &uncompressed_buffer)))
 		goto err;
 	if ((ret = scale_process_start(scale, &uncompressed_buffer, &scale_buffer)))
 		goto err;
-	if ((color = color_init(&play->glc, &scale_buffer, &color_buffer)) == NULL)
+	if ((ret = color_process_start(color, &scale_buffer, &color_buffer)))
 		goto err;
 	if ((ret = ycbcr_process_start(ycbcr, &color_buffer, &ycbcr_buffer)))
 		goto err;
@@ -699,7 +724,7 @@ int export_yuv4mpeg(struct play_s *play)
 	/* threads will do the dirty work... */
 	if ((ret = yuv4mpeg_wait(yuv4mpeg)))
 		goto err;
-	if ((ret = color_wait(color)))
+	if ((ret = color_process_wait(color)))
 		goto err;
 	if ((ret = scale_process_wait(scale)))
 		goto err;
@@ -711,6 +736,7 @@ int export_yuv4mpeg(struct play_s *play)
 	unpack_destroy(unpack);
 	ycbcr_destroy(ycbcr);
 	scale_destroy(scale);
+	color_destroy(color);
 
 	ps_buffer_destroy(&compressed_buffer);
 	ps_buffer_destroy(&uncompressed_buffer);
