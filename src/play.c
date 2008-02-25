@@ -47,6 +47,8 @@ struct play_s {
 	int override_color_correction;
 	float brightness, contrast;
 	float red_gamma, green_gamma, blue_gamma;
+
+	int info_level;
 };
 
 int show_info_value(struct play_s *play, const char *value);
@@ -105,6 +107,7 @@ int main(int argc, char *argv[])
 	/* log to stderr */
 	play.glc.log_file = "/dev/stderr";
 	play.glc.log_level = 0;
+	play.info_level = 1;
 
 	/* global color correction */
 	play.override_color_correction = 0;
@@ -117,8 +120,8 @@ int main(int argc, char *argv[])
 				  long_options, &optind)) != -1) {
 		switch (opt) {
 		case 'i':
-			play.glc.info_level = atoi(optarg);
-			if (play.glc.info_level < 1)
+			play.info_level = atoi(optarg);
+			if (play.info_level < 1)
 				goto usage;
 			play.action = action_info;
 			break;
@@ -474,7 +477,7 @@ int stream_info(struct play_s *play)
 
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer;
-	void *info;
+	info_t info;
 	unpack_t unpack;
 	int ret = 0;
 
@@ -498,35 +501,34 @@ int stream_info(struct play_s *play)
 	/* and filters */
 	if ((ret = unpack_init(&unpack, &play->glc)))
 		goto err;
+	if ((ret = info_init(&info, &play->glc)))
+		goto err;
+	info_set_level(info, play->info_level);
 
 	/* run it */
 	if ((ret = unpack_process_start(unpack, &compressed_buffer, &uncompressed_buffer)))
 		goto err;
-	if ((info = info_init(&play->glc, &uncompressed_buffer)) == NULL)
+	if ((ret = info_process_start(info, &uncompressed_buffer)))
 		goto err;
 	if ((ret = file_read(play->file, &compressed_buffer)))
 		goto err;
 
 	/* wait for threads and do cleanup */
-	if ((ret = info_wait(info)))
+	if ((ret = info_process_wait(info)))
 		goto err;
 	if ((ret = unpack_process_wait(unpack)))
 		goto err;
 
 	unpack_destroy(unpack);
+	info_destroy(info);
 
 	ps_buffer_destroy(&compressed_buffer);
 	ps_buffer_destroy(&uncompressed_buffer);
 
 	return 0;
 err:
-	if (!ret) {
-		fprintf(stderr, "extracting stream information failed: initializing filters failed\n");
-		return EAGAIN;
-	} else {
-		fprintf(stderr, "extracting stream information failed: %s (%d)\n", strerror(ret), ret);
-		return ret;
-	}
+	fprintf(stderr, "extracting stream information failed: %s (%d)\n", strerror(ret), ret);
+	return ret;
 }
 
 int export_img(struct play_s *play)
