@@ -74,7 +74,7 @@ void unpack_finish_callback(void *ptr, int err);
 int pack_init(pack_t *pack, glc_t *glc)
 {
 	*pack = (pack_t) malloc(sizeof(struct pack_s));
-	memset(pack, 0, sizeof(struct pack_s));
+	memset(*pack, 0, sizeof(struct pack_s));
 
 	(*pack)->glc = glc;
 	(*pack)->compress_min = 1024;

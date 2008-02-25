@@ -41,8 +41,10 @@ struct main_private_s {
 	ps_buffer_t *compressed;
 	size_t uncompressed_size, compressed_size;
 
-	void *file;
+	file_t file;
 	pack_t pack;
+
+	char *stream_file;
 
 	int sighandler;
 	void (*sigint_handler)(int);
@@ -177,10 +179,18 @@ int start_glc()
 	if (!lib.initialized)
 		return EAGAIN;
 
+	/* initialize file & write stream info */
+	if ((ret = file_init(&mpriv.file, &mpriv.glc)))
+		return ret;
+	if ((ret = file_open_target(mpriv.file, mpriv.stream_file)))
+		return ret;
+	if ((ret = file_write_info(mpriv.file, mpriv.glc.info,
+				   mpriv.glc.info_name, mpriv.glc.info_date)))
+		return ret;
+
 	if (!(mpriv.flags & MAIN_COMPRESS_NONE)) {
-		/* file needs stream info */
-		if ((mpriv.file = file_init(&mpriv.glc, mpriv.compressed)) == NULL)
-			return EAGAIN;
+		if ((ret = file_write_process_start(mpriv.file, mpriv.compressed)))
+			return ret;
 
 		if ((ret = pack_init(&mpriv.pack, &mpriv.glc)))
 			return ret;
@@ -192,8 +202,8 @@ int start_glc()
 
 		if ((ret = pack_process_start(mpriv.pack, mpriv.uncompressed, mpriv.compressed)))
 			return ret;
-	} else if ((mpriv.file = file_init(&mpriv.glc, mpriv.uncompressed)) == NULL)
-		return EAGAIN;
+	} else if ((ret = file_write_process_start(mpriv.file, mpriv.uncompressed)))
+		return ret;
 
 	if ((ret = alsa_start(mpriv.uncompressed)))
 		return ret;
@@ -260,7 +270,9 @@ void lib_close()
 			pack_process_wait(mpriv.pack);
 			pack_destroy(mpriv.pack);
 		}
-		file_wait(mpriv.file);
+		file_write_process_wait(mpriv.file);
+		file_close_target(mpriv.file);
+		file_destroy(mpriv.file);
 	}
 
 	if (mpriv.compressed) {
@@ -277,7 +289,7 @@ void lib_close()
 	util_free_info(&mpriv.glc);
 	util_free(&mpriv.glc);
 
-	free(mpriv.glc.stream_file);
+	free(mpriv.stream_file);
 	free(mpriv.glc.log_file);
 	return;
 err:
@@ -294,11 +306,11 @@ int load_environ()
 			mpriv.glc.flags |= GLC_CAPTURE;
 	}
 
-	mpriv.glc.stream_file = malloc(1024);
+	mpriv.stream_file = malloc(1024);
 	if (getenv("GLC_FILE"))
-		snprintf(mpriv.glc.stream_file, 1023, getenv("GLC_FILE"), getpid());
+		snprintf(mpriv.stream_file, 1023, getenv("GLC_FILE"), getpid());
 	else
-		snprintf(mpriv.glc.stream_file, 1023, "pid-%d.glc", getpid());
+		snprintf(mpriv.stream_file, 1023, "pid-%d.glc", getpid());
 
 	mpriv.glc.log_file = malloc(1024);
 	if (getenv("GLC_LOG_FILE"))

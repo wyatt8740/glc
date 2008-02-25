@@ -12,9 +12,6 @@
 #include <getopt.h>
 #include <string.h>
 #include <errno.h>
-#include <sys/stat.h>
-#include <sys/file.h>
-#include <fcntl.h>
 
 #include "common/glc.h"
 #include "common/util.h"
@@ -38,6 +35,9 @@ enum play_action {action_play, action_info, action_img, action_yuv4mpeg, action_
 struct play_s {
 	glc_t glc;
 	enum play_action action;
+
+	file_t file;
+	const char *stream_file;
 
 	double scale_factor;
 	unsigned int scale_width, scale_height;
@@ -203,7 +203,7 @@ int main(int argc, char *argv[])
 	/* stream file is mandatory */
 	if (optind >= argc)
 		goto usage;
-	play.glc.stream_file = argv[optind];
+	play.stream_file = argv[optind];
 
 	/* same goes to output file */
 	if (((play.action == action_img) |
@@ -220,15 +220,14 @@ int main(int argc, char *argv[])
 	}
 
 	/* open stream file */
-	play.glc.stream_fd = open(play.glc.stream_file, O_SYNC);
-	if (!play.glc.stream_fd) {
-		util_log(&play.glc, GLC_ERROR, "main",
-			 "can't open %s: %s (%d)", play.glc.stream_file, strerror(errno), errno);
-		return -1;
-	}
+	if (file_init(&play.file, &play.glc))
+		return EXIT_FAILURE;
+	if (file_open_source(play.file, play.stream_file))
+		return EXIT_FAILURE;
 
 	/* load information and check that the file is valid */
-	if (util_load_info(&play.glc))
+	util_create_info(&play.glc);
+	if (file_read_info(play.file, play.glc.info, &play.glc.info_name, &play.glc.info_date))
 		return EXIT_FAILURE;
 
 	/*
@@ -266,10 +265,11 @@ int main(int argc, char *argv[])
 	}
 
 	/* our cleanup */
+	file_close_source(play.file);
+	file_destroy(play.file);
 	util_log_close(&play.glc);
 	util_free_info(&play.glc);
 	util_free(&play.glc);
-	close(play.glc.stream_fd);
 
 	return EXIT_SUCCESS;
 
@@ -410,7 +410,7 @@ int play_stream(struct play_s *play)
 		goto err;
 
 	/* the pipeline is ready - lets give it some data */
-	if ((ret = file_read(&play->glc, &compressed_buffer)))
+	if ((ret = file_read(play->file, &compressed_buffer)))
 		goto err;
 
 	/* we've done our part - just wait for the threads */
@@ -489,7 +489,7 @@ int stream_info(struct play_s *play)
 		goto err;
 	if ((info = info_init(&play->glc, &uncompressed_buffer)) == NULL)
 		goto err;
-	if ((ret = file_read(&play->glc, &compressed_buffer)))
+	if ((ret = file_read(play->file, &compressed_buffer)))
 		goto err;
 
 	/* wait for threads and do cleanup */
@@ -580,7 +580,7 @@ int export_img(struct play_s *play)
 		goto err;
 
 	/* ok, read the file */
-	if ((ret = file_read(&play->glc, &compressed_buffer)))
+	if ((ret = file_read(play->file, &compressed_buffer)))
 		goto err;
 
 	/* wait 'till its done and clean up the mess... */
@@ -686,7 +686,7 @@ int export_yuv4mpeg(struct play_s *play)
 		goto err;
 
 	/* feed it with data */
-	if ((ret = file_read(&play->glc, &compressed_buffer)))
+	if ((ret = file_read(play->file, &compressed_buffer)))
 		goto err;
 
 	/* threads will do the dirty work... */
@@ -763,7 +763,7 @@ int export_wav(struct play_s *play)
 		goto err;
 	if ((wav = wav_init(&play->glc, &uncompressed_buffer)) == NULL)
 		goto err;
-	if ((ret = file_read(&play->glc, &compressed_buffer)))
+	if ((ret = file_read(play->file, &compressed_buffer)))
 		goto err;
 
 	/* wait and clean up */
