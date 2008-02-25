@@ -136,46 +136,6 @@ int util_timediff(glc_t *glc, glc_stime_t diff)
 }
 
 /**
- * \brief load stream information from file
- *
- * Loads stream information from file and initializes
- * global stream information structure (glc.info).
- * \param glc glc
- * \return 0 on success otherwise an error code
- */
-int util_load_info(glc_t *glc)
-{
-	util_create_info(glc);
-
-	if (read(glc->stream_fd, glc->info, GLC_STREAM_INFO_SIZE) != GLC_STREAM_INFO_SIZE) {
-		fprintf(stderr, "can't read stream information\n");
-		return ENOSTR;
-	}
-
-	if (glc->info->signature != GLC_SIGNATURE) {
-		fprintf(stderr, "signature does not match\n");
-		return EINVAL;
-	}
-
-	if (glc->info->version != GLC_STREAM_VERSION) {
-		fprintf(stderr, "unsupported stream version 0x%02x\n", glc->info->version);
-		return ENOTSUP;
-	}
-
-	if (glc->info->name_size > 0) {
-		glc->info_name = (char *) malloc(glc->info->name_size);
-		read(glc->stream_fd, glc->info_name, glc->info->name_size);
-	}
-
-	if (glc->info->date_size > 0) {
-		glc->info_date = (char *) malloc(glc->info->date_size);
-		read(glc->stream_fd, glc->info_date, glc->info->date_size);
-	}
-
-	return 0;
-}
-
-/**
  * \brief allocate info structure
  * \param glc glc
  * \return 0 on success otherwise an error code

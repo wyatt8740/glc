@@ -29,7 +29,6 @@ __PUBLIC int util_log_close(glc_t *glc);
 __PUBLIC glc_utime_t util_time(glc_t *glc);
 __PUBLIC int util_timediff(glc_t *glc, glc_stime_t diff);
 
-__PUBLIC int util_load_info(glc_t *glc);
 __PUBLIC int util_create_info(glc_t *glc);
 __PUBLIC int util_init_info(glc_t *glc);
 __PUBLIC int util_free_info(glc_t *glc);
