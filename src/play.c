@@ -41,6 +41,8 @@ struct play_s {
 
 	double scale_factor;
 	unsigned int scale_width, scale_height;
+
+	size_t compressed_size, uncompressed_size;
 };
 
 int show_info_value(struct play_s *play, const char *value);
@@ -93,8 +95,8 @@ int main(int argc, char *argv[])
 	play.scale_width = play.scale_height = 0;
 
 	/* default buffer size is 10MiB */
-	play.glc.compressed_size = 10 * 1024 * 1024;
-	play.glc.uncompressed_size = 10 * 1024 * 1024;
+	play.compressed_size = 10 * 1024 * 1024;
+	play.uncompressed_size = 10 * 1024 * 1024;
 
 	/* log to stderr */
 	play.glc.log_file = "/dev/stderr";
@@ -173,13 +175,13 @@ int main(int argc, char *argv[])
 			play.glc.flags |= GLC_EXPORT_STREAMING;
 			break;
 		case 'c':
-			play.glc.compressed_size = atoi(optarg) * 1024 * 1024;
-			if (play.glc.compressed_size <= 0)
+			play.compressed_size = atoi(optarg) * 1024 * 1024;
+			if (play.compressed_size <= 0)
 				goto usage;
 			break;
 		case 'u':
-			play.glc.uncompressed_size = atoi(optarg) * 1024 * 1024;
-			if (play.glc.uncompressed_size <= 0)
+			play.uncompressed_size = atoi(optarg) * 1024 * 1024;
+			if (play.uncompressed_size <= 0)
 				goto usage;
 			break;
 		case 's':
@@ -352,8 +354,9 @@ int play_stream(struct play_s *play)
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer,
 		    rgb_buffer, color_buffer, scale_buffer;
-	void *unpack, *color, *rgb, *demux;
+	void *color, *rgb, *demux;
 	scale_t scale;
+	unpack_t unpack;
 	int ret = 0;
 
 	if ((ret = ps_bufferattr_init(&attr)))
@@ -363,13 +366,13 @@ int play_stream(struct play_s *play)
 	 'compressed_buffer' buffer holds raw data from file and
 	 has its own size.
 	*/
-	if ((ret = ps_bufferattr_setsize(&attr, play->glc.compressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->compressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&compressed_buffer, &attr)))
 		goto err;
 
 	/* rest use 'uncompressed_buffer' size */
-	if ((ret = ps_bufferattr_setsize(&attr, play->glc.uncompressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->uncompressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&uncompressed_buffer, &attr)))
 		goto err;
@@ -385,6 +388,8 @@ int play_stream(struct play_s *play)
 		goto err;
 
 	/* init filters */
+	if ((ret = unpack_init(&unpack, &play->glc)))
+		goto err;
 	if ((ret = scale_init(&scale, &play->glc)))
 		goto err;
 	if (play->scale_width && play->scale_height)
@@ -393,7 +398,7 @@ int play_stream(struct play_s *play)
 		scale_set_scale(scale, play->scale_factor);
 
 	/* construct a pipeline for playback */
-	if ((unpack = unpack_init(&play->glc, &compressed_buffer, &uncompressed_buffer)) == NULL)
+	if ((ret = unpack_process_start(unpack, &compressed_buffer, &uncompressed_buffer)))
 		goto err;
 	if ((rgb = rgb_init(&play->glc, &uncompressed_buffer, &rgb_buffer)) == NULL)
 		goto err;
@@ -417,10 +422,12 @@ int play_stream(struct play_s *play)
 		goto err;
 	if ((ret = rgb_wait(rgb)))
 		goto err;
-	if ((ret = unpack_wait(unpack)))
+	if ((ret = unpack_process_wait(unpack)))
 		goto err;
 
 	/* stream processed - clean up time */
+	unpack_destroy(unpack);
+
 	ps_buffer_destroy(&compressed_buffer);
 	ps_buffer_destroy(&uncompressed_buffer);
 	ps_buffer_destroy(&color_buffer);
@@ -452,19 +459,20 @@ int stream_info(struct play_s *play)
 
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer;
-	void *unpack, *info;
+	void *info;
+	unpack_t unpack;
 	int ret = 0;
 
 	if ((ret = ps_bufferattr_init(&attr)))
 		goto err;
 
 	/* initialize buffers */
-	if ((ret = ps_bufferattr_setsize(&attr, play->glc.compressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->compressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&compressed_buffer, &attr)))
 		goto err;
 
-	if ((ret = ps_bufferattr_setsize(&attr, play->glc.uncompressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->uncompressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&uncompressed_buffer, &attr)))
 		goto err;
@@ -472,10 +480,14 @@ int stream_info(struct play_s *play)
 	if ((ret = ps_bufferattr_destroy(&attr)))
 		goto err;
 
-	/* run it */
-	if ((info = unpack_init(&play->glc, &compressed_buffer, &uncompressed_buffer)) == NULL)
+	/* and filters */
+	if ((ret = unpack_init(&unpack, &play->glc)))
 		goto err;
-	if ((unpack = info_init(&play->glc, &uncompressed_buffer)) == NULL)
+
+	/* run it */
+	if ((ret = unpack_process_start(unpack, &compressed_buffer, &uncompressed_buffer)))
+		goto err;
+	if ((info = info_init(&play->glc, &uncompressed_buffer)) == NULL)
 		goto err;
 	if ((ret = file_read(&play->glc, &compressed_buffer)))
 		goto err;
@@ -483,8 +495,10 @@ int stream_info(struct play_s *play)
 	/* wait for threads and do cleanup */
 	if ((ret = info_wait(info)))
 		goto err;
-	if ((ret = unpack_wait(unpack)))
+	if ((ret = unpack_process_wait(unpack)))
 		goto err;
+
+	unpack_destroy(unpack);
 
 	ps_buffer_destroy(&compressed_buffer);
 	ps_buffer_destroy(&uncompressed_buffer);
@@ -516,20 +530,21 @@ int export_img(struct play_s *play)
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer,
 		    rgb_buffer, color_buffer, scale_buffer;
-	void *unpack, *rgb, *color, *img;
+	void *rgb, *color, *img;
 	scale_t scale;
+	unpack_t unpack;
 	int ret = 0;
 
 	if ((ret = ps_bufferattr_init(&attr)))
 		goto err;
 
 	/* buffers */
-	if ((ret = ps_bufferattr_setsize(&attr, play->glc.compressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->compressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&compressed_buffer, &attr)))
 		goto err;
 
-	if ((ret = ps_bufferattr_setsize(&attr, play->glc.uncompressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->uncompressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&uncompressed_buffer, &attr)))
 		goto err;
@@ -543,6 +558,8 @@ int export_img(struct play_s *play)
 	if ((ret = ps_bufferattr_destroy(&attr)))
 		goto err;
 
+	if ((ret = unpack_init(&unpack, &play->glc)))
+		goto err;
 	if ((ret = scale_init(&scale, &play->glc)))
 		goto err;
 	if (play->scale_width && play->scale_height)
@@ -551,7 +568,7 @@ int export_img(struct play_s *play)
 		scale_set_scale(scale, play->scale_factor);
 
 	/* pipeline... */
-	if ((unpack = unpack_init(&play->glc, &compressed_buffer, &uncompressed_buffer)) == NULL)
+	if ((ret = unpack_process_start(unpack, &compressed_buffer, &uncompressed_buffer)))
 		goto err;
 	if ((rgb = rgb_init(&play->glc, &uncompressed_buffer, &rgb_buffer)) == NULL)
 		goto err;
@@ -575,8 +592,10 @@ int export_img(struct play_s *play)
 		goto err;
 	if ((ret = rgb_wait(rgb)))
 		goto err;
-	if ((ret = unpack_wait(unpack)))
+	if ((ret = unpack_process_wait(unpack)))
 		goto err;
+
+	unpack_destroy(unpack);
 
 	ps_buffer_destroy(&compressed_buffer);
 	ps_buffer_destroy(&uncompressed_buffer);
@@ -613,21 +632,22 @@ int export_yuv4mpeg(struct play_s *play)
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer,
 		    ycbcr_buffer, color_buffer, scale_buffer;
-	void *unpack, *color, *yuv4mpeg;
+	void *color, *yuv4mpeg;
 	ycbcr_t ycbcr;
 	scale_t scale;
+	unpack_t unpack;
 	int ret = 0;
 
 	if ((ret = ps_bufferattr_init(&attr)))
 		goto err;
 
 	/* buffers */
-	if ((ret = ps_bufferattr_setsize(&attr, play->glc.compressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->compressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&compressed_buffer, &attr)))
 		goto err;
 
-	if ((ret = ps_bufferattr_setsize(&attr, play->glc.uncompressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->uncompressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&uncompressed_buffer, &attr)))
 		goto err;
@@ -642,6 +662,8 @@ int export_yuv4mpeg(struct play_s *play)
 		goto err;
 
 	/* initialize filters */
+	if ((ret = unpack_init(&unpack, &play->glc)))
+		goto err;
 	if ((ret = ycbcr_init(&ycbcr, &play->glc)))
 		goto err;
 	if ((ret = scale_init(&scale, &play->glc)))
@@ -652,7 +674,7 @@ int export_yuv4mpeg(struct play_s *play)
 		scale_set_scale(scale, play->scale_factor);
 
 	/* construct the pipeline */
-	if ((unpack = unpack_init(&play->glc, &compressed_buffer, &uncompressed_buffer)) == NULL)
+	if ((ret = unpack_process_start(unpack, &compressed_buffer, &uncompressed_buffer)))
 		goto err;
 	if ((ret = scale_process_start(scale, &uncompressed_buffer, &scale_buffer)))
 		goto err;
@@ -676,17 +698,18 @@ int export_yuv4mpeg(struct play_s *play)
 		goto err;
 	if ((ret = ycbcr_process_wait(ycbcr)))
 		goto err;
-	if ((ret = unpack_wait(unpack)))
+	if ((ret = unpack_process_wait(unpack)))
 		goto err;
+
+	unpack_destroy(unpack);
+	ycbcr_destroy(ycbcr);
+	scale_destroy(scale);
 
 	ps_buffer_destroy(&compressed_buffer);
 	ps_buffer_destroy(&uncompressed_buffer);
 	ps_buffer_destroy(&color_buffer);
 	ps_buffer_destroy(&scale_buffer);
 	ps_buffer_destroy(&ycbcr_buffer);
-
-	ycbcr_destroy(ycbcr);
-	scale_destroy(scale);
 
 	return 0;
 err:
@@ -711,19 +734,20 @@ int export_wav(struct play_s *play)
 
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer;
-	void *unpack, *wav;
+	void *wav;
+	unpack_t unpack;
 	int ret = 0;
 
 	if ((ret = ps_bufferattr_init(&attr)))
 		goto err;
 
 	/* buffers */
-	if ((ret = ps_bufferattr_setsize(&attr, play->glc.compressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->compressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&compressed_buffer, &attr)))
 		goto err;
 
-	if ((ret = ps_bufferattr_setsize(&attr, play->glc.uncompressed_size)))
+	if ((ret = ps_bufferattr_setsize(&attr, play->uncompressed_size)))
 		goto err;
 	if ((ret = ps_buffer_init(&uncompressed_buffer, &attr)))
 		goto err;
@@ -731,8 +755,11 @@ int export_wav(struct play_s *play)
 	if ((ret = ps_bufferattr_destroy(&attr)))
 		goto err;
 
+	if ((ret = unpack_init(&unpack, &play->glc)))
+		goto err;
+
 	/* start the threads */
-	if ((unpack = unpack_init(&play->glc, &compressed_buffer, &uncompressed_buffer)) == NULL)
+	if ((ret = unpack_process_start(unpack, &compressed_buffer, &uncompressed_buffer)))
 		goto err;
 	if ((wav = wav_init(&play->glc, &uncompressed_buffer)) == NULL)
 		goto err;
@@ -742,8 +769,10 @@ int export_wav(struct play_s *play)
 	/* wait and clean up */
 	if ((ret = wav_wait(wav)))
 		goto err;
-	if ((ret = unpack_wait(unpack)))
+	if ((ret = unpack_process_wait(unpack)))
 		goto err;
+
+	unpack_destroy(unpack);
 
 	ps_buffer_destroy(&compressed_buffer);
 	ps_buffer_destroy(&uncompressed_buffer);

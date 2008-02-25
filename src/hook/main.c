@@ -29,17 +29,22 @@
 #include "../core/file.h"
 #include "lib.h"
 
+#define MAIN_COMPRESS_NONE         0x2
+#define MAIN_COMPRESS_QUICKLZ      0x4
+#define MAIN_COMPRESS_LZO          0x8
+
 struct main_private_s {
 	glc_t glc;
+	glc_flags_t flags;
 
 	ps_buffer_t *uncompressed;
 	ps_buffer_t *compressed;
 	size_t uncompressed_size, compressed_size;
 
-	void *file, *pack;
+	void *file;
+	pack_t pack;
 
 	int sighandler;
-	int compress;
 	void (*sigint_handler)(int);
 	void (*sighup_handler)(int);
 	void (*sigterm_handler)(int);
@@ -65,6 +70,7 @@ void init_glc()
 {
 	struct sigaction new_sighandler, old_sighandler;
 	int ret;
+	mpriv.flags = 0;
 
 	if ((ret = pthread_mutex_lock(&lib.init_lock)))
 		goto err;
@@ -80,7 +86,6 @@ void init_glc()
 			mpriv.glc.flags &= ~GLC_LOG;
 		util_log_version(&mpriv.glc);
 	}
-
 
 	if ((ret = init_buffers()))
 		goto err;
@@ -149,7 +154,7 @@ int init_buffers()
 	if ((ret = ps_buffer_init(mpriv.uncompressed, &attr)))
 		return ret;
 
-	if (mpriv.compress) {
+	if (!(mpriv.flags & MAIN_COMPRESS_NONE)) {
 		ps_bufferattr_setsize(&attr, mpriv.compressed_size);
 		mpriv.compressed = (ps_buffer_t *) malloc(sizeof(ps_buffer_t));
 		if ((ret = ps_buffer_init(mpriv.compressed, &attr)))
@@ -172,12 +177,21 @@ int start_glc()
 	if (!lib.initialized)
 		return EAGAIN;
 
-	if (mpriv.compress) {
+	if (!(mpriv.flags & MAIN_COMPRESS_NONE)) {
 		/* file needs stream info */
 		if ((mpriv.file = file_init(&mpriv.glc, mpriv.compressed)) == NULL)
 			return EAGAIN;
-		if ((mpriv.pack = pack_init(&mpriv.glc, mpriv.uncompressed, mpriv.compressed)) == NULL)
-			return EAGAIN;
+
+		if ((ret = pack_init(&mpriv.pack, &mpriv.glc)))
+			return ret;
+
+		if (mpriv.flags & MAIN_COMPRESS_QUICKLZ)
+			pack_set_compression(mpriv.pack, PACK_QUICKLZ);
+		else if (mpriv.flags & MAIN_COMPRESS_LZO)
+			pack_set_compression(mpriv.pack, PACK_LZO);
+
+		if ((ret = pack_process_start(mpriv.pack, mpriv.uncompressed, mpriv.compressed)))
+			return ret;
 	} else if ((mpriv.file = file_init(&mpriv.glc, mpriv.uncompressed)) == NULL)
 		return EAGAIN;
 
@@ -242,8 +256,10 @@ void lib_close()
 		goto err;
 
 	if (lib.running) {
-		if (mpriv.compress)
-			pack_wait(mpriv.pack);
+		if (!(mpriv.flags & MAIN_COMPRESS_NONE)) {
+			pack_process_wait(mpriv.pack);
+			pack_destroy(mpriv.pack);
+		}
 		file_wait(mpriv.file);
 	}
 
@@ -301,34 +317,21 @@ int load_environ()
 	else
 		mpriv.sighandler = 0;
 
+	mpriv.uncompressed_size = 1024 * 1024 * 25;
 	if (getenv("GLC_UNCOMPRESSED_BUFFER_SIZE"))
 		mpriv.uncompressed_size = atoi(getenv("GLC_UNCOMPRESSED_BUFFER_SIZE")) * 1024 * 1024;
-	else
-		mpriv.uncompressed_size = 1024 * 1024 * 25;
 
+	mpriv.compressed_size = 1024 * 1024 * 50;
 	if (getenv("GLC_COMPRESSED_BUFFER_SIZE"))
 		mpriv.compressed_size = atoi(getenv("GLC_COMPRESSED_BUFFER_SIZE")) * 1024 * 1024;
-	else
-		mpriv.compressed_size = 1024 * 1024 * 50;
 
 	if (getenv("GLC_COMPRESS")) {
-		if (!strcmp(getenv("GLC_COMPRESS"), "lzo")) {
-			mpriv.compress = 1;
-			mpriv.glc.flags |= GLC_COMPRESS_LZO;
-		} else if (!strcmp(getenv("GLC_COMPRESS"), "quicklz")) {
-			mpriv.compress = 1;
-			mpriv.glc.flags |= GLC_COMPRESS_QUICKLZ;
-		}
-	} else {
-#ifdef __QUICKLZ
-		mpriv.compress = 1;
-		mpriv.glc.flags |= GLC_COMPRESS_QUICKLZ;
-#else
-# ifdef __LZO
-		mpriv.compress = 1;
-		mpriv.glc.flags |= GLC_COMPRESS_LZO;
-# endif
-#endif
+		if (!strcmp(getenv("GLC_COMPRESS"), "lzo"))
+			mpriv.flags |= MAIN_COMPRESS_LZO;
+		else if (!strcmp(getenv("GLC_COMPRESS"), "quicklz"))
+			mpriv.flags |= MAIN_COMPRESS_QUICKLZ;
+		else
+			mpriv.flags |= MAIN_COMPRESS_NONE;
 	}
 
 	return 0;

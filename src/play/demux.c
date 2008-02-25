@@ -92,7 +92,8 @@ void *demux_init(glc_t *glc, ps_buffer_t *from)
 	demux->from = from;
 
 	ps_bufferattr_init(&demux->bufferattr);
-	ps_bufferattr_setsize(&demux->bufferattr, glc->uncompressed_size);
+	/** \todo fix this!!!!!!!!!!! */
+	ps_bufferattr_setsize(&demux->bufferattr, 1024 * 1024 * 10);
 
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
