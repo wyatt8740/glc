@@ -49,6 +49,10 @@ struct play_s {
 	float red_gamma, green_gamma, blue_gamma;
 
 	int info_level;
+	int interpolate;
+	double fps;
+
+	glc_ctx_i export_ctx;
 };
 
 int show_info_value(struct play_s *play, const char *value);
@@ -90,7 +94,7 @@ int main(int argc, char *argv[])
 
 	/* initialize glc with some sane values */
 	play.glc.flags = 0;
-	play.glc.fps = 0;
+	play.fps = 0;
 	play.glc.filename_format = NULL; /* user has to specify */
 
 	play.glc.silence_threshold = 200000; /* 0.2 sec accuracy */
@@ -108,6 +112,7 @@ int main(int argc, char *argv[])
 	play.glc.log_file = "/dev/stderr";
 	play.glc.log_level = 0;
 	play.info_level = 1;
+	play.interpolate = 1;
 
 	/* global color correction */
 	play.override_color_correction = 0;
@@ -140,14 +145,14 @@ int main(int argc, char *argv[])
 			play.action = action_img;
 			break;
 		case 'y':
-			play.glc.export_ctx = atoi(optarg);
-			if (play.glc.export_ctx < 1)
+			play.export_ctx = atoi(optarg);
+			if (play.export_ctx < 1)
 				goto usage;
 			play.action = action_yuv4mpeg;
 			break;
 		case 'f':
-			play.glc.fps = atof(optarg);
-			if (play.glc.fps <= 0)
+			play.fps = atof(optarg);
+			if (play.fps <= 0)
 				goto usage;
 			break;
 		case 'r':
@@ -180,6 +185,7 @@ int main(int argc, char *argv[])
 				play.glc.filename_format = optarg;
 			break;
 		case 't':
+			play.interpolate = 0;
 			play.glc.flags |= GLC_EXPORT_STREAMING;
 			break;
 		case 'c':
@@ -242,8 +248,9 @@ int main(int argc, char *argv[])
 	 If the fps hasn't been specified read it from the
 	 stream information.
 	*/
-	if (play.glc.fps == 0)
-		play.glc.fps = play.glc.info->fps;
+	if (play.fps == 0)
+		play.fps = play.glc.info->fps;
+	play.glc.fps = play.fps; /** \todo remove? */
 
 	switch (play.action) {
 	case action_play:
@@ -660,7 +667,7 @@ int export_yuv4mpeg(struct play_s *play)
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer,
 		    ycbcr_buffer, color_buffer, scale_buffer;
-	void *yuv4mpeg;
+	yuv4mpeg_t yuv4mpeg;
 	ycbcr_t ycbcr;
 	scale_t scale;
 	unpack_t unpack;
@@ -706,6 +713,11 @@ int export_yuv4mpeg(struct play_s *play)
 	if (play->override_color_correction)
 		color_override(color, play->brightness, play->contrast,
 			       play->red_gamma, play->green_gamma, play->blue_gamma);
+	if ((ret = yuv4mpeg_init(&yuv4mpeg, &play->glc)))
+		goto err;
+	yuv4mpeg_set_fps(yuv4mpeg, play->fps);
+	yuv4mpeg_set_ctx(yuv4mpeg, play->export_ctx);
+	yuv4mpeg_set_interpolation(yuv4mpeg, play->interpolate);
 
 	/* construct the pipeline */
 	if ((ret = unpack_process_start(unpack, &compressed_buffer, &uncompressed_buffer)))
@@ -716,7 +728,7 @@ int export_yuv4mpeg(struct play_s *play)
 		goto err;
 	if ((ret = ycbcr_process_start(ycbcr, &color_buffer, &ycbcr_buffer)))
 		goto err;
-	if ((yuv4mpeg = yuv4mpeg_init(&play->glc, &ycbcr_buffer)) == NULL)
+	if ((ret = yuv4mpeg_process_start(yuv4mpeg, &ycbcr_buffer)))
 		goto err;
 
 	/* feed it with data */
@@ -724,7 +736,7 @@ int export_yuv4mpeg(struct play_s *play)
 		goto err;
 
 	/* threads will do the dirty work... */
-	if ((ret = yuv4mpeg_wait(yuv4mpeg)))
+	if ((ret = yuv4mpeg_process_wait(yuv4mpeg)))
 		goto err;
 	if ((ret = color_process_wait(color)))
 		goto err;
@@ -739,6 +751,7 @@ int export_yuv4mpeg(struct play_s *play)
 	ycbcr_destroy(ycbcr);
 	scale_destroy(scale);
 	color_destroy(color);
+	yuv4mpeg_destroy(yuv4mpeg);
 
 	ps_buffer_destroy(&compressed_buffer);
 	ps_buffer_destroy(&uncompressed_buffer);
@@ -748,13 +761,8 @@ int export_yuv4mpeg(struct play_s *play)
 
 	return 0;
 err:
-	if (!ret) {
-		fprintf(stderr, "exporting  yuv4mpegfailed: initializing filters failed\n");
-		return EAGAIN;
-	} else {
-		fprintf(stderr, "exporting yuv4mpeg failed: %s (%d)\n", strerror(ret), ret);
-		return ret;
-	}
+	fprintf(stderr, "exporting yuv4mpeg failed: %s (%d)\n", strerror(ret), ret);
+	return ret;
 }
 
 int export_wav(struct play_s *play)

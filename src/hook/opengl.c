@@ -43,6 +43,7 @@ struct opengl_private_s {
 	int convert_ycbcr_420jpeg;
 	double scale_factor;
 	GLenum read_buffer;
+	double fps;
 
 	int started;
 	int capturing;
@@ -73,11 +74,11 @@ int opengl_init(glc_t *glc)
 		return ret;
 
 	/* load environment variables */
+	opengl.fps = 30;
 	if (getenv("GLC_FPS"))
-		opengl.glc->fps = atof(getenv("GLC_FPS"));
-	else
-		opengl.glc->fps = 30;
-	gl_capture_set_fps(opengl.gl_capture, opengl.glc->fps);
+		opengl.fps = atof(getenv("GLC_FPS"));
+	opengl.glc->fps = opengl.fps;
+	gl_capture_set_fps(opengl.gl_capture, opengl.fps);
 
 	if (getenv("GLC_COLORSPACE")) {
 		if (!strcmp(getenv("GLC_COLORSPACE"), "420jpeg"))
