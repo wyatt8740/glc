@@ -28,9 +28,11 @@
 #include "../common/util.h"
 #include "yuv4mpeg.h"
 
-struct yuv4mpeg_private_s {
+struct yuv4mpeg_s {
 	glc_t *glc;
 	glc_thread_t thread;
+	int running;
+
 	unsigned int file_count;
 	FILE *to;
 
@@ -39,59 +41,109 @@ struct yuv4mpeg_private_s {
 
 	unsigned int size;
 	char *prev_pic;
+	int interpolate;
+
+	const char *filename_format;
+	glc_ctx_i ctx;
 };
 
 int yuv4mpeg_read_callback(glc_thread_state_t *state);
 void yuv4mpeg_finish_callback(void *priv, int err);
 
-int yuv4mpeg_handle_hdr(struct yuv4mpeg_private_s *yuv4mpeg, glc_ctx_message_t *ctx_msg);
-int yuv4mpeg_handle_pic(struct yuv4mpeg_private_s *yuv4mpeg, glc_picture_header_t *pic_header, char *data);
-int yuv4mpeg_write_pic(struct yuv4mpeg_private_s *yuv4mpeg, char *pic);
+int yuv4mpeg_handle_hdr(yuv4mpeg_t yuv4mpeg, glc_ctx_message_t *ctx_msg);
+int yuv4mpeg_handle_pic(yuv4mpeg_t yuv4mpeg, glc_picture_header_t *pic_header, char *data);
+int yuv4mpeg_write_pic(yuv4mpeg_t yuv4mpeg, char *pic);
 
-void *yuv4mpeg_init(glc_t *glc, ps_buffer_t *from)
+int yuv4mpeg_init(yuv4mpeg_t *yuv4mpeg, glc_t *glc)
 {
-	struct yuv4mpeg_private_s *yuv4mpeg = malloc(sizeof(struct yuv4mpeg_private_s));
-	memset(yuv4mpeg, 0, sizeof(struct yuv4mpeg_private_s));
+	*yuv4mpeg = (yuv4mpeg_t) malloc(sizeof(struct yuv4mpeg_s));
+	memset(*yuv4mpeg, 0, sizeof(struct yuv4mpeg_s));
 
-	yuv4mpeg->glc = glc;
-	yuv4mpeg->fps = 1000000 / yuv4mpeg->glc->fps;
+	(*yuv4mpeg)->glc = glc;
+	(*yuv4mpeg)->fps = 1000000 / 30;
+	(*yuv4mpeg)->filename_format = "video%02d.glc";
+	(*yuv4mpeg)->ctx = 1;
+	(*yuv4mpeg)->interpolate = 1;
 
-	yuv4mpeg->thread.flags = GLC_THREAD_READ;
-	yuv4mpeg->thread.ptr = yuv4mpeg;
-	yuv4mpeg->thread.read_callback = &yuv4mpeg_read_callback;
-	yuv4mpeg->thread.finish_callback = &yuv4mpeg_finish_callback;
-	yuv4mpeg->thread.threads = 1;
+	(*yuv4mpeg)->thread.flags = GLC_THREAD_READ;
+	(*yuv4mpeg)->thread.ptr = *yuv4mpeg;
+	(*yuv4mpeg)->thread.read_callback = &yuv4mpeg_read_callback;
+	(*yuv4mpeg)->thread.finish_callback = &yuv4mpeg_finish_callback;
+	(*yuv4mpeg)->thread.threads = 1;
 
-	if (glc_thread_create(glc, &yuv4mpeg->thread, from, NULL))
-		return NULL;
-
-	return yuv4mpeg;
+	return 0;
 }
 
-int yuv4mpeg_wait(void *yuv4mpegpriv)
+int yuv4mpeg_destroy(yuv4mpeg_t yuv4mpeg)
 {
-	struct yuv4mpeg_private_s *yuv4mpeg = yuv4mpegpriv;
+	free(yuv4mpeg);
+	return 0;
+}
+
+int yuv4mpeg_set_filename(yuv4mpeg_t yuv4mpeg, const char *filename)
+{
+	yuv4mpeg->filename_format = filename;
+	return 0;
+}
+
+int yuv4mpeg_set_ctx(yuv4mpeg_t yuv4mpeg, glc_ctx_i ctx)
+{
+	yuv4mpeg->ctx = ctx;
+	return 0;
+}
+
+int yuv4mpeg_set_fps(yuv4mpeg_t yuv4mpeg, double fps)
+{
+	yuv4mpeg->fps = 1000000 / fps;
+	return 0;
+}
+
+int yuv4mpeg_set_interpolation(yuv4mpeg_t yuv4mpeg, int interpolate)
+{
+	yuv4mpeg->interpolate = interpolate;
+	return 0;
+}
+
+int yuv4mpeg_process_start(yuv4mpeg_t yuv4mpeg, ps_buffer_t *from)
+{
+	int ret;
+	if (yuv4mpeg->running)
+		return EAGAIN;
+
+	if ((ret = glc_thread_create(yuv4mpeg->glc, &yuv4mpeg->thread, from, NULL)))
+		return ret;
+	yuv4mpeg->running = 1;
+
+	return 0;
+}
+
+int yuv4mpeg_process_wait(yuv4mpeg_t yuv4mpeg)
+{
+	if (!yuv4mpeg->running)
+		return EAGAIN;
 
 	glc_thread_wait(&yuv4mpeg->thread);
-	free(yuv4mpeg);
+	yuv4mpeg->running = 0;
 
 	return 0;
 }
 
 void yuv4mpeg_finish_callback(void *priv, int err)
 {
-	struct yuv4mpeg_private_s *yuv4mpeg = (struct yuv4mpeg_private_s *) priv;
+	yuv4mpeg_t yuv4mpeg = (yuv4mpeg_t) priv;
 
 	if (err)
 		util_log(yuv4mpeg->glc, GLC_ERROR, "yuv4mpeg", "%s (%d)", strerror(err), err);
 
-	if (yuv4mpeg->prev_pic)
+	if (yuv4mpeg->prev_pic) {
 		free(yuv4mpeg->prev_pic);
+		yuv4mpeg->prev_pic = NULL;
+	}
 }
 
 int yuv4mpeg_read_callback(glc_thread_state_t *state)
 {
-	struct yuv4mpeg_private_s *yuv4mpeg = (struct yuv4mpeg_private_s *) state->ptr;
+	yuv4mpeg_t yuv4mpeg = (yuv4mpeg_t) state->ptr;
 
 	if (state->header.type == GLC_MESSAGE_CTX)
 		return yuv4mpeg_handle_hdr(yuv4mpeg, (glc_ctx_message_t *) state->read_data);
@@ -101,7 +153,7 @@ int yuv4mpeg_read_callback(glc_thread_state_t *state)
 	return 0;
 }
 
-int yuv4mpeg_handle_hdr(struct yuv4mpeg_private_s *yuv4mpeg, glc_ctx_message_t *ctx_msg)
+int yuv4mpeg_handle_hdr(yuv4mpeg_t yuv4mpeg, glc_ctx_message_t *ctx_msg)
 {
 	char *filename;
 	unsigned int p, q;
@@ -113,13 +165,14 @@ int yuv4mpeg_handle_hdr(struct yuv4mpeg_private_s *yuv4mpeg, glc_ctx_message_t *
 		return ENOTSUP;
 
 	if (yuv4mpeg->to) {
+		fclose(yuv4mpeg->to);
 		util_log(yuv4mpeg->glc, GLC_WARNING, "yuv4mpeg", "ctx update msg");
-		yuv4mpeg->time = 0; /* reset time */
 	}
 
 	filename = (char *) malloc(1024);
-	snprintf(filename, 1023, yuv4mpeg->glc->filename_format, ++yuv4mpeg->file_count);
+	snprintf(filename, 1023, yuv4mpeg->filename_format, ++yuv4mpeg->file_count);
 	util_log(yuv4mpeg->glc, GLC_INFORMATION, "yuv4mpeg", "opening %s for writing", filename);
+
 	yuv4mpeg->to = fopen(filename, "w");
 	if (!yuv4mpeg->to) {
 		util_log(yuv4mpeg->glc, GLC_ERROR, "yuv4mpeg", "can't open %s", filename);
@@ -130,7 +183,7 @@ int yuv4mpeg_handle_hdr(struct yuv4mpeg_private_s *yuv4mpeg, glc_ctx_message_t *
 
 	yuv4mpeg->size = ctx_msg->w * ctx_msg->h + (ctx_msg->w * ctx_msg->h) / 2;
 
-	if (!(yuv4mpeg->glc->flags & GLC_EXPORT_STREAMING)) {
+	if (yuv4mpeg->interpolate) {
 		if (yuv4mpeg->prev_pic)
 			yuv4mpeg->prev_pic = (char *) realloc(yuv4mpeg->prev_pic, yuv4mpeg->size);
 		else
@@ -155,14 +208,14 @@ int yuv4mpeg_handle_hdr(struct yuv4mpeg_private_s *yuv4mpeg, glc_ctx_message_t *
 	return 0;
 }
 
-int yuv4mpeg_handle_pic(struct yuv4mpeg_private_s *yuv4mpeg, glc_picture_header_t *pic_hdr, char *data)
+int yuv4mpeg_handle_pic(yuv4mpeg_t yuv4mpeg, glc_picture_header_t *pic_hdr, char *data)
 {
 	if (pic_hdr->ctx != yuv4mpeg->glc->export_ctx)
 		return 0;
 
 	if (yuv4mpeg->time < pic_hdr->timestamp) {
 		while (yuv4mpeg->time + yuv4mpeg->fps < pic_hdr->timestamp) {
-			if (!(yuv4mpeg->glc->flags & GLC_EXPORT_STREAMING))
+			if (yuv4mpeg->interpolate)
 				yuv4mpeg_write_pic(yuv4mpeg, yuv4mpeg->prev_pic);
 			yuv4mpeg->time += yuv4mpeg->fps;
 		}
@@ -170,13 +223,13 @@ int yuv4mpeg_handle_pic(struct yuv4mpeg_private_s *yuv4mpeg, glc_picture_header_
 		yuv4mpeg->time += yuv4mpeg->fps;
 	}
 
-	if (!(yuv4mpeg->glc->flags & GLC_EXPORT_STREAMING))
+	if (yuv4mpeg->interpolate)
 		memcpy(yuv4mpeg->prev_pic, data, yuv4mpeg->size);
 
 	return 0;
 }
 
-int yuv4mpeg_write_pic(struct yuv4mpeg_private_s *yuv4mpeg, char *pic)
+int yuv4mpeg_write_pic(yuv4mpeg_t yuv4mpeg, char *pic)
 {
 	fprintf(yuv4mpeg->to, "FRAME\n");
 	fwrite(pic, 1, yuv4mpeg->size, yuv4mpeg->to);
