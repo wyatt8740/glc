@@ -158,7 +158,7 @@ int yuv4mpeg_handle_hdr(yuv4mpeg_t yuv4mpeg, glc_ctx_message_t *ctx_msg)
 	char *filename;
 	unsigned int p, q;
 
-	if (ctx_msg->ctx != yuv4mpeg->glc->export_ctx)
+	if (ctx_msg->ctx != yuv4mpeg->ctx)
 		return 0;
 
 	if (!(ctx_msg->flags & GLC_CTX_YCBCR_420JPEG))
@@ -210,7 +210,7 @@ int yuv4mpeg_handle_hdr(yuv4mpeg_t yuv4mpeg, glc_ctx_message_t *ctx_msg)
 
 int yuv4mpeg_handle_pic(yuv4mpeg_t yuv4mpeg, glc_picture_header_t *pic_hdr, char *data)
 {
-	if (pic_hdr->ctx != yuv4mpeg->glc->export_ctx)
+	if (pic_hdr->ctx != yuv4mpeg->ctx)
 		return 0;
 
 	if (yuv4mpeg->time < pic_hdr->timestamp) {

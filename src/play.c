@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
 	/* initialize glc with some sane values */
 	play.glc.flags = 0;
 	play.fps = 0;
-	play.glc.filename_format = NULL; /* user has to specify */
+	play.export_filename_format = NULL; /* user has to specify */
 
 	play.glc.silence_threshold = 200000; /* 0.2 sec accuracy */
 	play.glc.alsa_playback_device = "default";
@@ -227,7 +227,7 @@ int main(int argc, char *argv[])
 	if (((play.action == action_img) |
 	     (play.action == action_wav) |
 	     (play.action == action_yuv4mpeg)) &&
-	    (play.glc.filename_format == NULL))
+	    (play.export_filename_format == NULL))
 		goto usage;
 
 	/* we do global initialization */
