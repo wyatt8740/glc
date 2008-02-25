@@ -33,11 +33,12 @@
 	  (((Cb) >> (8 - LOOKUP_BITS)) << LOOKUP_BITS) + \
 	  ( (Cr) >> (8 - LOOKUP_BITS))) * 3)
 
-struct color_private_s;
+#define COLOR_RUNNING     0x1
+#define COLOR_OVERRIDE    0x2
+
 struct color_ctx_s;
 
-typedef void (*color_proc)(struct color_private_s *color,
-			   struct color_ctx_s *ctx,
+typedef void (*color_proc)(color_t color, struct color_ctx_s *ctx,
 			   unsigned char *from, unsigned char *to);
 
 struct color_ctx_s {
@@ -57,32 +58,35 @@ struct color_ctx_s {
 	struct color_ctx_s *next;
 };
 
-struct color_private_s {
+struct color_s {
 	glc_t *glc;
+	glc_flags_t flags;
 	glc_thread_t thread;
+
 	struct color_ctx_s *ctx;
+
+	float brightness, contrast;
+	float red_gamma, green_gamma, blue_gamma;
 };
 
 int color_read_callback(glc_thread_state_t *state);
 int color_write_callback(glc_thread_state_t *state);
 void color_finish_callback(void *ptr, int err);
 
-void color_get_ctx(struct color_private_s *color, glc_ctx_i ctx_i,
+void color_get_ctx(color_t color, glc_ctx_i ctx_i,
 		   struct color_ctx_s **ctx);
 
-int color_ctx_msg(struct color_private_s *color, glc_ctx_message_t *msg);
-int color_color_msg(struct color_private_s *color, glc_color_message_t *msg);
+int color_ctx_msg(color_t color, glc_ctx_message_t *msg);
+int color_color_msg(color_t color, glc_color_message_t *msg);
 
-int color_generate_ycbcr_lookup_table(struct color_private_s *color,
+int color_generate_ycbcr_lookup_table(color_t color,
 				      struct color_ctx_s *ctx);
-int color_generate_rgb_lookup_table(struct color_private_s *color,
+int color_generate_rgb_lookup_table(color_t color,
 				    struct color_ctx_s *ctx);
 
-void color_ycbcr(struct color_private_s *color,
-		 struct color_ctx_s *ctx,
+void color_ycbcr(color_t color, struct color_ctx_s *ctx,
 		 unsigned char *from, unsigned char *to);
-void color_bgr(struct color_private_s *color,
-	       struct color_ctx_s *ctx,
+void color_bgr(color_t color, struct color_ctx_s *ctx,
 	       unsigned char *from, unsigned char *to);
 
 /* unfortunately over- and underflows will occur */
@@ -95,39 +99,75 @@ __inline__ unsigned char color_clamp(int val)
 	return val;
 }
 
-void *color_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
+int color_init(color_t *color, glc_t *glc)
 {
-	struct color_private_s *color = malloc(sizeof(struct color_private_s));
-	memset(color, 0, sizeof(struct color_private_s));
+	*color = malloc(sizeof(struct color_s));
+	memset(*color, 0, sizeof(struct color_s));
 
-	color->glc = glc;
+	(*color)->glc = glc;
 
-	color->thread.flags = GLC_THREAD_READ | GLC_THREAD_WRITE;
-	color->thread.read_callback = &color_read_callback;
-	color->thread.write_callback = &color_write_callback;
-	color->thread.finish_callback = &color_finish_callback;
-	color->thread.ptr = color;
-	color->thread.threads = util_cpus();
+	(*color)->thread.flags = GLC_THREAD_READ | GLC_THREAD_WRITE;
+	(*color)->thread.read_callback = &color_read_callback;
+	(*color)->thread.write_callback = &color_write_callback;
+	(*color)->thread.finish_callback = &color_finish_callback;
+	(*color)->thread.ptr = *color;
+	(*color)->thread.threads = util_cpus();
 
-	if (glc_thread_create(glc, &color->thread, from, to))
-		return NULL;
-
-	return color;
+	return 0;
 }
 
-int color_wait(void *colorpriv)
+int color_destroy(color_t color)
 {
-	struct color_private_s *color = colorpriv;
+	free(color);
+	return 0;
+}
+
+int color_process_start(color_t color, ps_buffer_t *from, ps_buffer_t *to)
+{
+	int ret;
+	if (color->flags & COLOR_RUNNING)
+		return EAGAIN;
+
+	if ((ret = glc_thread_create(color->glc, &color->thread, from, to)))
+		return ret;
+	color->flags |= COLOR_RUNNING;
+
+	return 0;
+}
+
+int color_process_wait(color_t color)
+{
+	if (!(color->flags & COLOR_RUNNING))
+		return EAGAIN;
 
 	glc_thread_wait(&color->thread);
-	free(color);
+	color->flags &= ~COLOR_RUNNING;
 
+	return 0;
+}
+
+int color_override(color_t color, float brightness, float contrast,
+			    float red, float green, float blue)
+{
+	color->brightness = brightness;
+	color->contrast = contrast;
+	color->red_gamma = red;
+	color->green_gamma = green;
+	color->blue_gamma = blue;
+
+	color->flags |= COLOR_OVERRIDE;
+	return 0;
+}
+
+int color_override_clear(color_t color)
+{
+	color->flags &= ~COLOR_OVERRIDE;
 	return 0;
 }
 
 void color_finish_callback(void *ptr, int err)
 {
-	struct color_private_s *color = ptr;
+	color_t color = (color_t) ptr;
 	struct color_ctx_s *del;
 
 	if (err)
@@ -146,7 +186,7 @@ void color_finish_callback(void *ptr, int err)
 
 int color_read_callback(glc_thread_state_t *state)
 {
-	struct color_private_s *color = state->ptr;
+	color_t color = (color_t) state->ptr;
 	struct color_ctx_s *ctx;
 	glc_picture_header_t *pic_hdr;
 
@@ -191,7 +231,7 @@ int color_write_callback(glc_thread_state_t *state)
 	return 0;
 }
 
-void color_get_ctx(struct color_private_s *color, glc_ctx_i ctx_i,
+void color_get_ctx(color_t color, glc_ctx_i ctx_i,
 		   struct color_ctx_s **ctx)
 {
 	/* this function is called from read callback so it is never
@@ -215,7 +255,7 @@ void color_get_ctx(struct color_private_s *color, glc_ctx_i ctx_i,
 	}
 }
 
-int color_ctx_msg(struct color_private_s *color, glc_ctx_message_t *msg)
+int color_ctx_msg(color_t color, glc_ctx_message_t *msg)
 {
 	struct color_ctx_s *ctx;
 	glc_flags_t old_flags;
@@ -240,12 +280,12 @@ int color_ctx_msg(struct color_private_s *color, glc_ctx_message_t *msg)
 			ctx->row += 8 - ctx->row % 8;
 	}
 
-	if (color->glc->flags & GLC_OVERRIDE_COLOR_CORRECTION) {
-		ctx->brightness = color->glc->brightness;
-		ctx->contrast = color->glc->contrast;
-		ctx->red_gamma = color->glc->red_gamma;
-		ctx->green_gamma = color->glc->green_gamma;
-		ctx->blue_gamma = color->glc->blue_gamma;
+	if (color->flags & COLOR_OVERRIDE) {
+		ctx->brightness = color->brightness;
+		ctx->contrast = color->contrast;
+		ctx->red_gamma = color->red_gamma;
+		ctx->green_gamma = color->green_gamma;
+		ctx->blue_gamma = color->blue_gamma;
 
 		util_log(color->glc, GLC_INFORMATION, "color",
 			 "using global color correction for ctx %d", msg->ctx);
@@ -290,11 +330,11 @@ int color_ctx_msg(struct color_private_s *color, glc_ctx_message_t *msg)
 	return 0;
 }
 
-int color_color_msg(struct color_private_s *color, glc_color_message_t *msg)
+int color_color_msg(color_t color, glc_color_message_t *msg)
 {
 	struct color_ctx_s *ctx;
 
-	if (color->glc->flags & GLC_OVERRIDE_COLOR_CORRECTION)
+	if (color->flags & COLOR_OVERRIDE)
 		return 0; /* ignore */
 
 	color_get_ctx(color, msg->ctx, &ctx);
@@ -331,7 +371,7 @@ int color_color_msg(struct color_private_s *color, glc_color_message_t *msg)
 	return 0;
 }
 
-void color_ycbcr(struct color_private_s *color,
+void color_ycbcr(color_t color,
 		 struct color_ctx_s *ctx,
 		 unsigned char *from, unsigned char *to)
 {
@@ -374,7 +414,7 @@ void color_ycbcr(struct color_private_s *color,
 	}
 }
 
-void color_bgr(struct color_private_s *color,
+void color_bgr(color_t color,
 	       struct color_ctx_s *ctx,
 	       unsigned char *from, unsigned char *to)
 {
@@ -419,7 +459,7 @@ unsigned char YCbCr_TO_RGB_Bd(unsigned char Y, unsigned char Cb, unsigned char C
 #define RGB_TO_YCbCrJPEG_Cr(Rd, Gd, Bd) \
 	(128 + 0.5      * (Rd) - 0.418688 * (Gd) - 0.081312 * (Bd))
 
-int color_generate_ycbcr_lookup_table(struct color_private_s *color,
+int color_generate_ycbcr_lookup_table(color_t color,
 				      struct color_ctx_s *ctx)
 {
 	unsigned int Y, Cb, Cr, pos;
@@ -458,7 +498,7 @@ int color_generate_ycbcr_lookup_table(struct color_private_s *color,
 	return 0;
 }
 
-int color_generate_rgb_lookup_table(struct color_private_s *color,
+int color_generate_rgb_lookup_table(color_t color,
 				    struct color_ctx_s *ctx)
 {
 	unsigned int c;

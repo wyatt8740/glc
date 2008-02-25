@@ -85,8 +85,6 @@ typedef u_int32_t glc_flags_t;
 #define GLC_LOG                             0x4
 /** disable writing errors to stderr */
 #define GLC_NOERR                           0x8
-/** override color correction values */
-#define GLC_OVERRIDE_COLOR_CORRECTION   0x20000
 /** export as png instead of bmp */
 #define GLC_EXPORT_PNG                  0x80000
 /** streaming mode: do not interpolate frames/audio */
@@ -140,17 +138,6 @@ typedef struct {
 	glc_utime_t silence_threshold;
 	/** alsa device for playback */
 	const char *alsa_playback_device;
-
-	/** global brightness */
-	float brightness;
-	/** global contrast */
-	float contrast;
-	/** global red gamma */
-	float red_gamma;
-	/** global green gamma */
-	float green_gamma;
-	/** global blue gamma */
-	float blue_gamma;
 
 	/** util uses this to store internal state */
 	void *util;
