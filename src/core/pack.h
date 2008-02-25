@@ -17,11 +17,113 @@
 #include <packetstream.h>
 #include "../common/glc.h"
 
-__PUBLIC void *pack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
-__PUBLIC int pack_wait(void *packpriv);
+/**
+ * \brief pack object
+ */
+typedef struct pack_s* pack_t;
 
-__PUBLIC void *unpack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to);
-__PUBLIC int unpack_wait(void *unpackpriv);
+/** QuickLZ compression */
+#define PACK_QUICKLZ       0x1
+/** LZO compression */
+#define PACK_LZO           0x2
+
+/**
+ * \brief unpack object
+ */
+typedef struct unpack_s* unpack_t;
+
+/**
+ * \brief initialize pack object
+ * \param pack pack object
+ * \param glc glc
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int pack_init(pack_t *pack, glc_t *glc);
+
+/**
+ * \brief set compression
+ *
+ * QuickLZ (PACK_QUICKLZ) and LZO (PACK_LZO) are currently supported.
+ * Both are fast enough for stream compression.
+ * LZO compresses marginally better but is slower. QuickLZ is default.
+ * \param pack pack object
+ * \param compression compression algorithm
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int pack_set_compression(pack_t pack, int compression);
+
+/**
+ * \brief set compression threshold
+ *
+ * Packets smaller than compression threshold won't be compressed.
+ * Default threshold is 1024.
+ * \param pack pack object
+ * \param min_size minimum packet size
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int pack_set_minimum_size(pack_t pack, size_t min_size);
+
+/**
+ * \brief start processing threads
+ *
+ * pack compresses all data that is practical to compress (currently
+ * pictures and audio data) and wraps compressed data into container
+ * packets.
+ * \param pack pack object
+ * \param from source buffer
+ * \param to target buffer
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int pack_process_start(pack_t pack, ps_buffer_t *from, ps_buffer_t *to);
+
+/**
+ * \brief block until process has finished
+ * \param pack pack object
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int pack_process_wait(pack_t pack);
+
+/**
+ * \brief destroy pack object
+ * \param pack pack object
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int pack_destroy(pack_t pack);
+
+
+/**
+ * \brief initialize unpack object
+ * \param unpack unpack object
+ * \param glc glc
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int unpack_init(unpack_t *unpack, glc_t *glc);
+
+/**
+ * \brief start processing threads
+ *
+ * unpack decompresses all supported compressed messages.
+ * \param unpack unpack object
+ * \param from source buffer
+ * \param to target buffer
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int unpack_process_start(unpack_t unpack, ps_buffer_t *from,
+				  ps_buffer_t *to);
+
+/**
+ * \brief block until process has finished
+ * \param unpack unpack object
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int unpack_process_wait(unpack_t unpack);
+
+/**
+ * \brief destroy unpack object
+ * \param unpack unpack object
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int unpack_destroy(unpack_t unpack);
 
 #endif
 

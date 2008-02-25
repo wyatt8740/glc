@@ -46,10 +46,18 @@
 # include <quicklz.h>
 #endif
 
-struct pack_private_s {
+struct pack_s {
 	glc_t *glc;
 	glc_thread_t thread;
 	size_t compress_min;
+	int running;
+	int compression;
+};
+
+struct unpack_s {
+	glc_t *glc;
+	glc_thread_t thread;
+	int running;
 };
 
 int pack_thread_create_callback(void *ptr, void **threadptr);
@@ -63,63 +71,121 @@ int unpack_read_callback(glc_thread_state_t *state);
 int unpack_write_callback(glc_thread_state_t *state);
 void unpack_finish_callback(void *ptr, int err);
 
-void *pack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
+int pack_init(pack_t *pack, glc_t *glc)
 {
-	struct pack_private_s *pack = malloc(sizeof(struct pack_private_s));
-	memset(pack, 0, sizeof(struct pack_private_s));
+	*pack = (pack_t) malloc(sizeof(struct pack_s));
+	memset(pack, 0, sizeof(struct pack_s));
 
-	pack->glc = glc;
-	pack->compress_min = 1024;
+	(*pack)->glc = glc;
+	(*pack)->compress_min = 1024;
 
-	pack->thread.flags = GLC_THREAD_WRITE | GLC_THREAD_READ;
-	pack->thread.ptr = pack;
-	pack->thread.thread_create_callback = &pack_thread_create_callback;
-	pack->thread.thread_finish_callback = &pack_thread_finish_callback;
-	pack->thread.read_callback = &pack_read_callback;
-	pack->thread.finish_callback = &pack_finish_callback;
-	pack->thread.threads = util_cpus();
+	(*pack)->thread.flags = GLC_THREAD_WRITE | GLC_THREAD_READ;
+	(*pack)->thread.ptr = *pack;
+	(*pack)->thread.thread_create_callback = &pack_thread_create_callback;
+	(*pack)->thread.thread_finish_callback = &pack_thread_finish_callback;
+	(*pack)->thread.read_callback = &pack_read_callback;
+	(*pack)->thread.finish_callback = &pack_finish_callback;
+	(*pack)->thread.threads = util_cpus();
 
-	if (pack->glc->flags & GLC_COMPRESS_QUICKLZ) {
 #ifdef __QUICKLZ
-		pack->thread.write_callback = &pack_quicklz_write_callback;
-		util_log(pack->glc, GLC_INFORMATION, "pack", "compressing using QuickLZ");
+	(*pack)->thread.write_callback = &pack_quicklz_write_callback;
+	(*pack)->compression = PACK_QUICKLZ;
 #else
-		util_log(pack->glc, GLC_ERROR, "pack", "QuickLZ not supported");
-		return NULL;
+# ifdef __LZO
+	(*pack)->thread.write_callback = &pack_lzo_write_callback;
+	(*pack)->compression = PACK_LZO;
+# else
+	util_log((*pack)->glc, GLC_ERROR, "pack",
+		 "no supported compression algorithms found");
+	return ENOTSUP;
+# endif
 #endif
-	} else if (pack->glc->flags & GLC_COMPRESS_LZO) {
-#ifdef __LZO
-		pack->thread.write_callback = &pack_lzo_write_callback;
-		util_log(pack->glc, GLC_INFORMATION, "pack", "compressing using LZO");
-		lzo_init();
-#else
-		util_log(pack->glc, GLC_ERROR, "pack", "LZO not supported");
-		return NULL;
-#endif
-	} else {
-		util_log(pack->glc, GLC_ERROR, "pack", "no compression selected");
-		return NULL;
-	}
 
-	if (glc_thread_create(glc, &pack->thread, from, to))
-		return NULL;
-
-	return pack;
+	return 0;
 }
 
-int pack_wait(void *packpriv)
+int pack_set_compression(pack_t pack, int compression)
 {
-	struct pack_private_s *pack = packpriv;
+	if (pack->running)
+		return EALREADY;
+
+	if (compression == PACK_QUICKLZ) {
+#ifdef __QUICKLZ
+		pack->thread.write_callback = &pack_quicklz_write_callback;
+		util_log(pack->glc, GLC_INFORMATION, "pack",
+			 "compressing using QuickLZ");
+#else
+		util_log(pack->glc, GLC_ERROR, "pack",
+			 "QuickLZ not supported");
+		return ENOTSUP;
+#endif
+	} else if (compression == PACK_LZO) {
+#ifdef __LZO
+		pack->thread.write_callback = &pack_lzo_write_callback;
+		util_log(pack->glc, GLC_INFORMATION, "pack",
+			 "compressing using LZO");
+		lzo_init();
+#else
+		util_log(pack->glc, GLC_ERROR, "pack",
+			 "LZO not supported");
+		return ENOTSUP;
+#endif
+	} else {
+		util_log(pack->glc, GLC_ERROR, "pack",
+			 "unknown/unsupported compression algorithm 0x%02x",
+			 compression);
+		return ENOTSUP;
+	}
+
+	pack->compression = compression;
+	return 0;
+}
+
+int pack_set_minimum_size(pack_t pack, size_t min_size)
+{
+	if (pack->running)
+		return EALREADY;
+
+	if (min_size < 0)
+		return EINVAL;
+
+	pack->compress_min = min_size;
+	return 0;
+}
+
+int pack_process_start(pack_t pack, ps_buffer_t *from, ps_buffer_t *to)
+{
+	int ret;
+	if (pack->running)
+		return EAGAIN;
+
+	if ((ret = glc_thread_create(pack->glc, &pack->thread, from, to)))
+		return ret;
+	pack->running = 1;
+
+	return 0;
+}
+
+int pack_process_wait(pack_t pack)
+{
+	if (!pack->running)
+		return EAGAIN;
 
 	glc_thread_wait(&pack->thread);
-	free(pack);
+	pack->running = 0;
 
+	return 0;
+}
+
+int pack_destroy(pack_t pack)
+{
+	free(pack);
 	return 0;
 }
 
 void pack_finish_callback(void *ptr, int err)
 {
-	struct pack_private_s *pack = (struct pack_private_s *) ptr;
+	pack_t pack = (pack_t) ptr;
 
 	if (err)
 		util_log(pack->glc, GLC_ERROR, "pack", "%s (%d)", strerror(err), err);
@@ -127,13 +193,13 @@ void pack_finish_callback(void *ptr, int err)
 
 int pack_thread_create_callback(void *ptr, void **threadptr)
 {
-	struct pack_private_s *pack = ptr;
+	pack_t pack = (pack_t) ptr;
 
-	if (pack->glc->flags & GLC_COMPRESS_QUICKLZ) {
+	if (pack->compression == PACK_QUICKLZ) {
 #ifdef __QUICKLZ
 		*threadptr = malloc(__quicklz_hashtable);
 #endif
-	} else if (pack->glc->flags & GLC_COMPRESS_LZO) {
+	} else if (pack->compression == PACK_LZO) {
 #ifdef __LZO
 		*threadptr = malloc(__lzo_wrk_mem);
 #endif
@@ -150,13 +216,13 @@ void pack_thread_finish_callback(void *ptr, void *threadptr, int err)
 
 int pack_read_callback(glc_thread_state_t *state)
 {
-	struct pack_private_s *pack = (struct pack_private_s *) state->ptr;
+	pack_t pack = (pack_t) state->ptr;
 
 	/* compress only audio and pictures */
 	if ((state->read_size > pack->compress_min) &&
 	    ((state->header.type == GLC_MESSAGE_PICTURE) |
 	     (state->header.type == GLC_MESSAGE_AUDIO))) {
-		if (pack->glc->flags & GLC_COMPRESS_QUICKLZ) {
+		if (pack->compression == PACK_QUICKLZ) {
 #ifdef __QUICKLZ
 			state->write_size = GLC_CONTAINER_MESSAGE_SIZE
 					    + GLC_QUICKLZ_HEADER_SIZE
@@ -164,7 +230,7 @@ int pack_read_callback(glc_thread_state_t *state)
 #else
 			goto copy;
 #endif
-		} else if (pack->glc->flags & GLC_COMPRESS_LZO) {
+		} else if (pack->compression == PACK_LZO) {
 #ifdef __LZO
 			state->write_size = GLC_CONTAINER_MESSAGE_SIZE
 					    + GLC_LZO_HEADER_SIZE
@@ -237,46 +303,63 @@ int pack_quicklz_write_callback(glc_thread_state_t *state)
 #endif
 }
 
-void *unpack_init(glc_t *glc, ps_buffer_t *from, ps_buffer_t *to)
+int unpack_init(unpack_t *unpack, glc_t *glc)
 {
-	struct pack_private_s *pack = malloc(sizeof(struct pack_private_s));
-	memset(pack, 0, sizeof(struct pack_private_s));
+	*unpack = (unpack_t) malloc(sizeof(struct unpack_s));
+	memset(*unpack, 0, sizeof(struct unpack_s));
 
-	pack->glc = glc;
+	(*unpack)->glc = glc;
 
-	pack->thread.flags = GLC_THREAD_WRITE | GLC_THREAD_READ;
-	pack->thread.ptr = pack;
-	pack->thread.read_callback = &unpack_read_callback;
-	pack->thread.write_callback = &unpack_write_callback;
-	pack->thread.finish_callback = &unpack_finish_callback;
-	pack->thread.threads = util_cpus();
+	(*unpack)->thread.flags = GLC_THREAD_WRITE | GLC_THREAD_READ;
+	(*unpack)->thread.ptr = *unpack;
+	(*unpack)->thread.read_callback = &unpack_read_callback;
+	(*unpack)->thread.write_callback = &unpack_write_callback;
+	(*unpack)->thread.finish_callback = &unpack_finish_callback;
+	(*unpack)->thread.threads = util_cpus();
 
 #ifdef __LZO
 	lzo_init();
 #endif
 
-	if (glc_thread_create(glc, &pack->thread, from, to))
-		return NULL;
-
-	return pack;
+	return 0;
 }
 
-int unpack_wait(void *unpackpriv)
+int unpack_process_start(unpack_t unpack, ps_buffer_t *from, ps_buffer_t *to)
 {
-	struct pack_private_s *pack = unpackpriv;
+	int ret;
+	if (unpack->running)
+		return EAGAIN;
 
-	glc_thread_wait(&pack->thread);
-	free(pack);
+	if ((ret = glc_thread_create(unpack->glc, &unpack->thread, from, to)))
+		return ret;
+	unpack->running = 1;
 
+	return 0;
+}
+
+int unpack_process_wait(unpack_t unpack)
+{
+	if (!unpack->running)
+		return EAGAIN;
+
+	glc_thread_wait(&unpack->thread);
+	unpack->running = 0;
+
+	return 0;
+}
+
+int unpack_destroy(unpack_t unpack)
+{
+	free(unpack);
 	return 0;
 }
 
 void unpack_finish_callback(void *ptr, int err)
 {
-	struct pack_private_s *pack = (struct pack_private_s *) ptr;
+	unpack_t unpack = (unpack_t) ptr;
 
 	if (err)
-		util_log(pack->glc, GLC_ERROR, "unpack", "%s (%d)", strerror(err), err);
+		util_log(unpack->glc, GLC_ERROR, "unpack", "%s (%d)", strerror(err), err);
 }
 
 int unpack_read_callback(glc_thread_state_t *state)

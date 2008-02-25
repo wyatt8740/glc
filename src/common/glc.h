@@ -81,10 +81,6 @@ typedef u_int32_t glc_flags_t;
 #define GLC_CAPTURE                         0x1
 /** glc is cancelled */
 #define GLC_CANCEL                          0x2
-/** compress stream with LZO */
-#define GLC_COMPRESS_LZO                 0x1000
-/** compress stream with QuickLZ */
-#define GLC_COMPRESS_QUICKLZ             0x2000
 /** enable log */
 #define GLC_LOG                          0x8000
 /** disable writing errors to stderr */
@@ -178,11 +174,6 @@ typedef struct {
 	char *info_name;
 	/** date */
 	char *info_date;
-
-	/** uncompressed data buffer size */
-	size_t uncompressed_size;
-	/** compressed data buffer size */
-	size_t compressed_size;
 } glc_t;
 
 /** error */
