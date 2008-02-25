@@ -354,9 +354,10 @@ int play_stream(struct play_s *play)
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer,
 		    rgb_buffer, color_buffer, scale_buffer;
-	void *color, *rgb, *demux;
+	void *color, *demux;
 	scale_t scale;
 	unpack_t unpack;
+	rgb_t rgb;
 	int ret = 0;
 
 	if ((ret = ps_bufferattr_init(&attr)))
@@ -390,6 +391,8 @@ int play_stream(struct play_s *play)
 	/* init filters */
 	if ((ret = unpack_init(&unpack, &play->glc)))
 		goto err;
+	if ((ret = rgb_init(&rgb, &play->glc)))
+		goto err;
 	if ((ret = scale_init(&scale, &play->glc)))
 		goto err;
 	if (play->scale_width && play->scale_height)
@@ -400,7 +403,7 @@ int play_stream(struct play_s *play)
 	/* construct a pipeline for playback */
 	if ((ret = unpack_process_start(unpack, &compressed_buffer, &uncompressed_buffer)))
 		goto err;
-	if ((rgb = rgb_init(&play->glc, &uncompressed_buffer, &rgb_buffer)) == NULL)
+	if ((ret = rgb_process_start(rgb, &uncompressed_buffer, &rgb_buffer)))
 		goto err;
 	if ((ret = scale_process_start(scale, &rgb_buffer, &scale_buffer)))
 		goto err;
@@ -420,21 +423,21 @@ int play_stream(struct play_s *play)
 		goto err;
 	if ((ret = scale_process_wait(scale)))
 		goto err;
-	if ((ret = rgb_wait(rgb)))
+	if ((ret = rgb_process_wait(rgb)))
 		goto err;
 	if ((ret = unpack_process_wait(unpack)))
 		goto err;
 
 	/* stream processed - clean up time */
 	unpack_destroy(unpack);
+	rgb_destroy(rgb);
+	scale_destroy(scale);
 
 	ps_buffer_destroy(&compressed_buffer);
 	ps_buffer_destroy(&uncompressed_buffer);
 	ps_buffer_destroy(&color_buffer);
 	ps_buffer_destroy(&scale_buffer);
 	ps_buffer_destroy(&rgb_buffer);
-
-	scale_destroy(scale);
 
 	return 0;
 err:
@@ -530,9 +533,10 @@ int export_img(struct play_s *play)
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer,
 		    rgb_buffer, color_buffer, scale_buffer;
-	void *rgb, *color, *img;
+	void *color, *img;
 	scale_t scale;
 	unpack_t unpack;
+	rgb_t rgb;
 	int ret = 0;
 
 	if ((ret = ps_bufferattr_init(&attr)))
@@ -558,7 +562,10 @@ int export_img(struct play_s *play)
 	if ((ret = ps_bufferattr_destroy(&attr)))
 		goto err;
 
+	/* filters */
 	if ((ret = unpack_init(&unpack, &play->glc)))
+		goto err;
+	if ((ret = rgb_init(&rgb, &play->glc)))
 		goto err;
 	if ((ret = scale_init(&scale, &play->glc)))
 		goto err;
@@ -570,7 +577,7 @@ int export_img(struct play_s *play)
 	/* pipeline... */
 	if ((ret = unpack_process_start(unpack, &compressed_buffer, &uncompressed_buffer)))
 		goto err;
-	if ((rgb = rgb_init(&play->glc, &uncompressed_buffer, &rgb_buffer)) == NULL)
+	if ((ret = rgb_process_start(rgb, &uncompressed_buffer, &rgb_buffer)))
 		goto err;
 	if ((ret = scale_process_start(scale, &rgb_buffer, &scale_buffer)))
 		goto err;
@@ -590,20 +597,20 @@ int export_img(struct play_s *play)
 		goto err;
 	if ((ret = scale_process_wait(scale)))
 		goto err;
-	if ((ret = rgb_wait(rgb)))
+	if ((ret = rgb_process_wait(rgb)))
 		goto err;
 	if ((ret = unpack_process_wait(unpack)))
 		goto err;
 
 	unpack_destroy(unpack);
+	rgb_destroy(rgb);
+	scale_destroy(scale);
 
 	ps_buffer_destroy(&compressed_buffer);
 	ps_buffer_destroy(&uncompressed_buffer);
 	ps_buffer_destroy(&color_buffer);
 	ps_buffer_destroy(&scale_buffer);
 	ps_buffer_destroy(&rgb_buffer);
-
-	scale_destroy(scale);
 
 	return 0;
 err:
