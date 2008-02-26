@@ -37,6 +37,9 @@ FEATURES += -D__QUICKLZ -I$(QUICKLZ)
 
 HEADERS = $(COMMON)/glc.h \
 	  $(COMMON)/util.h \
+	  $(COMMON)/core.h \
+	  $(COMMON)/state.h \
+	  $(COMMON)/log.h \
 	  $(COMMON)/thread.h \
 	  $(CORE)/pack.h \
 	  $(CORE)/file.h \
@@ -56,6 +59,9 @@ HEADERS = $(COMMON)/glc.h \
 	  $(EXPORT)/yuv4mpeg.h
 
 CORE_OBJS = $(BUILD)/util.o \
+	    $(BUILD)/core.o \
+	    $(BUILD)/log.o \
+	    $(BUILD)/state.o \
 	    $(BUILD)/thread.o \
 	    $(BUILD)/scale.o \
 	    $(BUILD)/info.o \
@@ -178,8 +184,17 @@ $(BUILD)/capture.o: $(SRC)/capture.c
 
 
 # common objects
+$(BUILD)/core.o: $(COMMON)/core.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/core.o -c $(COMMON)/core.c
+
 $(BUILD)/util.o: $(COMMON)/util.c $(HEADERS)
 	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/util.o -c $(COMMON)/util.c
+
+$(BUILD)/state.o: $(COMMON)/state.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/state.o -c $(COMMON)/state.c
+
+$(BUILD)/log.o: $(COMMON)/log.c $(HEADERS)
+	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/log.o -c $(COMMON)/log.c
 
 $(BUILD)/thread.o: $(COMMON)/thread.c $(HEADERS)
 	$(CC) $(SO_CFLAGS) $(FEATURES) -o $(BUILD)/thread.o -c $(COMMON)/thread.c
