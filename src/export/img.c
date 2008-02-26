@@ -28,16 +28,23 @@
 #include "img.h"
 
 struct img_private_s;
-typedef int (*img_write_proc)(struct img_private_s *img,
+typedef int (*img_write_proc)(img_t img,
 			      const unsigned char *pic,
 			      unsigned int w,
 			      unsigned int h,
 			      const char *filename);
 
-struct img_private_s {
+struct img_s {
 	glc_t *glc;
-	glc_utime_t fps;
 	glc_thread_t thread;
+	int running;
+
+	glc_ctx_i ctx;
+
+	const char *filename_format;
+
+	double fps;
+	glc_utime_t fps_usec;
 
 	unsigned int w, h;
 	unsigned int row;
@@ -51,68 +58,123 @@ struct img_private_s {
 void img_finish_callback(void *ptr, int err);
 int img_read_callback(glc_thread_state_t *state);
 
-int img_ctx_msg(struct img_private_s *img, glc_ctx_message_t *ctx_msg);
-int img_pic(struct img_private_s *img, glc_picture_header_t *pic_hdr,
+int img_ctx_msg(img_t img, glc_ctx_message_t *ctx_msg);
+int img_pic(img_t img, glc_picture_header_t *pic_hdr,
 	    const unsigned char *pic, size_t pic_size);
 
-int img_write_bmp(struct img_private_s *img, const unsigned char *pic,
+int img_write_bmp(img_t img, const unsigned char *pic,
 		  unsigned int w, unsigned int h,
 		  const char *filename);
-int img_write_png(struct img_private_s *img, const unsigned char *pic,
+int img_write_png(img_t img, const unsigned char *pic,
 		  unsigned int w, unsigned int h,
 		  const char *filename);
 
-void *img_init(glc_t *glc, ps_buffer_t *from)
+int img_init(img_t *img, glc_t *glc)
 {
-	struct img_private_s *img = malloc(sizeof(struct img_private_s));
-	memset(img, 0, sizeof(struct img_private_s));
+	*img = (img_t) malloc(sizeof(struct img_s));
+	memset(*img, 0, sizeof(struct img_s));
 
-	img->glc = glc;
-	img->fps = 1000000 / img->glc->fps;
+	(*img)->glc = glc;
+	(*img)->fps = 30;
+	(*img)->fps_usec = 1000000 / (*img)->fps;
+	(*img)->write_proc = &img_write_png;
+	(*img)->filename_format = "frame%08d.png";
+	(*img)->ctx = 1;
 
-	if (img->glc->flags & GLC_EXPORT_PNG)
-		img->write_proc = &img_write_png;
-	else
-		img->write_proc = &img_write_bmp;
+	(*img)->thread.flags = GLC_THREAD_READ;
+	(*img)->thread.ptr = *img;
+	(*img)->thread.read_callback = &img_read_callback;
+	(*img)->thread.finish_callback = &img_finish_callback;
+	(*img)->thread.threads = 1;
 
-	img->thread.flags = GLC_THREAD_READ;
-	img->thread.ptr = img;
-	img->thread.read_callback = &img_read_callback;
-	img->thread.finish_callback = &img_finish_callback;
-	img->thread.threads = 1;
-
-	if (glc_thread_create(glc, &img->thread, from, NULL))
-		return NULL;
-
-	return img;
+	return 0;
 }
 
-int img_wait(void *imgpriv)
+int img_destroy(img_t img)
 {
-	struct img_private_s *img = imgpriv;
+	free(img);
+	return 0;
+}
+
+int img_process_start(img_t img, ps_buffer_t *from)
+{
+	int ret;
+	if (img->running)
+		return EAGAIN;
+
+	if ((ret = glc_thread_create(img->glc, &img->thread, from, NULL)))
+		return ret;
+	img->running = 1;
+
+	return 0;
+}
+
+int img_process_wait(img_t img)
+{
+	if (!img->running)
+		return EAGAIN;
 
 	glc_thread_wait(&img->thread);
-	free(img);
+	img->running = 0;
 
+	return 0;
+}
+
+int img_set_fps(img_t img, double fps)
+{
+	img->fps = fps;
+	img->fps_usec = 1000000 / img->fps;
+	return 0;
+}
+
+int img_set_filename(img_t img, const char *filename)
+{
+	img->filename_format = filename;
+	return 0;
+}
+
+int img_set_format(img_t img, int format)
+{
+	if (format == IMG_PNG)
+		img->write_proc = &img_write_png;
+	else if (format == IMG_BMP)
+		img->write_proc = &img_write_bmp;
+	else {
+		util_log(img->glc, GLC_ERROR, "img",
+			 "unknown format 0x%02x", format);
+		return EINVAL;
+	}
+
+	return 0;
+}
+
+int img_set_stream_number(img_t img, glc_ctx_i ctx)
+{
+	img->ctx = ctx;
 	return 0;
 }
 
 void img_finish_callback(void *ptr, int err)
 {
-	struct img_private_s *img = (struct img_private_s *) ptr;
+	img_t img = (img_t) ptr;
 
 	util_log(img->glc, GLC_INFORMATION, "img", "%d images written", img->i);
 
 	if (err)
 		util_log(img->glc, GLC_ERROR, "img", "%s (%d)", strerror(err), err);
 
-	if (img->prev_pic)
+	if (img->prev_pic) {
 		free(img->prev_pic);
+		img->prev_pic = NULL;
+	}
+
+	img->i = 0;
+	img->time = 0;
 }
 
 int img_read_callback(glc_thread_state_t *state)
 {
-	struct img_private_s *img = state->ptr;
+	img_t img = state->ptr;
 	int ret = 0;
 
 	if (state->header.type == GLC_MESSAGE_CTX) {
@@ -126,9 +188,9 @@ int img_read_callback(glc_thread_state_t *state)
 	return ret;
 }
 
-int img_ctx_msg(struct img_private_s *img, glc_ctx_message_t *ctx_msg)
+int img_ctx_msg(img_t img, glc_ctx_message_t *ctx_msg)
 {
-	if (ctx_msg->ctx != img->glc->export_ctx)
+	if (ctx_msg->ctx != img->ctx)
 		return 0;
 
 	if (!(ctx_msg->flags & GLC_CTX_BGR)) {
@@ -155,27 +217,27 @@ int img_ctx_msg(struct img_private_s *img, glc_ctx_message_t *ctx_msg)
 	return 0;
 }
 
-int img_pic(struct img_private_s *img, glc_picture_header_t *pic_hdr,
+int img_pic(img_t img, glc_picture_header_t *pic_hdr,
 	    const unsigned char *pic, size_t pic_size)
 {
 	int ret = 0;
 	char filename[1024];
 
-	if (pic_hdr->ctx != img->glc->export_ctx)
+	if (pic_hdr->ctx != img->ctx)
 		return 0;
 
 	if (img->time < pic_hdr->timestamp) {
 		/* write previous pic until we are 'fps' away from current time */
-		while (img->time + img->fps < pic_hdr->timestamp) {
-			img->time += img->fps;
+		while (img->time + img->fps_usec < pic_hdr->timestamp) {
+			img->time += img->fps_usec;
 
-			snprintf(filename, sizeof(filename) - 1, img->glc->filename_format, img->i++);
+			snprintf(filename, sizeof(filename) - 1, img->filename_format, img->i++);
 			img->write_proc(img, img->prev_pic, img->w, img->h, filename);
 		}
 
-		img->time += img->fps;
+		img->time += img->fps_usec;
 
-		snprintf(filename, sizeof(filename) - 1, img->glc->filename_format, img->i++);
+		snprintf(filename, sizeof(filename) - 1, img->filename_format, img->i++);
 		ret = img->write_proc(img, pic, img->w, img->h, filename);
 	}
 
@@ -184,7 +246,7 @@ int img_pic(struct img_private_s *img, glc_picture_header_t *pic_hdr,
 	return ret;
 }
 
-int img_write_bmp(struct img_private_s *img, const unsigned char *pic,
+int img_write_bmp(img_t img, const unsigned char *pic,
 		  unsigned int w, unsigned int h, const char *filename)
 {
 	FILE *fd;
@@ -218,7 +280,7 @@ int img_write_bmp(struct img_private_s *img, const unsigned char *pic,
 	return 0;
 }
 
-int img_write_png(struct img_private_s *img, const unsigned char *pic,
+int img_write_png(img_t img, const unsigned char *pic,
 		  unsigned int w, unsigned int h,
 		  const char *filename)
 {
