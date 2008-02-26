@@ -31,6 +31,8 @@ struct audio_play_private_s {
 	glc_t *glc;
 	glc_thread_t thread;
 
+	glc_utime_t silence_threshold;
+
 	glc_audio_i audio_i;
 	snd_pcm_t *pcm;
 	const char *device;
@@ -73,6 +75,7 @@ void *audio_play_init(glc_t *glc, ps_buffer_t *from, glc_audio_i audio)
 	audio_play->glc = glc;
 	audio_play->device = audio_play->glc->alsa_playback_device;
 	audio_play->audio_i = audio;
+	audio_play->silence_threshold = 200000;
 
 	audio_play->thread.flags = GLC_THREAD_READ;
 	audio_play->thread.ptr = audio_play;
@@ -202,7 +205,7 @@ int audio_play_play(struct audio_play_private_s *audio_play, glc_audio_header_t 
 	glc_utime_t time = util_time(audio_play->glc);
 	glc_utime_t duration = (1000000 * frames) / audio_play->rate;
 	
-	if (time + audio_play->glc->silence_threshold + duration < audio_hdr->timestamp)
+	if (time + audio_play->silence_threshold + duration < audio_hdr->timestamp)
 		usleep(audio_hdr->timestamp - time - duration);
 	else if (time > audio_hdr->timestamp) {
 		util_log(audio_play->glc, GLC_WARNING, "audio_play", "dropped packet");

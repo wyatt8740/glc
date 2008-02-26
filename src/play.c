@@ -54,6 +54,10 @@ struct play_s {
 
 	const char *export_filename_format;
 	glc_ctx_i export_ctx;
+	glc_audio_i export_audio;
+	int img_format;
+
+	glc_utime_t silence_threshold;
 };
 
 int show_info_value(struct play_s *play, const char *value);
@@ -96,9 +100,8 @@ int main(int argc, char *argv[])
 	/* initialize glc with some sane values */
 	play.glc.flags = 0;
 	play.fps = 0;
-	play.export_filename_format = NULL; /* user has to specify */
 
-	play.glc.silence_threshold = 200000; /* 0.2 sec accuracy */
+	play.silence_threshold = 200000; /* 0.2 sec accuracy */
 	play.glc.alsa_playback_device = "default";
 
 	/* don't scale by default */
@@ -113,7 +116,11 @@ int main(int argc, char *argv[])
 	play.glc.log_file = "/dev/stderr";
 	play.glc.log_level = 0;
 	play.info_level = 1;
+
+	/* default export settings */
 	play.interpolate = 1;
+	play.export_filename_format = NULL; /* user has to specify */
+	play.img_format = IMG_BMP;
 
 	/* global color correction */
 	play.override_color_correction = 0;
@@ -132,16 +139,16 @@ int main(int argc, char *argv[])
 			play.action = action_info;
 			break;
 		case 'a':
-			play.glc.export_audio = atoi(optarg);
-			if (play.glc.export_audio < 1)
+			play.export_audio = atoi(optarg);
+			if (play.export_audio < 1)
 				goto usage;
 			play.action = action_wav;
 			break;
 		case 'p':
-			play.glc.flags |= GLC_EXPORT_PNG;
+			play.img_format = IMG_PNG;
 		case 'b':
-			play.glc.export_ctx = atoi(optarg);
-			if (play.glc.export_ctx < 1)
+			play.export_ctx = atoi(optarg);
+			if (play.export_ctx < 1)
 				goto usage;
 			play.action = action_img;
 			break;
@@ -174,7 +181,7 @@ int main(int argc, char *argv[])
 			break;
 		case 'l':
 			/* glc_utime_t so always positive */
-			play.glc.silence_threshold = atof(optarg) * 1000000;
+			play.silence_threshold = atof(optarg) * 1000000;
 			break;
 		case 'd':
 			play.glc.alsa_playback_device = optarg;
@@ -187,7 +194,6 @@ int main(int argc, char *argv[])
 			break;
 		case 't':
 			play.interpolate = 0;
-			play.glc.flags |= GLC_EXPORT_STREAMING;
 			break;
 		case 'c':
 			play.compressed_size = atoi(optarg) * 1024 * 1024;
@@ -214,9 +220,6 @@ int main(int argc, char *argv[])
 			goto usage;
 		}
 	}
-
-	/** \todo remove */
-	play.glc.filename_format = play.export_filename_format;
 
 	/* stream file is mandatory */
 	if (optind >= argc)
@@ -558,7 +561,7 @@ int export_img(struct play_s *play)
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer,
 		    rgb_buffer, color_buffer, scale_buffer;
-	void *img;
+	img_t img;
 	color_t color;
 	scale_t scale;
 	unpack_t unpack;
@@ -604,6 +607,12 @@ int export_img(struct play_s *play)
 	if (play->override_color_correction)
 		color_override(color, play->brightness, play->contrast,
 			       play->red_gamma, play->green_gamma, play->blue_gamma);
+	if ((ret = img_init(&img, &play->glc)))
+		goto err;
+	img_set_filename(img, play->export_filename_format);
+	img_set_stream_number(img, play->export_ctx);
+	img_set_format(img, play->img_format);
+	img_set_fps(img, play->fps);
 
 	/* pipeline... */
 	if ((ret = unpack_process_start(unpack, &compressed_buffer, &uncompressed_buffer)))
@@ -614,7 +623,7 @@ int export_img(struct play_s *play)
 		goto err;
 	if ((ret = color_process_start(color, &scale_buffer, &color_buffer)))
 		goto err;
-	if ((img = img_init(&play->glc, &color_buffer)) == NULL)
+	if ((ret = img_process_start(img, &color_buffer)))
 		goto err;
 
 	/* ok, read the file */
@@ -622,7 +631,7 @@ int export_img(struct play_s *play)
 		goto err;
 
 	/* wait 'till its done and clean up the mess... */
-	if ((ret = img_wait(img)))
+	if ((ret = img_process_wait(img)))
 		goto err;
 	if ((ret = color_process_wait(color)))
 		goto err;
@@ -637,6 +646,7 @@ int export_img(struct play_s *play)
 	rgb_destroy(rgb);
 	scale_destroy(scale);
 	color_destroy(color);
+	img_destroy(img);
 
 	ps_buffer_destroy(&compressed_buffer);
 	ps_buffer_destroy(&uncompressed_buffer);
@@ -646,13 +656,8 @@ int export_img(struct play_s *play)
 
 	return 0;
 err:
-	if (!ret) {
-		fprintf(stderr, "exporting images failed: initializing filters failed\n");
-		return EAGAIN;
-	} else {
-		fprintf(stderr, "exporting images failed: %s (%d)\n", strerror(ret), ret);
-		return ret;
-	}
+	fprintf(stderr, "exporting images failed: %s (%d)\n", strerror(ret), ret);
+	return ret;
 }
 
 int export_yuv4mpeg(struct play_s *play)
@@ -720,7 +725,7 @@ int export_yuv4mpeg(struct play_s *play)
 	if ((ret = yuv4mpeg_init(&yuv4mpeg, &play->glc)))
 		goto err;
 	yuv4mpeg_set_fps(yuv4mpeg, play->fps);
-	yuv4mpeg_set_ctx(yuv4mpeg, play->export_ctx);
+	yuv4mpeg_set_stream_number(yuv4mpeg, play->export_ctx);
 	yuv4mpeg_set_interpolation(yuv4mpeg, play->interpolate);
 	yuv4mpeg_set_filename(yuv4mpeg, play->export_filename_format);
 
@@ -782,7 +787,7 @@ int export_wav(struct play_s *play)
 
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer;
-	void *wav;
+	wav_t wav;
 	unpack_t unpack;
 	int ret = 0;
 
@@ -803,24 +808,32 @@ int export_wav(struct play_s *play)
 	if ((ret = ps_bufferattr_destroy(&attr)))
 		goto err;
 
+	/* init filters */
 	if ((ret = unpack_init(&unpack, &play->glc)))
 		goto err;
+	if ((ret = wav_init(&wav, &play->glc)))
+		goto err;
+	wav_set_interpolation(wav, play->interpolate);
+	wav_set_filename(wav, play->export_filename_format);
+	wav_set_stream_number(wav, play->export_audio);
+	wav_set_silence_threshold(wav, play->silence_threshold);
 
 	/* start the threads */
 	if ((ret = unpack_process_start(unpack, &compressed_buffer, &uncompressed_buffer)))
 		goto err;
-	if ((wav = wav_init(&play->glc, &uncompressed_buffer)) == NULL)
+	if ((ret = wav_process_start(wav, &uncompressed_buffer)))
 		goto err;
 	if ((ret = file_read(play->file, &compressed_buffer)))
 		goto err;
 
 	/* wait and clean up */
-	if ((ret = wav_wait(wav)))
+	if ((ret = wav_process_wait(wav)))
 		goto err;
 	if ((ret = unpack_process_wait(unpack)))
 		goto err;
 
 	unpack_destroy(unpack);
+	wav_destroy(wav);
 
 	ps_buffer_destroy(&compressed_buffer);
 	ps_buffer_destroy(&uncompressed_buffer);
