@@ -85,10 +85,6 @@ typedef u_int32_t glc_flags_t;
 #define GLC_LOG                             0x4
 /** disable writing errors to stderr */
 #define GLC_NOERR                           0x8
-/** export as png instead of bmp */
-#define GLC_EXPORT_PNG                  0x80000
-/** streaming mode: do not interpolate frames/audio */
-#define GLC_EXPORT_STREAMING           0x100000
 
 /**
  * \brief stream info structure
@@ -134,20 +130,11 @@ typedef struct {
 	/** fps */
 	double fps;
 
-	/** playback/export silence threshold in microseconds */
-	glc_utime_t silence_threshold;
 	/** alsa device for playback */
 	const char *alsa_playback_device;
 
 	/** util uses this to store internal state */
 	void *util;
-
-	/** filename format for exporting wav/pictures/yuv4mpeg */
-	const char *filename_format;
-	/** exported audio stream number */
-	glc_audio_i export_audio;
-	/** exported video stream number */
-	glc_ctx_i export_ctx;
 
 	/** stream info structure */
 	glc_stream_info_t *info;
