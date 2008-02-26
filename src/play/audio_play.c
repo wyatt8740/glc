@@ -27,9 +27,10 @@
 #include "../common/thread.h"
 #include "audio_play.h"
 
-struct audio_play_private_s {
+struct audio_play_s {
 	glc_t *glc;
 	glc_thread_t thread;
+	int running;
 
 	glc_utime_t silence_threshold;
 
@@ -49,12 +50,12 @@ struct audio_play_private_s {
 int audio_play_read_callback(glc_thread_state_t *state);
 void audio_play_finish_callback(void *priv, int err);
 
-int audio_play_hw(struct audio_play_private_s *audio_play, glc_audio_format_message_t *fmt_msg);
-int audio_play_play(struct audio_play_private_s *audio_play, glc_audio_header_t *audio_msg, char *data);
+int audio_play_hw(audio_play_t audio_play, glc_audio_format_message_t *fmt_msg);
+int audio_play_play(audio_play_t audio_play, glc_audio_header_t *audio_msg, char *data);
 
 snd_pcm_format_t glc_fmt_to_pcm_fmt(glc_flags_t flags);
 
-int audio_play_xrun(struct audio_play_private_s *audio_play, int err);
+int audio_play_xrun(audio_play_t audio_play, int err);
 
 snd_pcm_format_t glc_fmt_to_pcm_fmt(glc_flags_t flags)
 {
@@ -67,66 +68,100 @@ snd_pcm_format_t glc_fmt_to_pcm_fmt(glc_flags_t flags)
 	return 0;
 }
 
-void *audio_play_init(glc_t *glc, ps_buffer_t *from, glc_audio_i audio)
+int audio_play_init(audio_play_t *audio_play, glc_t *glc)
 {
-	struct audio_play_private_s *audio_play = (struct audio_play_private_s *) malloc(sizeof(struct audio_play_private_s));
-	memset(audio_play, 0, sizeof(struct audio_play_private_s));
+	*audio_play = (audio_play_t) malloc(sizeof(struct audio_play_s));
+	memset(*audio_play, 0, sizeof(struct audio_play_s));
 
-	audio_play->glc = glc;
-	audio_play->device = audio_play->glc->alsa_playback_device;
-	audio_play->audio_i = audio;
-	audio_play->silence_threshold = 200000;
+	(*audio_play)->glc = glc;
+	(*audio_play)->device = "default";
+	(*audio_play)->audio_i = 1;
+	(*audio_play)->silence_threshold = 200000; /** \todo make configurable? */
 
-	audio_play->thread.flags = GLC_THREAD_READ;
-	audio_play->thread.ptr = audio_play;
-	audio_play->thread.read_callback = &audio_play_read_callback;
-	audio_play->thread.finish_callback = &audio_play_finish_callback;
-	audio_play->thread.threads = 1;
+	(*audio_play)->thread.flags = GLC_THREAD_READ;
+	(*audio_play)->thread.ptr = *audio_play;
+	(*audio_play)->thread.read_callback = &audio_play_read_callback;
+	(*audio_play)->thread.finish_callback = &audio_play_finish_callback;
+	(*audio_play)->thread.threads = 1;
 
-	if (glc_thread_create(glc, &audio_play->thread, from, NULL))
-		return NULL;
-
-	return audio_play;
+	return 0;
 }
 
-int audio_play_wait(void *priv)
+int audio_play_destroy(audio_play_t audio_play)
 {
-	struct audio_play_private_s *audio_play = priv;
+	free(audio_play);
+	return 0;
+}
+
+int audio_play_set_alsa_playback_device(audio_play_t audio_play, const char *device)
+{
+	audio_play->device = device;
+	return 0;
+}
+
+int audio_play_set_stream_number(audio_play_t audio_play, glc_audio_i audio)
+{
+	audio_play->audio_i = audio;
+	return 0;
+}
+
+int audio_play_process_start(audio_play_t audio_play, ps_buffer_t *from)
+{
+	int ret;
+	if (audio_play->running)
+		return EAGAIN;
+
+	if ((ret = glc_thread_create(audio_play->glc, &audio_play->thread, from, NULL)))
+		return ret;
+	audio_play->running = 1;
+
+	return 0;
+}
+
+int audio_play_process_wait(audio_play_t audio_play)
+{
+	if (!audio_play->running)
+		return EAGAIN;
 
 	glc_thread_wait(&audio_play->thread);
-	free(audio_play);
+	audio_play->running = 0;
 
 	return 0;
 }
 
 void audio_play_finish_callback(void *priv, int err)
 {
-	struct audio_play_private_s *audio_play = (struct audio_play_private_s *) priv;
+	audio_play_t audio_play = (audio_play_t) priv;
 
 	if (err)
 		util_log(audio_play->glc, GLC_ERROR, "audio_play", "%s (%d)",
 			 strerror(err), err);
 	
-	if (audio_play->pcm)
+	if (audio_play->pcm) {
 		snd_pcm_close(audio_play->pcm);
+		audio_play->pcm = NULL;
+	}
 
-	if (audio_play->bufs)
+	if (audio_play->bufs) {
 		free(audio_play->bufs);
+		audio_play->bufs = NULL;
+	}
 }
 
 int audio_play_read_callback(glc_thread_state_t *state)
 {
-	struct audio_play_private_s *audio_play = (struct audio_play_private_s *) state->ptr;
+	audio_play_t audio_play = (audio_play_t ) state->ptr;
 
 	if (state->header.type == GLC_MESSAGE_AUDIO_FORMAT)
 		return audio_play_hw(audio_play, (glc_audio_format_message_t *) state->read_data);
 	else if (state->header.type == GLC_MESSAGE_AUDIO)
-		return audio_play_play(audio_play, (glc_audio_header_t *) state->read_data, &state->read_data[GLC_AUDIO_HEADER_SIZE]);
+		return audio_play_play(audio_play, (glc_audio_header_t *) state->read_data,
+				       &state->read_data[GLC_AUDIO_HEADER_SIZE]);
 	
 	return 0;
 }
 
-int audio_play_hw(struct audio_play_private_s *audio_play, glc_audio_format_message_t *fmt_msg)
+int audio_play_hw(audio_play_t audio_play, glc_audio_format_message_t *fmt_msg)
 {
 	snd_pcm_hw_params_t *hw_params = NULL;
 	snd_pcm_access_t access;
@@ -149,27 +184,35 @@ int audio_play_hw(struct audio_play_private_s *audio_play, glc_audio_format_mess
 	else
 		access = SND_PCM_ACCESS_RW_NONINTERLEAVED;
 
-	if ((ret = snd_pcm_open(&audio_play->pcm, audio_play->device, SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK)) < 0)
+	if ((ret = snd_pcm_open(&audio_play->pcm, audio_play->device,
+				SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK)) < 0)
 		goto err;
 	if ((ret = snd_pcm_hw_params_malloc(&hw_params)) < 0)
 		goto err;
 	if ((ret = snd_pcm_hw_params_any(audio_play->pcm, hw_params)) < 0)
 		goto err;
-	if ((ret = snd_pcm_hw_params_set_access(audio_play->pcm, hw_params, access)) < 0)
+	if ((ret = snd_pcm_hw_params_set_access(audio_play->pcm,
+						hw_params, access)) < 0)
 		goto err;
-	if ((ret = snd_pcm_hw_params_set_format(audio_play->pcm, hw_params, glc_fmt_to_pcm_fmt(audio_play->flags))) < 0)
+	if ((ret = snd_pcm_hw_params_set_format(audio_play->pcm, hw_params,
+						glc_fmt_to_pcm_fmt(audio_play->flags))) < 0)
 		goto err;
-	if ((ret = snd_pcm_hw_params_set_channels(audio_play->pcm, hw_params, audio_play->channels)) < 0)
+	if ((ret = snd_pcm_hw_params_set_channels(audio_play->pcm, hw_params,
+						  audio_play->channels)) < 0)
 		goto err;
-	if ((ret = snd_pcm_hw_params_set_rate(audio_play->pcm, hw_params, audio_play->rate, 0)) < 0)
+	if ((ret = snd_pcm_hw_params_set_rate(audio_play->pcm, hw_params,
+					      audio_play->rate, 0)) < 0)
 		goto err;
-	if ((ret = snd_pcm_hw_params_get_buffer_size_max(hw_params, &max_buffer_size)) < 0)
+	if ((ret = snd_pcm_hw_params_get_buffer_size_max(hw_params,
+							 &max_buffer_size)) < 0)
 		goto err;
-	if ((ret = snd_pcm_hw_params_set_buffer_size(audio_play->pcm, hw_params, max_buffer_size)) < 0)
+	if ((ret = snd_pcm_hw_params_set_buffer_size(audio_play->pcm,
+						     hw_params, max_buffer_size)) < 0)
 		goto err;
 	if ((ret = snd_pcm_hw_params_get_periods_min(hw_params, &min_periods, &dir)) < 0)
 		goto err;
-	if ((ret = snd_pcm_hw_params_set_periods(audio_play->pcm, hw_params, min_periods < 2 ? 2 : min_periods, dir)) < 0)
+	if ((ret = snd_pcm_hw_params_set_periods(audio_play->pcm, hw_params,
+						 min_periods < 2 ? 2 : min_periods, dir)) < 0)
 		goto err;
 	if ((ret = snd_pcm_hw_params(audio_play->pcm, hw_params)) < 0)
 		goto err;
@@ -186,7 +229,7 @@ err:
 	return -ret;
 }
 
-int audio_play_play(struct audio_play_private_s *audio_play, glc_audio_header_t *audio_hdr, char *data)
+int audio_play_play(audio_play_t audio_play, glc_audio_header_t *audio_hdr, char *data)
 {
 	snd_pcm_uframes_t frames, rem;
 	snd_pcm_sframes_t ret = 0;
@@ -248,7 +291,7 @@ int audio_play_play(struct audio_play_private_s *audio_play, glc_audio_header_t 
 	return 0;
 }
 
-int audio_play_xrun(struct audio_play_private_s *audio_play, int err)
+int audio_play_xrun(audio_play_t audio_play, int err)
 {
 	util_log(audio_play->glc, GLC_DEBUG, "audio_play", "xrun");
 	if (err == -EPIPE) {
