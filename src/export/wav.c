@@ -48,14 +48,20 @@ struct wav_data {
 	u_int32_t size;
 } __attribute__((packed));
 
-struct wav_private_s {
+struct wav_s {
 	glc_t *glc;
 	glc_thread_t thread;
+	int running;
+
+	glc_audio_i audio_i;
+	int interpolate;
+
 	unsigned int file_count;
-	
+	const char *filename_format;
+
 	char *silence;
 	size_t silence_size;
-	int silence_threshold;
+	glc_utime_t silence_threshold;
 
 	FILE *to;
 	
@@ -70,57 +76,107 @@ struct wav_private_s {
 int wav_read_callback(glc_thread_state_t *state);
 void wav_finish_callback(void *priv, int err);
 
-int wav_write_hdr(struct wav_private_s *wav, glc_audio_format_message_t *fmt_msg);
-int wav_write_audio(struct wav_private_s *wav, glc_audio_header_t *audio_msg, char *data);
+int wav_write_hdr(wav_t wav, glc_audio_format_message_t *fmt_msg);
+int wav_write_audio(wav_t wav, glc_audio_header_t *audio_msg, char *data);
 
-void *wav_init(glc_t *glc, ps_buffer_t *from)
+int wav_init(wav_t *wav, glc_t *glc)
 {
-	struct wav_private_s *wav = (struct wav_private_s *) malloc(sizeof(struct wav_private_s));
-	memset(wav, 0, sizeof(struct wav_private_s));
+	*wav = (wav_t) malloc(sizeof(struct wav_s));
+	memset(*wav, 0, sizeof(struct wav_s));
 
-	wav->glc = glc;
+	(*wav)->glc = glc;
 
-	wav->silence_size = 1024;
-	wav->silence = (char *) malloc(wav->silence_size);
+	(*wav)->filename_format = "audio%02d.wav";
+	(*wav)->silence_threshold = 200000; /* 0.2s */
+	(*wav)->audio_i = 1;
+	(*wav)->interpolate = 1;
 
-	wav->thread.flags = GLC_THREAD_READ;
-	wav->thread.ptr = wav;
-	wav->thread.read_callback = &wav_read_callback;
-	wav->thread.finish_callback = &wav_finish_callback;
-	wav->thread.threads = 1;
+	(*wav)->silence_size = 1024;
+	(*wav)->silence = (char *) malloc((*wav)->silence_size);
+	memset((*wav)->silence, 0, (*wav)->silence_size);
 
-	if (glc_thread_create(glc, &wav->thread, from, NULL))
-		return NULL;
+	(*wav)->thread.flags = GLC_THREAD_READ;
+	(*wav)->thread.ptr = *wav;
+	(*wav)->thread.read_callback = &wav_read_callback;
+	(*wav)->thread.finish_callback = &wav_finish_callback;
+	(*wav)->thread.threads = 1;
 
-	return wav;
+	return 0;
 }
 
-int wav_wait(void *wavpriv)
+int wav_destroy(wav_t wav)
 {
-	struct wav_private_s *wav = wavpriv;
+	free(wav->silence);
+	free(wav);
+	return 0;
+}
+
+int wav_process_start(wav_t wav, ps_buffer_t *from)
+{
+	int ret;
+	if (wav->running)
+		return EAGAIN;
+
+	if ((ret = glc_thread_create(wav->glc, &wav->thread, from, NULL)))
+		return ret;
+	wav->running = 1;
+
+	return 0;
+}
+
+int wav_process_wait(wav_t wav)
+{
+	if (!wav->running)
+		return EAGAIN;
 
 	glc_thread_wait(&wav->thread);
-	free(wav);
+	wav->running = 0;
 
+	return 0;
+}
+
+int wav_set_interpolation(wav_t wav, int interpolate)
+{
+	wav->interpolate = interpolate;
+	return 0;
+}
+
+int wav_set_filename(wav_t wav, const char *filename)
+{
+	wav->filename_format = filename;
+	return 0;
+}
+
+int wav_set_stream_number(wav_t wav, glc_audio_i audio)
+{
+	wav->audio_i = audio;
+	return 0;
+}
+
+int wav_set_silence_threshold(wav_t wav, glc_utime_t silence_threshold)
+{
+	wav->silence_threshold = silence_threshold;
 	return 0;
 }
 
 void wav_finish_callback(void *priv, int err)
 {
-	struct wav_private_s *wav = (struct wav_private_s *) priv;
+	wav_t wav = (wav_t ) priv;
 
 	if (err)
 		util_log(wav->glc, GLC_ERROR, "wav", "%s (%d)", strerror(err), err);
 
-	if (wav->to)
+	if (wav->to) {
 		fclose(wav->to);
+		wav->to = NULL;
+	}
 
-	free(wav->silence);
+	wav->file_count = 0;
 }
 
 int wav_read_callback(glc_thread_state_t *state)
 {
-	struct wav_private_s *wav = (struct wav_private_s *) state->ptr;
+	wav_t wav = (wav_t ) state->ptr;
 
 	if (state->header.type == GLC_MESSAGE_AUDIO_FORMAT)
 		return wav_write_hdr(wav, (glc_audio_format_message_t *) state->read_data);
@@ -130,12 +186,12 @@ int wav_read_callback(glc_thread_state_t *state)
 	return 0;
 }
 
-int wav_write_hdr(struct wav_private_s *wav, glc_audio_format_message_t *fmt_msg)
+int wav_write_hdr(wav_t wav, glc_audio_format_message_t *fmt_msg)
 {
 	int sample_size;
 	char *filename;
 
-	if (fmt_msg->audio != wav->glc->export_audio)
+	if (fmt_msg->audio != wav->audio_i)
 		return 0;
 	
 	if (fmt_msg->flags & GLC_AUDIO_S16_LE)
@@ -154,11 +210,10 @@ int wav_write_hdr(struct wav_private_s *wav, glc_audio_format_message_t *fmt_msg
 		util_log(wav->glc, GLC_ERROR, "wav",
 			 "configuration update msg to stream %d", fmt_msg->audio);
 		fclose(wav->to);
-		wav->time = 0; /* reset time */
 	}
 	
 	filename = (char *) malloc(1024);
-	snprintf(filename, 1023, wav->glc->filename_format, ++wav->file_count);
+	snprintf(filename, 1023, wav->filename_format, ++wav->file_count);
 	util_log(wav->glc, GLC_INFORMATION, "wav", "opening %s for writing", filename);
 	wav->to = fopen(filename, "w");
 	if (!wav->to) {
@@ -194,13 +249,13 @@ int wav_write_hdr(struct wav_private_s *wav, glc_audio_format_message_t *fmt_msg
 	return 0;
 }
 
-int wav_write_audio(struct wav_private_s *wav, glc_audio_header_t *audio_hdr, char *data)
+int wav_write_audio(wav_t wav, glc_audio_header_t *audio_hdr, char *data)
 {
 	size_t need_silence, write_silence;
 	unsigned int c;
 	size_t samples, s;
 
-	if (audio_hdr->audio != wav->glc->export_audio)
+	if (audio_hdr->audio != wav->audio_i)
 		return 0;
 	
 	glc_utime_t duration = (audio_hdr->size * 1000000) / wav->bps;
@@ -212,12 +267,12 @@ int wav_write_audio(struct wav_private_s *wav, glc_audio_header_t *audio_hdr, ch
 
 	wav->time += duration;
 
-	if (wav->time + wav->glc->silence_threshold < audio_hdr->timestamp) {
+	if (wav->time + wav->silence_threshold < audio_hdr->timestamp) {
 		need_silence = ((audio_hdr->timestamp - wav->time) * wav->bps) / 1000000;
 		need_silence -= need_silence % (wav->sample_size * wav->channels);
 
 		wav->time += (need_silence * 1000000) / wav->bps;
-		if (!(wav->glc->flags & GLC_EXPORT_STREAMING)) {
+		if (wav->interpolate) {
 			util_log(wav->glc, GLC_WARNING, "wav", "writing %zd bytes of silence", need_silence);
 			while (need_silence > 0) {
 				write_silence = need_silence > wav->silence_size ? wav->silence_size : need_silence;
