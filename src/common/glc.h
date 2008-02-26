@@ -130,9 +130,6 @@ typedef struct {
 	/** fps */
 	double fps;
 
-	/** alsa device for playback */
-	const char *alsa_playback_device;
-
 	/** util uses this to store internal state */
 	void *util;
 

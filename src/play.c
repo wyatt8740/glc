@@ -58,6 +58,7 @@ struct play_s {
 	int img_format;
 
 	glc_utime_t silence_threshold;
+	const char *alsa_playback_device;
 };
 
 int show_info_value(struct play_s *play, const char *value);
@@ -102,7 +103,7 @@ int main(int argc, char *argv[])
 	play.fps = 0;
 
 	play.silence_threshold = 200000; /* 0.2 sec accuracy */
-	play.glc.alsa_playback_device = "default";
+	play.alsa_playback_device = "default";
 
 	/* don't scale by default */
 	play.scale_factor = 1;
@@ -184,7 +185,7 @@ int main(int argc, char *argv[])
 			play.silence_threshold = atof(optarg) * 1000000;
 			break;
 		case 'd':
-			play.glc.alsa_playback_device = optarg;
+			play.alsa_playback_device = optarg;
 			break;
 		case 'o':
 			if (!strcmp(optarg, "-")) /** \todo fopen(1) ? */
@@ -431,6 +432,7 @@ int play_stream(struct play_s *play)
 		goto err;
 	demux_set_video_buffer_size(demux, play->uncompressed_size);
 	demux_set_audio_buffer_size(demux, play->uncompressed_size / 10);
+	demux_set_alsa_playback_device(demux, play->alsa_playback_device);
 
 	/* construct a pipeline for playback */
 	if ((ret = unpack_process_start(unpack, &compressed_buffer, &uncompressed_buffer)))
