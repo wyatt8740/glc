@@ -29,6 +29,9 @@
 #include <errno.h>
 
 #include "../common/glc.h"
+#include "../common/core.h"
+#include "../common/log.h"
+#include "../common/state.h"
 #include "../common/util.h"
 #include "gl_capture.h"
 
@@ -56,12 +59,14 @@ typedef GLvoid *(*glMapBufferProc)(GLenum target,
 typedef GLboolean (*glUnmapBufferProc)(GLenum target);
 
 struct gl_capture_ctx_s {
+	glc_state_ctx_t state_ctx;
+	glc_ctx_i ctx_i;
+
 	glc_flags_t flags;
 	Display *dpy;
 	int screen;
 	GLXDrawable drawable;
 	ps_packet_t packet;
-	glc_ctx_i ctx_i;
 	glc_utime_t last, pbo_timestamp;
 
 	unsigned int w, h;
@@ -87,7 +92,6 @@ struct gl_capture_s {
 
 	pthread_rwlock_t ctxlist_lock;
 	struct gl_capture_ctx_s *ctx;
-	glc_ctx_i ctx_c;
 
 	ps_buffer_t *to;
 
@@ -160,13 +164,13 @@ int gl_capture_set_buffer(gl_capture_t gl_capture, ps_buffer_t *buffer)
 int gl_capture_set_read_buffer(gl_capture_t gl_capture, GLenum buffer)
 {
 	if (buffer == GL_FRONT)
-		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+		glc_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 			 "reading frames from GL_FRONT");
 	else if (buffer == GL_BACK)
-		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+		glc_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 			 "reading frames from GL_BACK");
 	else {
-		util_log(gl_capture->glc, GLC_ERROR, "gl_capture",
+		glc_log(gl_capture->glc, GLC_ERROR, "gl_capture",
 			 "unknown read buffer 0x%02x", buffer);
 		return ENOTSUP;
 	}
@@ -181,7 +185,7 @@ int gl_capture_set_fps(gl_capture_t gl_capture, double fps)
 		return EINVAL;
 
 	gl_capture->fps = 1000000 / fps;
-	util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+	glc_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 		 "capturing at %f fps", fps);
 
 	return 0;
@@ -190,13 +194,13 @@ int gl_capture_set_fps(gl_capture_t gl_capture, double fps)
 int gl_capture_set_pack_alignment(gl_capture_t gl_capture, GLint pack_alignment)
 {
 	if (pack_alignment == 1)
-		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+		glc_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 			 "reading data as byte aligned");
 	else if (pack_alignment == 8)
-		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+		glc_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 			 "reading data as dword aligned");
 	else {
-		util_log(gl_capture->glc, GLC_ERROR, "gl_capture",
+		glc_log(gl_capture->glc, GLC_ERROR, "gl_capture",
 			 "unknown GL_PACK_ALIGNMENT %d", pack_alignment);
 		return ENOTSUP;
 	}
@@ -211,12 +215,12 @@ int gl_capture_try_pbo(gl_capture_t gl_capture, int try_pbo)
 		gl_capture->flags |= GL_CAPTURE_TRY_PBO;
 	} else {
 		if (gl_capture->flags & GL_CAPTURE_USE_PBO) {
-			util_log(gl_capture->glc, GLC_WARNING, "gl_capture",
+			glc_log(gl_capture->glc, GLC_WARNING, "gl_capture",
 				 "can't disable PBO; it is in use");
 			return EAGAIN;
 		}
 
-		util_log(gl_capture->glc, GLC_DEBUG, "gl_capture",
+		glc_log(gl_capture->glc, GLC_DEBUG, "gl_capture",
 			 "PBO disabled");
 		gl_capture->flags &= ~GL_CAPTURE_TRY_PBO;
 	}
@@ -227,15 +231,15 @@ int gl_capture_try_pbo(gl_capture_t gl_capture, int try_pbo)
 int gl_capture_set_pixel_format(gl_capture_t gl_capture, GLenum format)
 {
 	if (format == GL_BGRA) {
-		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+		glc_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 			 "reading frames in GL_BGRA format");
 		gl_capture->bpp = 4;
 	} else if (format == GL_BGR) {
-		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+		glc_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 			 "reading frames in GL_BGR format");
 		gl_capture->bpp = 3;
 	} else {
-		util_log(gl_capture->glc, GLC_ERROR, "gl_capture",
+		glc_log(gl_capture->glc, GLC_ERROR, "gl_capture",
 			 "unsupported pixel format 0x%02x", format);
 		return ENOTSUP;
 	}
@@ -250,7 +254,7 @@ int gl_capture_draw_indicator(gl_capture_t gl_capture, int draw_indicator)
 		gl_capture->flags |= GL_CAPTURE_DRAW_INDICATOR;
 
 		if (gl_capture->capture_buffer == GL_FRONT)
-			util_log(gl_capture->glc, GLC_WARNING, "gl_capture",
+			glc_log(gl_capture->glc, GLC_WARNING, "gl_capture",
 				 "indicator doesn't work well when capturing from GL_FRONT");
 	} else
 		gl_capture->flags &= ~GL_CAPTURE_DRAW_INDICATOR;
@@ -288,16 +292,16 @@ int gl_capture_lock_fps(gl_capture_t gl_capture, int lock_fps)
 int gl_capture_start(gl_capture_t gl_capture)
 {
 	if (!gl_capture->to) {
-		util_log(gl_capture->glc, GLC_ERROR, "gl_capture",
+		glc_log(gl_capture->glc, GLC_ERROR, "gl_capture",
 			 "no target buffer specified");
 		return EAGAIN;
 	}
 
 	if (gl_capture->flags & GL_CAPTURE_CAPTURING)
-		util_log(gl_capture->glc, GLC_WARNING, "gl_capture",
+		glc_log(gl_capture->glc, GLC_WARNING, "gl_capture",
 			 "capturing is already active");
 	else
-		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+		glc_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 			 "starting capturing");
 
 	gl_capture->flags |= GL_CAPTURE_CAPTURING;
@@ -308,10 +312,10 @@ int gl_capture_start(gl_capture_t gl_capture)
 int gl_capture_stop(gl_capture_t gl_capture)
 {
 	if (gl_capture->flags & GL_CAPTURE_CAPTURING)
-		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+		glc_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 			 "stopping capturing");
 	else
-		util_log(gl_capture->glc, GLC_WARNING, "gl_capture",
+		glc_log(gl_capture->glc, GLC_WARNING, "gl_capture",
 			 "capturing is already stopped");
 
 	gl_capture->flags &= ~GL_CAPTURE_CAPTURING;
@@ -401,7 +405,7 @@ int gl_capture_calc_geometry(gl_capture_t gl_capture, struct gl_capture_ctx_s *c
 		ctx->cx = ctx->cy = 0;
 	}
 
-	util_log(gl_capture->glc, GLC_DEBUG, "gl_capture",
+	glc_log(gl_capture->glc, GLC_DEBUG, "gl_capture",
 		 "calculated capture area for ctx %d is %ux%u+%u+%u",
 		 ctx->ctx_i, ctx->cw, ctx->ch, ctx->cx, ctx->cy);
 
@@ -507,7 +511,7 @@ int gl_capture_init_pbo(gl_capture_t gl_capture)
 	if (!gl_capture->glUnmapBuffer)
 		return ENOTSUP;
 
-	util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+	glc_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 		 "using GL_ARB_pixel_buffer_object");
 
 	return 0;
@@ -517,7 +521,7 @@ int gl_capture_create_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
 {
 	GLint binding;
 
-	util_log(gl_capture->glc, GLC_DEBUG, "gl_capture", "creating PBO");
+	glc_log(gl_capture->glc, GLC_DEBUG, "gl_capture", "creating PBO");
 
 	glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING_ARB, &binding);
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
@@ -534,7 +538,7 @@ int gl_capture_create_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
 
 int gl_capture_destroy_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
 {
-	util_log(gl_capture->glc, GLC_DEBUG, "gl_capture", "destroying PBO");
+	glc_log(gl_capture->glc, GLC_DEBUG, "gl_capture", "destroying PBO");
 
 	gl_capture->glDeleteBuffers(1, &ctx->pbo);
 	return 0;
@@ -613,11 +617,12 @@ int gl_capture_get_ctx(gl_capture_t gl_capture, struct gl_capture_ctx_s **ctx, D
 		fctx->drawable = drawable;
 		ps_packet_init(&fctx->packet, gl_capture->to);
 
+		glc_state_ctx_new(gl_capture->glc, &fctx->ctx_i, &fctx->state_ctx);
+
 		/* these functions need to be thread-safe */
 		pthread_rwlock_wrlock(&gl_capture->ctxlist_lock);
 
 		fctx->next = gl_capture->ctx;
-		fctx->ctx_i = ++gl_capture->ctx_c;
 		gl_capture->ctx = fctx;
 
 		pthread_rwlock_unlock(&gl_capture->ctxlist_lock);
@@ -675,7 +680,7 @@ int gl_capture_update_ctx(gl_capture_t gl_capture,
 	if ((w != ctx->w) | (h != ctx->h) | (ctx->flags & GLC_CTX_CREATE)) {
 		gl_capture_calc_geometry(gl_capture, ctx, w, h);
 
-		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+		glc_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 			 "creating/updating configuration for ctx %d", ctx->ctx_i);
 
 		msg.type = GLC_MESSAGE_CTX;
@@ -689,7 +694,7 @@ int gl_capture_update_ctx(gl_capture_t gl_capture,
 		ps_packet_write(&ctx->packet, &ctx_msg, GLC_CTX_MESSAGE_SIZE);
 		ps_packet_close(&ctx->packet);
 
-		util_log(gl_capture->glc, GLC_DEBUG, "gl_capture",
+		glc_log(gl_capture->glc, GLC_DEBUG, "gl_capture",
 			 "ctx %d: %ux%u (%ux%u), 0x%02x flags", ctx->ctx_i,
 			 ctx->cw, ctx->ch, ctx->w, ctx->h, ctx->flags);
 
@@ -733,7 +738,7 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 	msg.type = GLC_MESSAGE_PICTURE;
 	pic.ctx = ctx->ctx_i;
 
-	now = util_time(gl_capture->glc);
+	now = glc_state_time(gl_capture->glc);
 	if (gl_capture->flags & GL_CAPTURE_USE_PBO)
 		pic.timestamp = ctx->pbo_timestamp;
 	else
@@ -749,7 +754,7 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 
 	if ((gl_capture->flags & GL_CAPTURE_USE_PBO) && (!ctx->pbo_active)) {
 		ret = gl_capture_start_pbo(gl_capture, ctx);
-		ctx->pbo_timestamp = util_time(gl_capture->glc);
+		ctx->pbo_timestamp = glc_state_time(gl_capture->glc);
 		goto finish;
 	}
 
@@ -783,7 +788,7 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 	}
 
 	if (gl_capture->flags & GL_CAPTURE_LOCK_FPS) {
-		now = util_time(gl_capture->glc);
+		now = glc_state_time(gl_capture->glc);
 
 		if (now - ctx->last < gl_capture->fps)
 			usleep(gl_capture->fps + ctx->last - now);
@@ -794,7 +799,7 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 	 to grow unlimited.
 	*/
 	ctx->last += gl_capture->fps;
-	now = util_time(gl_capture->glc);
+	now = glc_state_time(gl_capture->glc);
 
 	if (now - ctx->last > gl_capture->fps) /* reasonable choice? */
 		ctx->last = now - 0.5 * gl_capture->fps;
@@ -803,7 +808,7 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 
 finish:
 	if (ret != 0)
-		util_log(gl_capture->glc, GLC_ERROR, "gl_capture",
+		glc_log(gl_capture->glc, GLC_ERROR, "gl_capture",
 			 "%s (%d)", strerror(ret), ret);
 
 	if (gl_capture->flags & GL_CAPTURE_DRAW_INDICATOR)
@@ -813,7 +818,7 @@ finish:
 cancel:
 	if (ret == EBUSY) {
 		ret = 0;
-		util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+		glc_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 			 "dropped frame, buffer not ready");
 	}
 	ps_packet_cancel(&ctx->packet);
@@ -827,7 +832,7 @@ int gl_capture_refresh_color_correction(gl_capture_t gl_capture)
 	if (!(gl_capture->flags & GL_CAPTURE_CAPTURING))
 		return 0; /* capturing not active */
 
-	util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+	glc_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 		 "refreshing color correction");
 
 	pthread_rwlock_rdlock(&gl_capture->ctxlist_lock);
@@ -866,7 +871,7 @@ int gl_capture_update_color(gl_capture_t gl_capture, struct gl_capture_ctx_s *ct
 	/** \todo figure out brightness and contrast */
 	msg.brightness = msg.contrast = 0;
 
-	util_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+	glc_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 		 "color correction: brightness=%f, contrast=%f, red=%f, green=%f, blue=%f",
 		 msg.brightness, msg.contrast, msg.red, msg.green, msg.blue);
 
@@ -884,7 +889,7 @@ int gl_capture_update_color(gl_capture_t gl_capture, struct gl_capture_ctx_s *ct
 err:
 	ps_packet_cancel(&ctx->packet);
 
-	util_log(gl_capture->glc, GLC_ERROR, "gl_capture",
+	glc_log(gl_capture->glc, GLC_ERROR, "gl_capture",
 		 "can't write gamma correction information to buffer: %s (%d)",
 		 strerror(ret), ret);
 	return ret;

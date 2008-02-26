@@ -24,6 +24,8 @@
 #include <errno.h>
 
 #include "../common/glc.h"
+#include "../common/core.h"
+#include "../common/log.h"
 #include "../common/thread.h"
 #include "../common/util.h"
 #include "yuv4mpeg.h"
@@ -136,7 +138,7 @@ void yuv4mpeg_finish_callback(void *priv, int err)
 	yuv4mpeg_t yuv4mpeg = (yuv4mpeg_t) priv;
 
 	if (err)
-		util_log(yuv4mpeg->glc, GLC_ERROR, "yuv4mpeg", "%s (%d)", strerror(err), err);
+		glc_log(yuv4mpeg->glc, GLC_ERROR, "yuv4mpeg", "%s (%d)", strerror(err), err);
 
 	if (yuv4mpeg->to) {
 		fclose(yuv4mpeg->to);
@@ -177,16 +179,16 @@ int yuv4mpeg_handle_hdr(yuv4mpeg_t yuv4mpeg, glc_ctx_message_t *ctx_msg)
 
 	if (yuv4mpeg->to) {
 		fclose(yuv4mpeg->to);
-		util_log(yuv4mpeg->glc, GLC_WARNING, "yuv4mpeg", "ctx update msg");
+		glc_log(yuv4mpeg->glc, GLC_WARNING, "yuv4mpeg", "ctx update msg");
 	}
 
 	filename = (char *) malloc(1024);
 	snprintf(filename, 1023, yuv4mpeg->filename_format, ++yuv4mpeg->file_count);
-	util_log(yuv4mpeg->glc, GLC_INFORMATION, "yuv4mpeg", "opening %s for writing", filename);
+	glc_log(yuv4mpeg->glc, GLC_INFORMATION, "yuv4mpeg", "opening %s for writing", filename);
 
 	yuv4mpeg->to = fopen(filename, "w");
 	if (!yuv4mpeg->to) {
-		util_log(yuv4mpeg->glc, GLC_ERROR, "yuv4mpeg", "can't open %s", filename);
+		glc_log(yuv4mpeg->glc, GLC_ERROR, "yuv4mpeg", "can't open %s", filename);
 		free(filename);
 		return EINVAL;
 	}

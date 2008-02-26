@@ -23,7 +23,10 @@
 #include <sched.h>
 
 #include "../common/glc.h"
+#include "../common/core.h"
+#include "../common/log.h"
 #include "../common/util.h"
+#include "../common/state.h"
 #include "../common/thread.h"
 #include "audio_play.h"
 
@@ -134,7 +137,7 @@ void audio_play_finish_callback(void *priv, int err)
 	audio_play_t audio_play = (audio_play_t) priv;
 
 	if (err)
-		util_log(audio_play->glc, GLC_ERROR, "audio_play", "%s (%d)",
+		glc_log(audio_play->glc, GLC_ERROR, "audio_play", "%s (%d)",
 			 strerror(err), err);
 	
 	if (audio_play->pcm) {
@@ -222,7 +225,7 @@ int audio_play_hw(audio_play_t audio_play, glc_audio_format_message_t *fmt_msg)
 	snd_pcm_hw_params_free(hw_params);
 	return 0;
 err:
-	util_log(audio_play->glc, GLC_ERROR, "audio_play", "can't initialize pcm: %s (%d)",
+	glc_log(audio_play->glc, GLC_ERROR, "audio_play", "can't initialize pcm: %s (%d)",
 		 snd_strerror(ret), ret);
 	if (hw_params)
 		snd_pcm_hw_params_free(hw_params);
@@ -239,19 +242,19 @@ int audio_play_play(audio_play_t audio_play, glc_audio_header_t *audio_hdr, char
 		return 0;
 
 	if (!audio_play->pcm) {
-		util_log(audio_play->glc, GLC_ERROR, "audio_play", "broken stream %d",
+		glc_log(audio_play->glc, GLC_ERROR, "audio_play", "broken stream %d",
 			 audio_play->audio_i);
 		return EINVAL;
 	}
 	
 	frames = snd_pcm_bytes_to_frames(audio_play->pcm, audio_hdr->size);
-	glc_utime_t time = util_time(audio_play->glc);
+	glc_utime_t time = glc_state_time(audio_play->glc);
 	glc_utime_t duration = (1000000 * frames) / audio_play->rate;
 	
 	if (time + audio_play->silence_threshold + duration < audio_hdr->timestamp)
 		usleep(audio_hdr->timestamp - time - duration);
 	else if (time > audio_hdr->timestamp) {
-		util_log(audio_play->glc, GLC_WARNING, "audio_play", "dropped packet");
+		glc_log(audio_play->glc, GLC_WARNING, "audio_play", "dropped packet");
 		return 0;
 	}
 
@@ -280,7 +283,7 @@ int audio_play_play(audio_play_t audio_play, glc_audio_header_t *audio_hdr, char
 			break;
 		else if (ret < 0) {
 			if ((ret = audio_play_xrun(audio_play, ret))) {
-				util_log(audio_play->glc, GLC_ERROR, "audio_play",
+				glc_log(audio_play->glc, GLC_ERROR, "audio_play",
 					 "xrun recovery failed: %s", snd_strerror(-ret));
 				return ret;
 			}
@@ -293,7 +296,7 @@ int audio_play_play(audio_play_t audio_play, glc_audio_header_t *audio_hdr, char
 
 int audio_play_xrun(audio_play_t audio_play, int err)
 {
-	util_log(audio_play->glc, GLC_DEBUG, "audio_play", "xrun");
+	glc_log(audio_play->glc, GLC_DEBUG, "audio_play", "xrun");
 	if (err == -EPIPE) {
 		if ((err = snd_pcm_prepare(audio_play->pcm)) < 0)
 			return -err;

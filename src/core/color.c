@@ -23,6 +23,8 @@
 #include <math.h>
 
 #include "../common/glc.h"
+#include "../common/core.h"
+#include "../common/log.h"
 #include "../common/thread.h"
 #include "../common/util.h"
 #include "color.h"
@@ -111,7 +113,7 @@ int color_init(color_t *color, glc_t *glc)
 	(*color)->thread.write_callback = &color_write_callback;
 	(*color)->thread.finish_callback = &color_finish_callback;
 	(*color)->thread.ptr = *color;
-	(*color)->thread.threads = util_cpus();
+	(*color)->thread.threads = glc_threads_hint(glc);
 
 	return 0;
 }
@@ -171,7 +173,7 @@ void color_finish_callback(void *ptr, int err)
 	struct color_ctx_s *del;
 
 	if (err)
-		util_log(color->glc, GLC_ERROR, "color", "%s (%d)", strerror(err), err);
+		glc_log(color->glc, GLC_ERROR, "color", "%s (%d)", strerror(err), err);
 
 	while (color->ctx != NULL) {
 		del = color->ctx;
@@ -287,9 +289,9 @@ int color_ctx_msg(color_t color, glc_ctx_message_t *msg)
 		ctx->green_gamma = color->green_gamma;
 		ctx->blue_gamma = color->blue_gamma;
 
-		util_log(color->glc, GLC_INFORMATION, "color",
+		glc_log(color->glc, GLC_INFORMATION, "color",
 			 "using global color correction for ctx %d", msg->ctx);
-		util_log(color->glc, GLC_INFORMATION, "color",
+		glc_log(color->glc, GLC_INFORMATION, "color",
 			 "ctx %d: brightness=%f, contrast=%f, red=%f, green=%f, blue=%f",
 			 msg->ctx, ctx->brightness, ctx->contrast,
 			 ctx->red_gamma, ctx->green_gamma, ctx->blue_gamma);
@@ -299,7 +301,7 @@ int color_ctx_msg(color_t color, glc_ctx_message_t *msg)
 		    (ctx->red_gamma == 1) &&
 		    (ctx->green_gamma == 1) &&
 		    (ctx->blue_gamma == 1)) {
-			util_log(color->glc, GLC_INFORMATION, "color", "skipping color correction");
+			glc_log(color->glc, GLC_INFORMATION, "color", "skipping color correction");
 			ctx->proc = NULL;
 		} else if (ctx->flags & GLC_CTX_YCBCR_420JPEG) {
 			color_generate_ycbcr_lookup_table(color, ctx);
@@ -309,18 +311,18 @@ int color_ctx_msg(color_t color, glc_ctx_message_t *msg)
 			ctx->proc = &color_bgr;
 		} else {
 			/* set proc NULL -> no conversion done */
-			util_log(color->glc, GLC_WARNING, "color", "unsupported ctx %d", msg->ctx);
+			glc_log(color->glc, GLC_WARNING, "color", "unsupported ctx %d", msg->ctx);
 			ctx->proc = NULL;
 		}
 	} else if (((old_flags & GLC_CTX_BGR) | (old_flags & GLC_CTX_BGRA)) &&
 		   (msg->flags & GLC_CTX_YCBCR_420JPEG)) {
-		util_log(color->glc, GLC_WARNING, "color",
+		glc_log(color->glc, GLC_WARNING, "color",
 			 "colorspace switched from RGB to Y'CbCr, recalculating lookup table");
 		color_generate_ycbcr_lookup_table(color, ctx);
 		ctx->proc = &color_ycbcr;
 	} else if (((msg->flags & GLC_CTX_BGR) | (msg->flags & GLC_CTX_BGRA)) &&
 		 (old_flags & GLC_CTX_YCBCR_420JPEG)) {
-		util_log(color->glc, GLC_WARNING, "color",
+		glc_log(color->glc, GLC_WARNING, "color",
 			 "colorspace switched from Y'CbCr to RGB, recalculating lookup table");
 		color_generate_rgb_lookup_table(color, ctx);
 		ctx->proc = &color_bgr;
@@ -346,7 +348,7 @@ int color_color_msg(color_t color, glc_color_message_t *msg)
 	ctx->green_gamma = msg->green;
 	ctx->blue_gamma = msg->blue;
 
-	util_log(color->glc, GLC_INFORMATION, "color",
+	glc_log(color->glc, GLC_INFORMATION, "color",
 		 "ctx %d: brightness=%f, contrast=%f, red=%f, green=%f, blue=%f",
 		 msg->ctx, ctx->brightness, ctx->contrast,
 		 ctx->red_gamma, ctx->green_gamma, ctx->blue_gamma);
@@ -356,7 +358,7 @@ int color_color_msg(color_t color, glc_color_message_t *msg)
 	    (ctx->red_gamma == 1) &&
 	    (ctx->green_gamma == 1) &&
 	    (ctx->blue_gamma == 1)) {
-		util_log(color->glc, GLC_INFORMATION, "color", "skipping color correction");
+		glc_log(color->glc, GLC_INFORMATION, "color", "skipping color correction");
 		ctx->proc = NULL;
 	} else if (ctx->flags & GLC_CTX_YCBCR_420JPEG) {
 		color_generate_ycbcr_lookup_table(color, ctx);
@@ -466,7 +468,7 @@ int color_generate_ycbcr_lookup_table(color_t color,
 	unsigned char R, G, B;
 	size_t lookup_size = (1 << LOOKUP_BITS) * (1 << LOOKUP_BITS) * (1 << LOOKUP_BITS) * 3;
 
-	util_log(color->glc, GLC_INFORMATION, "color",
+	glc_log(color->glc, GLC_INFORMATION, "color",
 		 "using %d bit lookup table (%zd bytes)", LOOKUP_BITS, lookup_size);
 	ctx->lookup_table = malloc(lookup_size);
 

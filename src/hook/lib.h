@@ -24,6 +24,8 @@
 #include <packetstream.h>
 #include <pthread.h>
 
+#define LIB_CAPTURING    0x1
+
 typedef struct {
 	void *(*dlopen)(const char *filename, int flag);
 	void *(*dlsym)(void *, const char *);
@@ -32,6 +34,7 @@ typedef struct {
 	int initialized;
 	int running;
 	pthread_mutex_t init_lock;
+	glc_flags_t flags;
 } glc_lib_t;
 
 #define INIT_GLC \

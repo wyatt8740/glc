@@ -18,6 +18,8 @@
 #include <dlfcn.h>
 
 #include "../common/glc.h"
+#include "../common/core.h"
+#include "../common/log.h"
 #include "../common/util.h"
 #include "../core/scale.h"
 #include "../core/ycbcr.h"
@@ -67,7 +69,7 @@ int opengl_init(glc_t *glc)
 	int ret = 0;
 	unsigned int x, y, w, h;
 
-	util_log(opengl.glc, GLC_DEBUG, "opengl", "initializing");
+	glc_log(opengl.glc, GLC_DEBUG, "opengl", "initializing");
 
 	/* initialize gl_capture object */
 	if ((ret = gl_capture_init(&opengl.gl_capture, opengl.glc)))
@@ -77,7 +79,7 @@ int opengl_init(glc_t *glc)
 	opengl.fps = 30;
 	if (getenv("GLC_FPS"))
 		opengl.fps = atof(getenv("GLC_FPS"));
-	opengl.glc->fps = opengl.fps;
+	glc_util_info_fps(opengl.glc, opengl.fps);
 	gl_capture_set_fps(opengl.gl_capture, opengl.fps);
 
 	if (getenv("GLC_COLORSPACE")) {
@@ -86,7 +88,7 @@ int opengl_init(glc_t *glc)
 		else if (!strcmp(getenv("GLC_COLORSPACE"), "bgr"))
 			opengl.convert_ycbcr_420jpeg = 0;
 		else
-			util_log(opengl.glc, GLC_WARNING, "opengl",
+			glc_log(opengl.glc, GLC_WARNING, "opengl",
 				 "unknown colorspace '%s'", getenv("GLC_COLORSPACE"));
 	} else
 		opengl.convert_ycbcr_420jpeg = 1;
@@ -102,7 +104,7 @@ int opengl_init(glc_t *glc)
 		else if (!strcmp(getenv("GLC_CAPTURE"), "back"))
 			opengl.read_buffer = GL_BACK;
 		else
-			util_log(opengl.glc, GLC_WARNING, "opengl",
+			glc_log(opengl.glc, GLC_WARNING, "opengl",
 				 "unknown capture buffer '%s'", getenv("GLC_CAPTURE"));
 	}
 	gl_capture_set_read_buffer(opengl.gl_capture, opengl.read_buffer);
@@ -188,7 +190,7 @@ int opengl_close()
 	if (!opengl.started)
 		return 0;
 
-	util_log(opengl.glc, GLC_DEBUG, "opengl", "closing");
+	glc_log(opengl.glc, GLC_DEBUG, "opengl", "closing");
 
 	if (opengl.capturing)
 		gl_capture_stop(opengl.gl_capture);
@@ -196,8 +198,8 @@ int opengl_close()
 
 	if (opengl.unscaled) {
 		if (lib.running) {
-			if ((ret = util_write_end_of_stream(opengl.glc, opengl.unscaled))) {
-				util_log(opengl.glc, GLC_ERROR, "opengl",
+			if ((ret = glc_util_write_end_of_stream(opengl.glc, opengl.unscaled))) {
+				glc_log(opengl.glc, GLC_ERROR, "opengl",
 					 "can't write end of stream: %s (%d)", strerror(ret), ret);
 				return ret;
 			}
@@ -212,8 +214,8 @@ int opengl_close()
 			scale_destroy(opengl.scale);
 		}
 	} else if (lib.running) {
-		if ((ret = util_write_end_of_stream(opengl.glc, opengl.buffer))) {
-			util_log(opengl.glc, GLC_ERROR, "opengl",
+		if ((ret = glc_util_write_end_of_stream(opengl.glc, opengl.buffer))) {
+			glc_log(opengl.glc, GLC_ERROR, "opengl",
 				 "can't write end of stream: %s (%d)", strerror(ret), ret);
 			return ret;
 		}

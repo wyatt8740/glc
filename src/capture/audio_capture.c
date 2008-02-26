@@ -24,12 +24,17 @@
 #include <pthread.h>
 
 #include "../common/glc.h"
+#include "../common/core.h"
+#include "../common/log.h"
+#include "../common/state.h"
 #include "../common/util.h"
 #include "audio_capture.h"
 
 struct audio_capture_s {
 	glc_t *glc;
 	ps_buffer_t *to;
+
+	glc_state_audio_t state_audio;
 	glc_audio_i id;
 
 	snd_pcm_t *pcm;
@@ -76,7 +81,8 @@ int audio_capture_init(audio_capture_t *audio_capture, glc_t *glc)
 	(*audio_capture)->channels = 2;
 	(*audio_capture)->rate = 44100;
 	(*audio_capture)->min_periods = 2;
-	(*audio_capture)->id = util_audio_stream_id((*audio_capture)->glc);
+	glc_state_audio_new((*audio_capture)->glc, &(*audio_capture)->id,
+			    &(*audio_capture)->state_audio);
 	(*audio_capture)->skip_data = 1;
 
 	sem_init(&(*audio_capture)->capture, 0, 0);
@@ -140,10 +146,10 @@ int audio_capture_start(audio_capture_t audio_capture)
 		return EINVAL;
 
 	if (audio_capture->skip_data)
-		util_log(audio_capture->glc, GLC_WARNING, "audio_capture",
+		glc_log(audio_capture->glc, GLC_WARNING, "audio_capture",
 			 "device %s already started", audio_capture->device);
 	else
-		util_log(audio_capture->glc, GLC_INFORMATION, "audio_capture",
+		glc_log(audio_capture->glc, GLC_INFORMATION, "audio_capture",
 			 "starting device %s", audio_capture->device);
 
 	if (!audio_capture->pcm) {
@@ -161,10 +167,10 @@ int audio_capture_stop(audio_capture_t audio_capture)
 		return EINVAL;
 
 	if (audio_capture->skip_data)
-		util_log(audio_capture->glc, GLC_INFORMATION, "audio_capture",
+		glc_log(audio_capture->glc, GLC_INFORMATION, "audio_capture",
 			 "stopping device %s", audio_capture->device);
 	else
-		util_log(audio_capture->glc, GLC_WARNING, "audio_capture",
+		glc_log(audio_capture->glc, GLC_WARNING, "audio_capture",
 			 "device %s already stopped", audio_capture->device);
 
 	audio_capture->skip_data = 1;
@@ -180,7 +186,7 @@ int audio_capture_open(audio_capture_t audio_capture)
 	glc_message_header_t msg_hdr;
 	glc_audio_format_message_t fmt_msg;
 
-	util_log(audio_capture->glc, GLC_DEBUG, "audio_capture", "opening device %s",
+	glc_log(audio_capture->glc, GLC_DEBUG, "audio_capture", "opening device %s",
 		 audio_capture->device);
 
 	/* open pcm */
@@ -218,7 +224,7 @@ int audio_capture_open(audio_capture_t audio_capture)
 	audio_capture->flags = GLC_AUDIO_INTERLEAVED;
 	audio_capture->flags |= audio_capture_fmt_flags(audio_capture->format);
 	if (audio_capture->flags & GLC_AUDIO_FORMAT_UNKNOWN) {
-		util_log(audio_capture->glc, GLC_ERROR, "audio_capture",
+		glc_log(audio_capture->glc, GLC_ERROR, "audio_capture",
 			 "unsupported audio format 0x%02x", audio_capture->format);
 		return ENOTSUP;
 	}
@@ -247,7 +253,7 @@ int audio_capture_open(audio_capture_t audio_capture)
 	if ((ret = snd_pcm_start(audio_capture->pcm)) < 0)
 		goto err;
 
-	util_log(audio_capture->glc, GLC_DEBUG, "audio_capture",
+	glc_log(audio_capture->glc, GLC_DEBUG, "audio_capture",
 		 "success (stream=%d, device=%s, rate=%u, channels=%u)", audio_capture->id,
 		 audio_capture->device, audio_capture->rate, audio_capture->channels);
 
@@ -258,7 +264,7 @@ err:
 	if (sw_params)
 		snd_pcm_sw_params_free(sw_params);
 
-	util_log(audio_capture->glc, GLC_ERROR, "audio_capture",
+	glc_log(audio_capture->glc, GLC_ERROR, "audio_capture",
 		 "initialization failed: %s", snd_strerror(ret));
 	return -ret;
 }
@@ -388,7 +394,7 @@ void *audio_capture_thread(void *argptr)
 				continue;
 			}
 
-			time = util_time(audio_capture->glc);
+			time = glc_state_time(audio_capture->glc);
 			delay_usec = avail * audio_capture->rate_usec;
 
 			if (delay_usec < time)
@@ -410,11 +416,11 @@ void *audio_capture_thread(void *argptr)
 				read = -audio_capture_xrun(audio_capture, read);
 
 			if (read != audio_capture->period_size)
-				util_log(audio_capture->glc, GLC_WARNING, "audio_capture",
+				glc_log(audio_capture->glc, GLC_WARNING, "audio_capture",
 					 "read %ld, expected %ld", read * audio_capture->bytes_per_frame,
 					 audio_capture->period_size_in_bytes);
 			else if (read < 0)
-				util_log(audio_capture->glc, GLC_ERROR, "audio_capture",
+				glc_log(audio_capture->glc, GLC_ERROR, "audio_capture",
 					 "xrun recovery failed: %s", snd_strerror(read));
 
 			hdr.size = read * audio_capture->bytes_per_frame;
@@ -433,7 +439,7 @@ void *audio_capture_thread(void *argptr)
 			continue;
 
 cancel:
-			util_log(audio_capture->glc, GLC_ERROR, "audio_capture", "%s (%d)", strerror(ret), ret);
+			glc_log(audio_capture->glc, GLC_ERROR, "audio_capture", "%s (%d)", strerror(ret), ret);
 			if (ret == EINTR)
 				break;
 			if (ps_packet_cancel(&packet))
@@ -447,7 +453,7 @@ cancel:
 
 int audio_capture_xrun(audio_capture_t audio_capture, int err)
 {
-	util_log(audio_capture->glc, GLC_DEBUG, "audio_capture", "xrun");
+	glc_log(audio_capture->glc, GLC_DEBUG, "audio_capture", "xrun");
 
 	if (err == -EPIPE) {
 		if ((err = snd_pcm_prepare(audio_capture->pcm)) < 0)

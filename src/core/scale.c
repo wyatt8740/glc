@@ -22,6 +22,8 @@
 #include <errno.h>
 
 #include "../common/glc.h"
+#include "../common/core.h"
+#include "../common/log.h"
 #include "../common/thread.h"
 #include "../common/util.h"
 #include "scale.h"
@@ -100,7 +102,7 @@ int scale_init(scale_t *scale, glc_t *glc)
 	(*scale)->thread.write_callback = &scale_write_callback;
 	(*scale)->thread.finish_callback = &scale_finish_callback;
 	(*scale)->thread.ptr = *scale;
-	(*scale)->thread.threads = util_cpus();
+	(*scale)->thread.threads = glc_threads_hint(glc);
 	(*scale)->scale = 1.0;
 
 	return 0;
@@ -164,7 +166,7 @@ void scale_finish_callback(void *ptr, int err)
 	struct scale_ctx_s *del;
 
 	if (err)
-		util_log(scale->glc, GLC_ERROR, "scale", "%s (%d)", strerror(err), err);
+		glc_log(scale->glc, GLC_ERROR, "scale", "%s (%d)", strerror(err), err);
 
 	while (scale->ctx != NULL) {
 		del = scale->ctx;
@@ -467,7 +469,7 @@ int scale_ctx_msg(scale_t scale, glc_ctx_message_t *ctx_msg, glc_thread_state_t 
 		ctx->sh = ctx->scale * ctx->h;
 		ctx->rx = (ctx->rw - ctx->sw) / 2;
 		ctx->ry = (ctx->rh - ctx->sh) / 2;
-		util_log(scale->glc, GLC_DEBUG, "scale",
+		glc_log(scale->glc, GLC_DEBUG, "scale",
 			 "real size is %ux%u, scaled picture starts at %ux%u",
 			 ctx->rw, ctx->rh, ctx->rx, ctx->ry);
 	} else {
@@ -499,15 +501,15 @@ int scale_ctx_msg(scale_t scale, glc_ctx_message_t *ctx_msg, glc_thread_state_t 
 
 	if ((ctx_msg->flags & GLC_CTX_BGR) | (ctx_msg->flags & GLC_CTX_BGRA)) {
 		if ((ctx->scale == 0.5) && !(scale->flags & SCALE_SIZE)) {
-			util_log(scale->glc, GLC_DEBUG, "scale",
+			glc_log(scale->glc, GLC_DEBUG, "scale",
 				 "scaling RGB data to half-size (from %ux%u to %ux%u)",
 				 ctx->w, ctx->h, ctx->sw, ctx->sh);
 			ctx->proc = scale_rgb_half;
 		} else if ((ctx->scale == 1.0) && (ctx_msg->flags & GLC_CTX_BGRA)) {
-			util_log(scale->glc, GLC_DEBUG, "scale", "converting BGRA to BGR");
+			glc_log(scale->glc, GLC_DEBUG, "scale", "converting BGRA to BGR");
 			ctx->proc = scale_rgb_convert;
 		} else if (ctx->scale != 1.0) {
-			util_log(scale->glc, GLC_DEBUG, "scale",
+			glc_log(scale->glc, GLC_DEBUG, "scale",
 				 "scaling RGB data with factor %f (from %ux%u to %ux%u)",
 				 ctx->scale, ctx->w, ctx->h, ctx->sw, ctx->sh);
 			ctx->proc = scale_rgb_scale;
@@ -535,12 +537,12 @@ int scale_ctx_msg(scale_t scale, glc_ctx_message_t *ctx_msg, glc_thread_state_t 
 		ctx->size = ctx->rw * ctx->rh + 2 * ((ctx->rw / 2) * (ctx->rh / 2));
 
 		if ((ctx->scale == 0.5) && !(scale->flags & SCALE_SIZE)) {
-			util_log(scale->glc, GLC_DEBUG, "scale",
+			glc_log(scale->glc, GLC_DEBUG, "scale",
 				 "scaling Y'CbCr data to half-size (from %ux%u to %ux%u)",
 				 ctx->w, ctx->h, ctx->sw, ctx->sh);
 			ctx->proc = scale_ycbcr_half;
 		} else if (ctx->scale != 1.0) {
-			util_log(scale->glc, GLC_DEBUG, "scale",
+			glc_log(scale->glc, GLC_DEBUG, "scale",
 				 "scaling Y'CbCr data with factor %f (from %ux%u to %ux%u)",
 				 ctx->scale, ctx->w, ctx->h, ctx->sw, ctx->sh);
 			ctx->proc = scale_ycbcr_scale;
@@ -567,7 +569,7 @@ int scale_generate_rgb_map(scale_t scale, struct scale_ctx_s *ctx)
 	float d;
 	size_t smap_size = ctx->sw * ctx->sh * 3 * 4;
 
-	util_log(scale->glc, GLC_DEBUG, "scale", "generating %zd + %zd byte scale map for ctx %d",
+	glc_log(scale->glc, GLC_DEBUG, "scale", "generating %zd + %zd byte scale map for ctx %d",
 		 smap_size * sizeof(unsigned int), smap_size * sizeof(float), ctx->ctx);
 
 	if (ctx->pos)
@@ -582,7 +584,7 @@ int scale_generate_rgb_map(scale_t scale, struct scale_ctx_s *ctx)
 	r = 0;
 	do {
 		d = (float) (ctx->w - r++) / (float) ctx->sw;
-		util_log(scale->glc, GLC_DEBUG, "scale", "d = %f", d);
+		glc_log(scale->glc, GLC_DEBUG, "scale", "d = %f", d);
 	} while ((d * (float) (ctx->sh - 1) + 1.0 > ctx->h) |
 		 (d * (float) (ctx->sw - 1) + 1.0 > ctx->w));
 
@@ -626,7 +628,7 @@ int scale_generate_ycbcr_map(scale_t scale, struct scale_ctx_s *ctx)
 	float d;
 	size_t smap_size = ctx->sw * ctx->sh * 5; /* yw*yh*4 + (ch*cw)*4, ch = yh/2, cw = yw/2 */
 
-	util_log(scale->glc, GLC_DEBUG, "scale", "generating %zd B + %zd B scale map for ctx %d",
+	glc_log(scale->glc, GLC_DEBUG, "scale", "generating %zd B + %zd B scale map for ctx %d",
 		 smap_size * sizeof(unsigned int), smap_size * sizeof(float), ctx->ctx);
 
 	if (ctx->pos)
@@ -641,7 +643,7 @@ int scale_generate_ycbcr_map(scale_t scale, struct scale_ctx_s *ctx)
 	r = 0;
 	do {
 		d = (float) (ctx->w - r++) / (float) ctx->sw;
-		util_log(scale->glc, GLC_DEBUG, "scale", "Y: d = %f", d);
+		glc_log(scale->glc, GLC_DEBUG, "scale", "Y: d = %f", d);
 	} while ((d * (float) (ctx->sh - 1) + 1.0 > ctx->h) |
 		 (d * (float) (ctx->sw - 1) + 1.0 > ctx->w));
 
@@ -680,7 +682,7 @@ int scale_generate_ycbcr_map(scale_t scale, struct scale_ctx_s *ctx)
 	r = (r < 2) ? (0) : (r - 2);
 	do {
 		d = (float) ((ctx->w / 2) - r++) / (float) cw;
-		util_log(scale->glc, GLC_DEBUG, "scale", "C: d = %f", d);
+		glc_log(scale->glc, GLC_DEBUG, "scale", "C: d = %f", d);
 	} while ((d * (float) (ch - 1) + 1.0 > (ctx->h / 2)) |
 		 (d * (float) (cw - 1) + 1.0 > (ctx->w / 2)));
 

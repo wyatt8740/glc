@@ -14,7 +14,10 @@
 #include <errno.h>
 
 #include "common/glc.h"
+#include "common/core.h"
+#include "common/log.h"
 #include "common/util.h"
+#include "common/state.h"
 
 #include "core/file.h"
 #include "core/pack.h"
@@ -35,6 +38,9 @@ enum play_action {action_play, action_info, action_img, action_yuv4mpeg, action_
 struct play_s {
 	glc_t glc;
 	enum play_action action;
+
+	glc_stream_info_t stream_info;
+	char *info_name, *info_date;
 
 	file_t file;
 	const char *stream_file;
@@ -59,6 +65,8 @@ struct play_s {
 
 	glc_utime_t silence_threshold;
 	const char *alsa_playback_device;
+
+	int log_level;
 };
 
 int show_info_value(struct play_s *play, const char *value);
@@ -98,8 +106,6 @@ int main(int argc, char *argv[])
 	};
 	option_index = 0;
 
-	/* initialize glc with some sane values */
-	play.glc.flags = 0;
 	play.fps = 0;
 
 	play.silence_threshold = 200000; /* 0.2 sec accuracy */
@@ -114,8 +120,7 @@ int main(int argc, char *argv[])
 	play.uncompressed_size = 10 * 1024 * 1024;
 
 	/* log to stderr */
-	play.glc.log_file = "/dev/stderr";
-	play.glc.log_level = 0;
+	play.log_level = 0;
 	play.info_level = 1;
 
 	/* default export settings */
@@ -211,10 +216,9 @@ int main(int argc, char *argv[])
 			play.action = action_val;
 			break;
 		case 'v':
-			play.glc.log_level = atoi(optarg);
-			if (play.glc.log_level < 0)
+			play.log_level = atoi(optarg);
+			if (play.log_level < 0)
 				goto usage;
-			play.glc.flags |= GLC_LOG | GLC_NOERR;
 			break;
 		case 'h':
 		default:
@@ -235,11 +239,10 @@ int main(int argc, char *argv[])
 		goto usage;
 
 	/* we do global initialization */
-	util_init(&play.glc);
-	if (play.glc.flags & GLC_LOG) {
-		util_log_init(&play.glc);
-		util_log_version(&play.glc);
-	}
+	glc_init(&play.glc);
+	glc_log_set_level(&play.glc, play.log_level);
+	glc_util_log_version(&play.glc);
+	glc_state_init(&play.glc);
 
 	/* open stream file */
 	if (file_init(&play.file, &play.glc))
@@ -248,8 +251,7 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 
 	/* load information and check that the file is valid */
-	util_create_info(&play.glc);
-	if (file_read_info(play.file, play.glc.info, &play.glc.info_name, &play.glc.info_date))
+	if (file_read_info(play.file, &play.stream_info, &play.info_name, &play.info_date))
 		return EXIT_FAILURE;
 
 	/*
@@ -257,8 +259,7 @@ int main(int argc, char *argv[])
 	 stream information.
 	*/
 	if (play.fps == 0)
-		play.fps = play.glc.info->fps;
-	play.glc.fps = play.fps; /** \todo remove? */
+		play.fps = play.stream_info.fps;
 
 	switch (play.action) {
 	case action_play:
@@ -290,9 +291,12 @@ int main(int argc, char *argv[])
 	/* our cleanup */
 	file_close_source(play.file);
 	file_destroy(play.file);
-	util_log_close(&play.glc);
-	util_free_info(&play.glc);
-	util_free(&play.glc);
+
+	free(play.info_name);
+	free(play.info_date);
+
+	glc_state_destroy(&play.glc);
+	glc_destroy(&play.glc);
 
 	return EXIT_SUCCESS;
 
@@ -331,27 +335,27 @@ usage:
 int show_info_value(struct play_s *play, const char *value)
 {
 	if (!strcmp("all", value)) {
-		printf("  signature   = 0x%08x\n", play->glc.info->signature);
-		printf("  version     = 0x%02x\n", play->glc.info->version);
-		printf("  flags       = %d\n", play->glc.info->flags);
-		printf("  fps         = %f\n", play->glc.info->fps);
-		printf("  pid         = %d\n", play->glc.info->pid);
-		printf("  name        = %s\n", play->glc.info_name);
-		printf("  date        = %s\n", play->glc.info_date);
+		printf("  signature   = 0x%08x\n", play->stream_info.signature);
+		printf("  version     = 0x%02x\n", play->stream_info.version);
+		printf("  flags       = %d\n", play->stream_info.flags);
+		printf("  fps         = %f\n", play->stream_info.fps);
+		printf("  pid         = %d\n", play->stream_info.pid);
+		printf("  name        = %s\n", play->info_name);
+		printf("  date        = %s\n", play->info_date);
 	} else if (!strcmp("signature", value))
-		printf("0x%08x\n", play->glc.info->signature);
+		printf("0x%08x\n", play->stream_info.signature);
 	else if (!strcmp("version", value))
-		printf("0x%02x\n", play->glc.info->version);
+		printf("0x%02x\n", play->stream_info.version);
 	else if (!strcmp("flags", value))
-		printf("%d\n", play->glc.info->flags);
+		printf("%d\n", play->stream_info.flags);
 	else if (!strcmp("fps", value))
-		printf("%f\n", play->glc.info->fps);
+		printf("%f\n", play->stream_info.fps);
 	else if (!strcmp("pid", value))
-		printf("%d\n", play->glc.info->pid);
+		printf("%d\n", play->stream_info.pid);
 	else if (!strcmp("name", value))
-		printf("%s\n", play->glc.info_name);
+		printf("%s\n", play->info_name);
 	else if (!strcmp("date", value))
-		printf("%s\n", play->glc.info_date);
+		printf("%s\n", play->info_date);
 	else
 		return ENOTSUP;
 	return 0;
@@ -369,7 +373,7 @@ int play_stream(struct play_s *play)
 	 color -(color)->           applies color correction
 	 demux -(...)-> gl_play, audio_play
 
-	 Each filter, except demux and file, has util_cpus() worker
+	 Each filter, except demux and file, has glc_threads_hint(glc) worker
 	 threads. Packet order in stream is preserved. Demux creates
 	 separate buffer and _play handler for each video/audio stream.
 	*/

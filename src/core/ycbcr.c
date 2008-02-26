@@ -22,6 +22,8 @@
 #include <errno.h>
 
 #include "../common/glc.h"
+#include "../common/core.h"
+#include "../common/log.h"
 #include "../common/thread.h"
 #include "../common/util.h"
 #include "ycbcr.h"
@@ -116,7 +118,7 @@ int ycbcr_init(ycbcr_t *ycbcr, glc_t *glc)
 	(*ycbcr)->thread.write_callback = &ycbcr_write_callback;
 	(*ycbcr)->thread.finish_callback = &ycbcr_finish_callback;
 	(*ycbcr)->thread.ptr = *ycbcr;
-	(*ycbcr)->thread.threads = util_cpus();
+	(*ycbcr)->thread.threads = glc_threads_hint(glc);
 	(*ycbcr)->scale = 1.0;
 
 	return 0;
@@ -170,7 +172,7 @@ void ycbcr_finish_callback(void *ptr, int err)
 	struct ycbcr_ctx_s *del;
 
 	if (err)
-		util_log(ycbcr->glc, GLC_ERROR, "ycbcr", "%s (%d)", strerror(err), err);
+		glc_log(ycbcr->glc, GLC_ERROR, "ycbcr", "%s (%d)", strerror(err), err);
 
 	while (ycbcr->ctx != NULL) {
 		del = ycbcr->ctx;
@@ -459,12 +461,12 @@ int ycbcr_ctx_msg(ycbcr_t ycbcr, glc_ctx_message_t *ctx_msg)
 	if (ctx->scale == 1.0)
 		ctx->convert = &ycbcr_bgr_to_jpeg420;
 	else if (ctx->scale == 0.5) {
-		util_log(ycbcr->glc, GLC_DEBUG, "ycbcr",
+		glc_log(ycbcr->glc, GLC_DEBUG, "ycbcr",
 			 "scaling to half-size (from %ux%u to %ux%u)",
 			 ctx->w, ctx->h, ctx->yw, ctx->yh);
 		ctx->convert = &ycbcr_bgr_to_jpeg420_half;
 	} else {
-		util_log(ycbcr->glc, GLC_DEBUG, "ycbcr",
+		glc_log(ycbcr->glc, GLC_DEBUG, "ycbcr",
 			 "scaling with factor %f (from %ux%u to %ux%u)",
 			 ctx->scale, ctx->w, ctx->h, ctx->yw, ctx->yh);
 		ctx->convert = &ycbcr_bgr_to_jpeg420_scale;
@@ -488,7 +490,7 @@ int ycbcr_generate_map(ycbcr_t ycbcr, struct ycbcr_ctx_s *ctx)
 	float d, ofx, ofy, fx0, fx1, fy0, fy1;
 
 	scale_maps_size = ctx->yw * ctx->yh * 4 + ctx->cw * ctx->ch * 4;
-	util_log(ycbcr->glc, GLC_DEBUG, "ycbcr", "generating %zd + %zd byte scale map for ctx %d",
+	glc_log(ycbcr->glc, GLC_DEBUG, "ycbcr", "generating %zd + %zd byte scale map for ctx %d",
 		 scale_maps_size * sizeof(unsigned int), scale_maps_size * sizeof(float), ctx->ctx_i);
 
 	if (ctx->pos)
@@ -506,7 +508,7 @@ int ycbcr_generate_map(ycbcr_t ycbcr, struct ycbcr_ctx_s *ctx)
 	r = 0;
 	do {
 		d = (float) (ctx->w - r++) / (float) ctx->yw;
-		util_log(ycbcr->glc, GLC_DEBUG, "ycbcr", "Y: d = %f", d);
+		glc_log(ycbcr->glc, GLC_DEBUG, "ycbcr", "Y: d = %f", d);
 	} while ((d * (float) (ctx->yh - 1) + 1.0 > ctx->h) |
 		 (d * (float) (ctx->yw - 1) + 1.0 > ctx->w));
 
@@ -546,7 +548,7 @@ int ycbcr_generate_map(ycbcr_t ycbcr, struct ycbcr_ctx_s *ctx)
 	r = (r < 2) ? (0) : (r - 2);
 	do {
 		d = (float) (ctx->w - r++) / (float) ctx->cw;
-		util_log(ycbcr->glc, GLC_DEBUG, "ycbcr", "C: d = %f", d);
+		glc_log(ycbcr->glc, GLC_DEBUG, "ycbcr", "C: d = %f", d);
 	} while ((d * (float) (ctx->ch - 1) + 1.0 > ctx->h) |
 		 (d * (float) (ctx->cw - 1) + 1.0 > ctx->w));
 

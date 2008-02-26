@@ -18,6 +18,8 @@
 #include <alsa/asoundlib.h>
 
 #include "../common/util.h"
+#include "../common/core.h"
+#include "../common/log.h"
 #include "lib.h"
 #include "../capture/audio_hook.h"
 #include "../capture/audio_capture.h"
@@ -70,7 +72,7 @@ int alsa_init(glc_t *glc)
 	alsa.audio_hook = NULL;
 	int ret = 0;
 
-	util_log(alsa.glc, GLC_DEBUG, "alsa", "initializing");
+	glc_log(alsa.glc, GLC_DEBUG, "alsa", "initializing");
 
 	if (getenv("GLC_AUDIO"))
 		alsa.capture = atoi(getenv("GLC_AUDIO"));
@@ -178,7 +180,7 @@ int alsa_close()
 	if (!alsa.started)
 		return 0;
 
-	util_log(alsa.glc, GLC_DEBUG, "alsa", "closing");
+	glc_log(alsa.glc, GLC_DEBUG, "alsa", "closing");
 
 	if (alsa.capture) {
 		if (alsa.capturing)
@@ -493,7 +495,7 @@ snd_pcm_sframes_t __alsa_snd_pcm_mmap_commit(snd_pcm_t *pcm, snd_pcm_uframes_t o
 
 	ret = alsa.snd_pcm_mmap_commit(pcm, offset, frames);
 	if (ret != frames)
-		util_log(alsa.glc, GLC_WARNING, "alsa", "frames=%lu, ret=%ld", frames, ret);
+		glc_log(alsa.glc, GLC_WARNING, "alsa", "frames=%lu, ret=%ld", frames, ret);
 	return ret;
 }
 

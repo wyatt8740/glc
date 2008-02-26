@@ -42,7 +42,7 @@ __PUBLIC int gl_play_destroy(gl_play_t gl_play);
  *
  * Default video stream is 1.
  * \param gl_play gl_play object
- * \param video video stream number
+ * \param ctx video stream number
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int gl_play_set_stream_number(gl_play_t gl_play, glc_ctx_i ctx);

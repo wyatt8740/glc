@@ -21,6 +21,8 @@
 #include <stdint.h>
 
 #include "../common/glc.h"
+#include "../common/core.h"
+#include "../common/log.h"
 #include "../common/thread.h"
 #include "../common/util.h"
 #include "pack.h"
@@ -85,7 +87,7 @@ int pack_init(pack_t *pack, glc_t *glc)
 	(*pack)->thread.thread_finish_callback = &pack_thread_finish_callback;
 	(*pack)->thread.read_callback = &pack_read_callback;
 	(*pack)->thread.finish_callback = &pack_finish_callback;
-	(*pack)->thread.threads = util_cpus();
+	(*pack)->thread.threads = glc_threads_hint(glc);
 
 #ifdef __QUICKLZ
 	(*pack)->thread.write_callback = &pack_quicklz_write_callback;
@@ -95,7 +97,7 @@ int pack_init(pack_t *pack, glc_t *glc)
 	(*pack)->thread.write_callback = &pack_lzo_write_callback;
 	(*pack)->compression = PACK_LZO;
 # else
-	util_log((*pack)->glc, GLC_ERROR, "pack",
+	glc_log((*pack)->glc, GLC_ERROR, "pack",
 		 "no supported compression algorithms found");
 	return ENOTSUP;
 # endif
@@ -112,26 +114,26 @@ int pack_set_compression(pack_t pack, int compression)
 	if (compression == PACK_QUICKLZ) {
 #ifdef __QUICKLZ
 		pack->thread.write_callback = &pack_quicklz_write_callback;
-		util_log(pack->glc, GLC_INFORMATION, "pack",
+		glc_log(pack->glc, GLC_INFORMATION, "pack",
 			 "compressing using QuickLZ");
 #else
-		util_log(pack->glc, GLC_ERROR, "pack",
+		glc_log(pack->glc, GLC_ERROR, "pack",
 			 "QuickLZ not supported");
 		return ENOTSUP;
 #endif
 	} else if (compression == PACK_LZO) {
 #ifdef __LZO
 		pack->thread.write_callback = &pack_lzo_write_callback;
-		util_log(pack->glc, GLC_INFORMATION, "pack",
+		glc_log(pack->glc, GLC_INFORMATION, "pack",
 			 "compressing using LZO");
 		lzo_init();
 #else
-		util_log(pack->glc, GLC_ERROR, "pack",
+		glc_log(pack->glc, GLC_ERROR, "pack",
 			 "LZO not supported");
 		return ENOTSUP;
 #endif
 	} else {
-		util_log(pack->glc, GLC_ERROR, "pack",
+		glc_log(pack->glc, GLC_ERROR, "pack",
 			 "unknown/unsupported compression algorithm 0x%02x",
 			 compression);
 		return ENOTSUP;
@@ -188,7 +190,7 @@ void pack_finish_callback(void *ptr, int err)
 	pack_t pack = (pack_t) ptr;
 
 	if (err)
-		util_log(pack->glc, GLC_ERROR, "pack", "%s (%d)", strerror(err), err);
+		glc_log(pack->glc, GLC_ERROR, "pack", "%s (%d)", strerror(err), err);
 }
 
 int pack_thread_create_callback(void *ptr, void **threadptr)
@@ -315,7 +317,7 @@ int unpack_init(unpack_t *unpack, glc_t *glc)
 	(*unpack)->thread.read_callback = &unpack_read_callback;
 	(*unpack)->thread.write_callback = &unpack_write_callback;
 	(*unpack)->thread.finish_callback = &unpack_finish_callback;
-	(*unpack)->thread.threads = util_cpus();
+	(*unpack)->thread.threads = glc_threads_hint(glc);
 
 #ifdef __LZO
 	lzo_init();
@@ -359,7 +361,7 @@ void unpack_finish_callback(void *ptr, int err)
 	unpack_t unpack = (unpack_t) ptr;
 
 	if (err)
-		util_log(unpack->glc, GLC_ERROR, "unpack", "%s (%d)", strerror(err), err);
+		glc_log(unpack->glc, GLC_ERROR, "unpack", "%s (%d)", strerror(err), err);
 }
 
 int unpack_read_callback(glc_thread_state_t *state)
@@ -369,7 +371,7 @@ int unpack_read_callback(glc_thread_state_t *state)
 		state->write_size = ((glc_lzo_header_t *) state->read_data)->size;
 		return 0;
 #else
-		util_log(((struct pack_private_s *) state->ptr)->glc,
+		glc_log(((struct pack_private_s *) state->ptr)->glc,
 			 GLC_ERROR, "unpack", "LZO not supported");
 		return ENOTSUP;
 #endif
@@ -378,7 +380,7 @@ int unpack_read_callback(glc_thread_state_t *state)
 		state->write_size = ((glc_quicklz_header_t *) state->read_data)->size;
 		return 0;
 #else
-		util_log(((struct pack_private_s *) state->ptr)->glc,
+		glc_log(((struct pack_private_s *) state->ptr)->glc,
 			 GLC_ERROR, "unpack", "unpack: QuickLZ not supported");
 		return ENOTSUP;
 #endif

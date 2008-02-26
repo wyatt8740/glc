@@ -29,6 +29,9 @@
 #include <sched.h>
 
 #include "../common/glc.h"
+#include "../common/core.h"
+#include "../common/log.h"
+#include "../common/state.h"
 #include "../common/util.h"
 #include "audio_hook.h"
 
@@ -36,7 +39,9 @@
 #define AUDIO_HOOK_ALLOW_SKIP   0x2
 
 struct audio_hook_stream_s {
+	glc_state_audio_t state_audio;
 	glc_audio_i audio_i;
+
 	snd_pcm_t *pcm;
 	int mode;
 	const snd_pcm_channel_area_t *mmap_areas;
@@ -129,7 +134,7 @@ int audio_hook_allow_skip(audio_hook_t audio_hook, int allow_skip)
 int audio_hook_start(audio_hook_t audio_hook)
 {
 	if (!audio_hook->to) {
-		util_log(audio_hook->glc, GLC_ERROR, "audio_hook",
+		glc_log(audio_hook->glc, GLC_ERROR, "audio_hook",
 			 "target buffer not specified");
 		return EAGAIN;
 	}
@@ -138,10 +143,10 @@ int audio_hook_start(audio_hook_t audio_hook)
 		audio_hook_init_streams(audio_hook);
 
 	if (audio_hook->flags & AUDIO_HOOK_CAPTURING)
-		util_log(audio_hook->glc, GLC_WARNING, "audio_hook",
+		glc_log(audio_hook->glc, GLC_WARNING, "audio_hook",
 			 "capturing is already active");
 	else
-		util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
+		glc_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
 			 "starting capturing");
 
 	audio_hook->flags |= AUDIO_HOOK_CAPTURING;
@@ -151,10 +156,10 @@ int audio_hook_start(audio_hook_t audio_hook)
 int audio_hook_stop(audio_hook_t audio_hook)
 {
 	if (audio_hook->flags & AUDIO_HOOK_CAPTURING)
-		util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
+		glc_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
 			 "stopping capturing");
 	else
-		util_log(audio_hook->glc, GLC_WARNING, "audio_hook",
+		glc_log(audio_hook->glc, GLC_WARNING, "audio_hook",
 			 "capturing is already stopped");
 
 	audio_hook->flags &= ~AUDIO_HOOK_CAPTURING;
@@ -319,7 +324,7 @@ int audio_hook_wait_for_thread(audio_hook_t audio_hook, struct audio_hook_stream
 
 	return 0;
 busy:
-	util_log(audio_hook->glc, GLC_WARNING, "audio_hook",
+	glc_log(audio_hook->glc, GLC_WARNING, "audio_hook",
 		 "dropped audio data, capture thread not ready");
 	return EBUSY;
 }
@@ -373,7 +378,7 @@ int audio_hook_alsa_open(audio_hook_t audio_hook, snd_pcm_t *pcm, const char *na
 
 	stream->mode = mode;
 
-	util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
+	glc_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
 		 "%p: opened device \"%s\" with mode is 0x%02x (async=%s, nonblock=%s)",
 		 stream->pcm, name, mode,
 		 mode & SND_PCM_ASYNC ? "yes" : "no",
@@ -387,7 +392,7 @@ int audio_hook_alsa_close(audio_hook_t audio_hook, snd_pcm_t *pcm)
 	struct audio_hook_stream_s *stream;
 
 	audio_hook_get_stream_alsa(audio_hook, pcm, &stream);
-	util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook", "%p: closing stream %d",
+	glc_log(audio_hook->glc, GLC_INFORMATION, "audio_hook", "%p: closing stream %d",
 		 pcm, stream->audio_i);
 	stream->fmt = 0; /* no format -> do not initialize */
 
@@ -418,7 +423,7 @@ int audio_hook_alsa_i(audio_hook_t audio_hook, snd_pcm_t *pcm, const void *buffe
 	if ((ret = audio_hook_set_data_size(stream, snd_pcm_frames_to_bytes(pcm, size))))
 		goto unlock;
 
-	stream->capture_time = util_time(audio_hook->glc);
+	stream->capture_time = glc_state_time(audio_hook->glc);
 	memcpy(stream->capture_data, buffer, stream->capture_size);
 	sem_post(&stream->capture_full);
 
@@ -446,7 +451,7 @@ int audio_hook_alsa_n(audio_hook_t audio_hook, snd_pcm_t *pcm, void **bufs, snd_
 		return ret;
 
 	if (stream->flags & GLC_AUDIO_INTERLEAVED) {
-		util_log(audio_hook->glc, GLC_ERROR, "audio_hook",
+		glc_log(audio_hook->glc, GLC_ERROR, "audio_hook",
 			 "stream format (interleaved) incompatible with snd_pcm_writen()");
 		ret = EINVAL;
 		goto unlock;
@@ -458,7 +463,7 @@ int audio_hook_alsa_n(audio_hook_t audio_hook, snd_pcm_t *pcm, void **bufs, snd_
 	if ((ret = audio_hook_set_data_size(stream, snd_pcm_frames_to_bytes(pcm, size))))
 		goto unlock;
 
-	stream->capture_time = util_time(audio_hook->glc);
+	stream->capture_time = glc_state_time(audio_hook->glc);
 	for (c = 0; c < stream->channels; c++)
 		memcpy(&stream->capture_data[c * snd_pcm_samples_to_bytes(pcm, size)], bufs[c],
 		       snd_pcm_samples_to_bytes(pcm, size));
@@ -518,13 +523,13 @@ int audio_hook_alsa_mmap_commit(audio_hook_t audio_hook, snd_pcm_t *pcm,
 
 	if (!stream->mmap_areas) {
 		/* this might actually happen */
-		util_log(audio_hook->glc, GLC_WARNING, "audio_hook",
+		glc_log(audio_hook->glc, GLC_WARNING, "audio_hook",
 			 "snd_pcm_mmap_commit() before snd_pcm_mmap_begin()");
 		return EINVAL; /* not locked */
 	}
 
 	if (offset != stream->offset)
-		util_log(audio_hook->glc, GLC_WARNING, "audio_hook",
+		glc_log(audio_hook->glc, GLC_WARNING, "audio_hook",
 			 "offset=%lu != stream->offset=%lu", offset, stream->offset);
 
 	if ((ret = audio_hook_wait_for_thread(audio_hook, stream)))
@@ -533,7 +538,7 @@ int audio_hook_alsa_mmap_commit(audio_hook_t audio_hook, snd_pcm_t *pcm,
 	if ((ret = audio_hook_set_data_size(stream, snd_pcm_frames_to_bytes(pcm, frames))))
 		goto unlock;
 
-	stream->capture_time = util_time(audio_hook->glc);
+	stream->capture_time = glc_state_time(audio_hook->glc);
 
 	if (stream->flags & GLC_AUDIO_INTERLEAVED) {
 		memcpy(stream->capture_data,
@@ -598,7 +603,7 @@ int audio_hook_alsa_hw_params(audio_hook_t audio_hook, snd_pcm_t *pcm, snd_pcm_h
 	if ((ret = audio_hook_lock_write(audio_hook, stream)))
 		return ret;
 
-	util_log(audio_hook->glc, GLC_DEBUG, "audio_hook",
+	glc_log(audio_hook->glc, GLC_DEBUG, "audio_hook",
 		 "%p: creating/updating configuration for stream %d",
 		 stream->pcm, stream->audio_i);
 
@@ -608,7 +613,7 @@ int audio_hook_alsa_hw_params(audio_hook_t audio_hook, snd_pcm_t *pcm, snd_pcm_h
 	stream->flags = 0; /* zero flags */
 	stream->flags |= pcm_fmt_to_glc_fmt(format);
 	if (stream->flags & GLC_AUDIO_FORMAT_UNKNOWN) {
-		util_log(audio_hook->glc, GLC_ERROR, "audio_hook",
+		glc_log(audio_hook->glc, GLC_ERROR, "audio_hook",
 			 "%p: unsupported audio format 0x%02x", stream->pcm, format);
 		ret = ENOTSUP;
 		goto err;
@@ -627,13 +632,13 @@ int audio_hook_alsa_hw_params(audio_hook_t audio_hook, snd_pcm_t *pcm, snd_pcm_h
 		stream->flags |= GLC_AUDIO_INTERLEAVED; /* convert to interleaved */
 		stream->complex = 1; /* do conversion */
 	} else {
-		util_log(audio_hook->glc, GLC_ERROR, "audio_hook",
+		glc_log(audio_hook->glc, GLC_ERROR, "audio_hook",
 			 "%p: unsupported access mode 0x%02x", stream->pcm, access);
 		ret = ENOTSUP;
 		goto err;
 	}
 
-	util_log(audio_hook->glc, GLC_DEBUG, "audio_hook",
+	glc_log(audio_hook->glc, GLC_DEBUG, "audio_hook",
 		 "%p: %d channels, rate %d, flags 0x%02x",
 		 stream->pcm, stream->channels, stream->rate, stream->flags);
 
@@ -647,7 +652,7 @@ int audio_hook_alsa_hw_params(audio_hook_t audio_hook, snd_pcm_t *pcm, snd_pcm_h
 	return 0;
 
 err:
-	util_log(audio_hook->glc, GLC_ERROR, "audio_hook",
+	glc_log(audio_hook->glc, GLC_ERROR, "audio_hook",
 		 "%p: can't extract hardware configuration: %s (%d)",
 		 stream->pcm, snd_strerror(ret), ret);
 
@@ -665,9 +670,9 @@ int audio_hook_stream_init(audio_hook_t audio_hook, struct audio_hook_stream_s *
 
 	/* we need proper id for the stream */
 	if (stream->audio_i < 1)
-		stream->audio_i = util_audio_stream_id(audio_hook->glc);
+		glc_state_audio_new(audio_hook->glc, &stream->audio_i, &stream->state_audio);
 
-	util_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
+	glc_log(audio_hook->glc, GLC_INFORMATION, "audio_hook",
 		 "%p: initializing stream %d", stream->pcm, stream->audio_i);
 
 	/* init packet */

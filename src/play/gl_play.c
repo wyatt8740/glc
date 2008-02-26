@@ -28,6 +28,9 @@
 #include <errno.h>
 
 #include "../common/glc.h"
+#include "../common/core.h"
+#include "../common/log.h"
+#include "../common/state.h"
 #include "../common/util.h"
 #include "../common/thread.h"
 #include "gl_play.h"
@@ -135,7 +138,7 @@ int gl_play_thread_create_callback(void *ptr, void **threadptr)
 		gl_play->dpy = XOpenDisplay(NULL);
 
 	if (!gl_play->dpy) {
-		util_log(gl_play->glc, GLC_ERROR, "gl_play",
+		glc_log(gl_play->glc, GLC_ERROR, "gl_play",
 			 "can't open display");
 		return EAGAIN;
 	}
@@ -148,7 +151,7 @@ void gl_play_finish_callback(void *ptr, int err)
 	gl_play_t gl_play = (gl_play_t) ptr;
 
 	if (err)
-		util_log(gl_play->glc, GLC_ERROR, "gl_play",
+		glc_log(gl_play->glc, GLC_ERROR, "gl_play",
 			 "%s (%d)", strerror(err), err);
 
 	if (gl_play->created) {
@@ -330,7 +333,7 @@ int gl_handle_xevents(gl_play_t gl_play, glc_thread_state_t *state)
 			code = XLookupKeysym(&event.xkey, 0);
 
 			if (code == XK_Right)
-				util_timediff(gl_play->glc, -100000);
+				glc_state_time_add_diff(gl_play->glc, -100000);
 			else if (code == XK_f)
 				gl_play_toggle_fullscreen(gl_play);
 			break;
@@ -338,10 +341,10 @@ int gl_handle_xevents(gl_play_t gl_play, glc_thread_state_t *state)
 			code = XLookupKeysym(&event.xkey, 0);
 
 			if (code == XK_Escape)
-				gl_play->glc->flags |= GLC_CANCEL;
+				glc_state_set(gl_play->glc, GLC_STATE_CANCEL);
 			break;
 		case DestroyNotify:
-			gl_play->glc->flags |= GLC_CANCEL;
+			glc_state_set(gl_play->glc, GLC_STATE_CANCEL);
 			break;
 		case ClientMessage:
 			if (event.xclient.message_type == gl_play->wm_proto_atom) {
@@ -351,7 +354,7 @@ int gl_handle_xevents(gl_play_t gl_play, glc_thread_state_t *state)
 					 this would kill just this single stream, but it confuses
 					 users, so...
 					*/
-					gl_play->glc->flags |= GLC_CANCEL;
+					glc_state_set(gl_play->glc, GLC_STATE_CANCEL);
 				}
 			}
 			break;
@@ -399,12 +402,12 @@ int gl_play_read_callback(glc_thread_state_t *state)
 			gl_play_create_ctx(gl_play);
 		else if ((ctx_msg->flags & GLC_CTX_BGR) && (ctx_msg->flags & GLC_CTX_UPDATE)) {
 			if (gl_play_update_ctx(gl_play)) {
-				util_log(gl_play->glc, GLC_ERROR, "gl_play",
+				glc_log(gl_play->glc, GLC_ERROR, "gl_play",
 					 "broken ctx %d", ctx_msg->ctx);
 				return EINVAL;
 			}
 		} else {
-			util_log(gl_play->glc, GLC_ERROR, "gl_play",
+			glc_log(gl_play->glc, GLC_ERROR, "gl_play",
 				 "ctx %d is in unsupported format", ctx_msg->ctx);
 			return EINVAL;
 		}
@@ -420,7 +423,7 @@ int gl_play_read_callback(glc_thread_state_t *state)
 			return 0;
 
 		if (!gl_play->created) {
-			util_log(gl_play->glc, GLC_ERROR, "gl_play",
+			glc_log(gl_play->glc, GLC_ERROR, "gl_play",
 				 "picture refers to uninitalized ctx %d", pic_hdr->ctx);
 			return EINVAL;
 		}
@@ -428,12 +431,12 @@ int gl_play_read_callback(glc_thread_state_t *state)
 		/* draw first, measure and sleep after */
 		gl_play_draw_picture(gl_play, &state->read_data[GLC_PICTURE_HEADER_SIZE]);
 
-		time = util_time(gl_play->glc);
+		time = glc_state_time(gl_play->glc);
 
 		if (pic_hdr->timestamp > time)
 			usleep(pic_hdr->timestamp - time);
 		else if (time > pic_hdr->timestamp + gl_play->fps) {
-			util_log(gl_play->glc, GLC_DEBUG, "gl_play", "dropped frame");
+			glc_log(gl_play->glc, GLC_DEBUG, "gl_play", "dropped frame");
 			return 0;
 		}
 

@@ -23,6 +23,8 @@
 #include <packetstream.h>
 
 #include "../common/glc.h"
+#include "../common/core.h"
+#include "../common/log.h"
 #include "../common/thread.h"
 #include "../common/util.h"
 #include "img.h"
@@ -140,7 +142,7 @@ int img_set_format(img_t img, int format)
 	else if (format == IMG_BMP)
 		img->write_proc = &img_write_bmp;
 	else {
-		util_log(img->glc, GLC_ERROR, "img",
+		glc_log(img->glc, GLC_ERROR, "img",
 			 "unknown format 0x%02x", format);
 		return EINVAL;
 	}
@@ -158,10 +160,10 @@ void img_finish_callback(void *ptr, int err)
 {
 	img_t img = (img_t) ptr;
 
-	util_log(img->glc, GLC_INFORMATION, "img", "%d images written", img->i);
+	glc_log(img->glc, GLC_INFORMATION, "img", "%d images written", img->i);
 
 	if (err)
-		util_log(img->glc, GLC_ERROR, "img", "%s (%d)", strerror(err), err);
+		glc_log(img->glc, GLC_ERROR, "img", "%s (%d)", strerror(err), err);
 
 	if (img->prev_pic) {
 		free(img->prev_pic);
@@ -194,7 +196,7 @@ int img_ctx_msg(img_t img, glc_ctx_message_t *ctx_msg)
 		return 0;
 
 	if (!(ctx_msg->flags & GLC_CTX_BGR)) {
-		util_log(img->glc, GLC_ERROR, "img",
+		glc_log(img->glc, GLC_ERROR, "img",
 				"ctx %d is in unsupported format", ctx_msg->ctx);
 		return ENOTSUP;
 	}
@@ -253,7 +255,7 @@ int img_write_bmp(img_t img, const unsigned char *pic,
 	unsigned int val;
 	unsigned int i;
 
-	util_log(img->glc, GLC_INFORMATION, "img",
+	glc_log(img->glc, GLC_INFORMATION, "img",
 		 "opening %s for writing (BMP)", filename);
 	if (!(fd = fopen(filename, "w")))
 		return errno;
@@ -290,7 +292,7 @@ int img_write_png(img_t img, const unsigned char *pic,
 	unsigned int i;
 	FILE *fd;
 
-	util_log(img->glc, GLC_INFORMATION, "img",
+	glc_log(img->glc, GLC_INFORMATION, "img",
 		 "opening %s for writing (PNG)", filename);
 	if (!(fd = fopen(filename, "w")))
 		return errno;

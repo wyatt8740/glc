@@ -22,6 +22,8 @@
 #include <errno.h>
 
 #include "../common/glc.h"
+#include "../common/core.h"
+#include "../common/log.h"
 #include "../common/thread.h"
 #include "../common/util.h"
 #include "wav.h"
@@ -164,7 +166,7 @@ void wav_finish_callback(void *priv, int err)
 	wav_t wav = (wav_t ) priv;
 
 	if (err)
-		util_log(wav->glc, GLC_ERROR, "wav", "%s (%d)", strerror(err), err);
+		glc_log(wav->glc, GLC_ERROR, "wav", "%s (%d)", strerror(err), err);
 
 	if (wav->to) {
 		fclose(wav->to);
@@ -201,23 +203,23 @@ int wav_write_hdr(wav_t wav, glc_audio_format_message_t *fmt_msg)
 	else if (fmt_msg->flags & GLC_AUDIO_S32_LE)
 		sample_size = 4;
 	else {
-		util_log(wav->glc, GLC_ERROR, "wav",
+		glc_log(wav->glc, GLC_ERROR, "wav",
 			 "unsupported format 0x%02x (stream %d)", fmt_msg->flags, fmt_msg->audio);
 		return ENOTSUP;
 	}
 
 	if (wav->to) {
-		util_log(wav->glc, GLC_ERROR, "wav",
+		glc_log(wav->glc, GLC_ERROR, "wav",
 			 "configuration update msg to stream %d", fmt_msg->audio);
 		fclose(wav->to);
 	}
 	
 	filename = (char *) malloc(1024);
 	snprintf(filename, 1023, wav->filename_format, ++wav->file_count);
-	util_log(wav->glc, GLC_INFORMATION, "wav", "opening %s for writing", filename);
+	glc_log(wav->glc, GLC_INFORMATION, "wav", "opening %s for writing", filename);
 	wav->to = fopen(filename, "w");
 	if (!wav->to) {
-		util_log(wav->glc, GLC_ERROR, "wav", "can't open %s", filename);
+		glc_log(wav->glc, GLC_ERROR, "wav", "can't open %s", filename);
 		free(filename);
 		return EINVAL;
 	}
@@ -261,7 +263,7 @@ int wav_write_audio(wav_t wav, glc_audio_header_t *audio_hdr, char *data)
 	glc_utime_t duration = (audio_hdr->size * 1000000) / wav->bps;
 
 	if (!wav->to) {
-		util_log(wav->glc, GLC_ERROR, "wav", "broken stream %d", audio_hdr->audio);
+		glc_log(wav->glc, GLC_ERROR, "wav", "broken stream %d", audio_hdr->audio);
 		return EINVAL;
 	}
 
@@ -273,7 +275,7 @@ int wav_write_audio(wav_t wav, glc_audio_header_t *audio_hdr, char *data)
 
 		wav->time += (need_silence * 1000000) / wav->bps;
 		if (wav->interpolate) {
-			util_log(wav->glc, GLC_WARNING, "wav", "writing %zd bytes of silence", need_silence);
+			glc_log(wav->glc, GLC_WARNING, "wav", "writing %zd bytes of silence", need_silence);
 			while (need_silence > 0) {
 				write_silence = need_silence > wav->silence_size ? wav->silence_size : need_silence;
 				fwrite(wav->silence, 1, write_silence, wav->to);

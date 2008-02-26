@@ -20,6 +20,8 @@
 #include <errno.h>
 
 #include "../common/glc.h"
+#include "../common/core.h"
+#include "../common/log.h"
 #include "../common/thread.h"
 #include "../common/util.h"
 #include "info.h"
@@ -62,7 +64,6 @@ struct info_s {
 	glc_utime_t time;
 	int level;
 	FILE *stream;
-	int stream_info;
 	glc_ctx_i prev_ctx;
 
 	struct info_ctx_s *ctx_list;
@@ -80,7 +81,6 @@ void ctx_info(info_t info, glc_ctx_message_t *ctx_message);
 void pic_info(info_t info, glc_picture_header_t *pic_header);
 void audio_fmt_info(info_t info, glc_audio_format_message_t *fmt_message);
 void audio_info(info_t info, glc_audio_header_t *audio_header);
-void stream_info(info_t info);
 void color_info(info_t info, glc_color_message_t *color_msg);
 
 void print_time(FILE *stream, glc_utime_t time);
@@ -159,7 +159,7 @@ void info_finish_callback(void *ptr, int err)
 	struct info_audio_s *audio;
 
 	if (err)
-		util_log(info->glc, GLC_ERROR, "info", "%s (%d)",
+		glc_log(info->glc, GLC_ERROR, "info", "%s (%d)",
 			 strerror(err), err);
 
 	while (info->ctx_list != NULL) {
@@ -198,9 +198,6 @@ void info_finish_callback(void *ptr, int err)
 int info_read_callback(glc_thread_state_t *state)
 {
 	info_t info = (info_t) state->ptr;
-
-	if (!info->stream_info)
-		stream_info(info);
 
 	if (state->header.type == GLC_MESSAGE_CTX)
 		ctx_info(info, (glc_ctx_message_t *) state->read_data);
@@ -435,12 +432,12 @@ void color_info(info_t info, glc_color_message_t *color_msg)
 		fprintf(info->stream, "color correction information for ctx %d\n", color_msg->ctx);
 }
 
+/*
 void stream_info(info_t info)
 {
 	if (info->stream_info)
 		return;
 
-	/* show stream info header */
 	if (info->glc->info) {
 		fprintf(info->stream, "glc stream info\n");
 		fprintf(info->stream, "  signature   = 0x%08x\n", info->glc->info->signature);
@@ -455,6 +452,7 @@ void stream_info(info_t info)
 
 	info->stream_info = 1;
 }
+*/
 
 void print_time(FILE *stream, glc_utime_t time)
 {

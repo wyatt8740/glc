@@ -28,6 +28,9 @@
 #include <fcntl.h>
 
 #include "../common/glc.h"
+#include "../common/state.h"
+#include "../common/core.h"
+#include "../common/log.h"
 #include "../common/thread.h"
 #include "../common/util.h"
 #include "file.h"
@@ -78,13 +81,13 @@ int file_open_target(file_t file, const char *filename)
 	if (file->fd >= 0)
 		return EBUSY;
 
-	util_log(file->glc, GLC_INFORMATION, "file",
+	glc_log(file->glc, GLC_INFORMATION, "file",
 		 "opening %s for writing stream", filename);
 
 	fd = open(filename, O_CREAT | O_WRONLY | O_SYNC, 0644);
 
 	if (fd == -1) {
-		util_log(file->glc, GLC_ERROR, "file", "can't open %s: %s (%d)",
+		glc_log(file->glc, GLC_ERROR, "file", "can't open %s: %s (%d)",
 			 filename, strerror(errno), errno);
 		return errno;
 	}
@@ -101,7 +104,7 @@ int file_set_target(file_t file, int fd)
 		return EBUSY;
 
 	if (flock(fd, LOCK_EX | LOCK_NB) == -1) {
-		util_log(file->glc, GLC_ERROR, "file",
+		glc_log(file->glc, GLC_ERROR, "file",
 			 "can't lock file: %s (%d)", strerror(errno), errno);
 		return errno;
 	}
@@ -123,12 +126,12 @@ int file_close_target(file_t file)
 
 	/* try to remove lock */
 	if (flock(file->fd, LOCK_UN) == -1)
-		util_log(file->glc, GLC_WARNING,
+		glc_log(file->glc, GLC_WARNING,
 			 "file", "can't unlock file: %s (%d)",
 			 strerror(errno), errno);
 
 	if (close(file->fd))
-		util_log(file->glc, GLC_ERROR, "file",
+		glc_log(file->glc, GLC_ERROR, "file",
 			 "can't close file: %s (%d)",
 			 strerror(errno), errno);
 
@@ -155,7 +158,7 @@ int file_write_info(file_t file, glc_stream_info_t *info,
 	file->flags |= FILE_INFO_WRITTEN;
 	return 0;
 err:
-	util_log(file->glc, GLC_ERROR, "file",
+	glc_log(file->glc, GLC_ERROR, "file",
 		 "can't write stream information: %s (%d)",
 		 strerror(errno), errno);
 	return errno;
@@ -195,7 +198,7 @@ void file_finish_callback(void *ptr, int err)
 	file_t file = (file_t) ptr;
 
 	if (err)
-		util_log(file->glc, GLC_ERROR, "file", "%s (%d)", strerror(err), err);
+		glc_log(file->glc, GLC_ERROR, "file", "%s (%d)", strerror(err), err);
 }
 
 int file_read_callback(glc_thread_state_t *state)
@@ -229,7 +232,7 @@ int file_read_callback(glc_thread_state_t *state)
 	return 0;
 
 err:
-	util_log(file->glc, GLC_ERROR, "file", "%s (%d)", strerror(errno), errno);
+	glc_log(file->glc, GLC_ERROR, "file", "%s (%d)", strerror(errno), errno);
 	return errno;
 }
 
@@ -239,13 +242,13 @@ int file_open_source(file_t file, const char *filename)
 	if (file->fd >= 0)
 		return EBUSY;
 
-	util_log(file->glc, GLC_INFORMATION, "file",
+	glc_log(file->glc, GLC_INFORMATION, "file",
 		 "opening %s for reading stream", filename);
 
 	fd = open(filename, O_SYNC);
 
 	if (fd == -1) {
-		util_log(file->glc, GLC_ERROR, "file", "can't open %s: %s (%d)",
+		glc_log(file->glc, GLC_ERROR, "file", "can't open %s: %s (%d)",
 			 filename, strerror(errno), errno);
 		return errno;
 	}
@@ -275,7 +278,7 @@ int file_close_source(file_t file)
 		return EAGAIN;
 
 	if (close(file->fd))
-		util_log(file->glc, GLC_ERROR, "file",
+		glc_log(file->glc, GLC_ERROR, "file",
 			 "can't close file: %s (%d)",
 			 strerror(errno), errno);
 
@@ -292,21 +295,21 @@ int file_read_info(file_t file, glc_stream_info_t *info,
 		return EAGAIN;
 
 	if (read(file->fd, info, GLC_STREAM_INFO_SIZE) != GLC_STREAM_INFO_SIZE) {
-		util_log(file->glc, GLC_ERROR, "file",
+		glc_log(file->glc, GLC_ERROR, "file",
 			 "can't read stream info header");
 		return errno;
 	}
 	file->flags |= FILE_INFO_READ;
 
 	if (info->signature != GLC_SIGNATURE) {
-		util_log(file->glc, GLC_ERROR, "file",
+		glc_log(file->glc, GLC_ERROR, "file",
 			 "signature 0x%08x does not match 0x%08x",
 			 info->signature, GLC_SIGNATURE);
 		return EINVAL;
 	}
 
 	if (info->version != GLC_STREAM_VERSION) {
-		util_log(file->glc, GLC_ERROR, "file",
+		glc_log(file->glc, GLC_ERROR, "file",
 			 "unsupported stream version 0x%02x (0x%02x is supported)",
 			 info->version, GLC_STREAM_VERSION);
 		return ENOTSUP;
@@ -341,13 +344,13 @@ int file_read(file_t file, ps_buffer_t *to)
 		return EAGAIN;
 
 	if (!(file->flags & FILE_INFO_READ)) {
-		util_log(file->glc, GLC_ERROR, "file",
+		glc_log(file->glc, GLC_ERROR, "file",
 			 "stream info header not read");
 		return EAGAIN;
 	}
 
 	if (!(file->flags & FILE_INFO_VALID)) {
-		util_log(file->glc, GLC_ERROR, "file",
+		glc_log(file->glc, GLC_ERROR, "file",
 			 "stream info header not valid");
 		file->flags &= ~FILE_INFO_READ;
 		return EINVAL;
@@ -376,7 +379,7 @@ int file_read(file_t file, ps_buffer_t *to)
 		if ((ret = ps_packet_close(&packet)))
 			goto err;
 	} while ((header.type != GLC_MESSAGE_CLOSE) &&
-		 (!(file->glc->flags & GLC_CANCEL)));
+		 (!glc_state_test(file->glc, GLC_STATE_CANCEL)));
 
 finish:
 	ps_packet_destroy(&packet);
@@ -390,7 +393,7 @@ send_eof:
 	ps_packet_write(&packet, &header, GLC_MESSAGE_HEADER_SIZE);
 	ps_packet_close(&packet);
 
-	util_log(file->glc, GLC_ERROR, "file", "unexpected EOF");
+	glc_log(file->glc, GLC_ERROR, "file", "unexpected EOF");
 	goto finish;
 
 read_fail:
@@ -399,8 +402,8 @@ err:
 	if (ret == EINTR)
 		goto finish; /* just cancel */
 
-	util_log(file->glc, GLC_ERROR, "file", "%s (%d)", strerror(ret), ret);
-	util_log(file->glc, GLC_DEBUG, "file", "packet size is %zd", packet_size);
+	glc_log(file->glc, GLC_ERROR, "file", "%s (%d)", strerror(ret), ret);
+	glc_log(file->glc, GLC_DEBUG, "file", "packet size is %zd", packet_size);
 	ps_buffer_cancel(to);
 
 	file->flags &= ~(FILE_INFO_READ | FILE_INFO_VALID);

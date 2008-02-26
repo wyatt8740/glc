@@ -22,6 +22,9 @@
 #include <errno.h>
 
 #include "../common/glc.h"
+#include "../common/core.h"
+#include "../common/log.h"
+#include "../common/state.h"
 #include "../common/thread.h"
 #include "../common/util.h"
 #include "demux.h"
@@ -165,13 +168,13 @@ int demux_close(demux_t demux)
 
 	if (demux->ctx != NULL) {
 		if ((ret = demux_video_close(demux)))
-			util_log(demux->glc, GLC_ERROR, "demux", "can't close video streams: %s (%d)",
+			glc_log(demux->glc, GLC_ERROR, "demux", "can't close video streams: %s (%d)",
 				 strerror(ret), ret);
 	}
 
 	if (demux->stream != NULL) {
 		if ((ret = demux_audio_close(demux)))
-			util_log(demux->glc, GLC_ERROR, "demux", "can't close audio streams: %s (%d)",
+			glc_log(demux->glc, GLC_ERROR, "demux", "can't close audio streams: %s (%d)",
 				 strerror(ret), ret);
 	}
 
@@ -218,12 +221,13 @@ void *demux_thread(void *argptr)
 		}
 
 		ps_packet_close(&read);
-	} while ((!(demux->glc->flags & GLC_CANCEL)) && (msg_hdr.type != GLC_MESSAGE_CLOSE));
+	} while ((!glc_state_test(demux->glc, GLC_STATE_CANCEL)) &&
+		 (msg_hdr.type != GLC_MESSAGE_CLOSE));
 
 finish:
 	ps_packet_destroy(&read);
 
-	if (demux->glc->flags & GLC_CANCEL)
+	if (glc_state_test(demux->glc, GLC_STATE_CANCEL))
 		ps_buffer_cancel(demux->from);
 
 	demux_video_close(demux);
@@ -235,7 +239,7 @@ err:
 	if (ret == EINTR) /* just _cancel() */
 		ret = 0;
 	else
-		util_log(demux->glc, GLC_ERROR, "demux", "%s (%d)", strerror(ret), ret);
+		glc_log(demux->glc, GLC_ERROR, "demux", "%s (%d)", strerror(ret), ret);
 	goto finish;
 }
 
@@ -291,7 +295,7 @@ err:
 		return ret;
 
 	/* since it is EINTR, _cancel() is already done */
-	util_log(demux->glc, GLC_DEBUG, "demux", "video stream %d has quit", ctx->ctx_i);
+	glc_log(demux->glc, GLC_DEBUG, "demux", "video stream %d has quit", ctx->ctx_i);
 	demux_video_ctx_clean(demux, ctx);
 	return 0;
 }
@@ -474,7 +478,7 @@ err:
 	if (ret != EINTR)
 		return ret;
 
-	util_log(demux->glc, GLC_DEBUG, "demux", "audio stream %d has quit", stream->audio_i);
+	glc_log(demux->glc, GLC_DEBUG, "demux", "audio stream %d has quit", stream->audio_i);
 	demux_audio_stream_clean(demux, stream);
 	return 0;
 }

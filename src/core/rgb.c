@@ -22,6 +22,8 @@
 #include <errno.h>
 
 #include "../common/glc.h"
+#include "../common/core.h"
+#include "../common/log.h"
 #include "../common/thread.h"
 #include "../common/util.h"
 #include "rgb.h"
@@ -127,7 +129,7 @@ int rgb_init(rgb_t *rgb, glc_t *glc)
 	(*rgb)->thread.write_callback = &rgb_write_callback;
 	(*rgb)->thread.finish_callback = &rgb_finish_callback;
 	(*rgb)->thread.ptr = *rgb;
-	(*rgb)->thread.threads = util_cpus();
+	(*rgb)->thread.threads = glc_threads_hint(glc);
 
 	return 0;
 }
@@ -170,7 +172,7 @@ void rgb_finish_callback(void *ptr, int err)
 	struct rgb_ctx_s *del;
 
 	if (err)
-		util_log(rgb->glc, GLC_ERROR, "rgb", "%s (%d)", strerror(err), err);
+		glc_log(rgb->glc, GLC_ERROR, "rgb", "%s (%d)", strerror(err), err);
 
 	while (rgb->ctx != NULL) {
 		del = rgb->ctx;
@@ -307,7 +309,7 @@ int rgb_init_lookup(rgb_t rgb)
 	unsigned int Y, Cb, Cr, color;
 	size_t lookup_size = (1 << LOOKUP_BITS) * (1 << LOOKUP_BITS) * (1 << LOOKUP_BITS) * 3;
 
-	util_log(rgb->glc, GLC_INFORMATION, "rgb",
+	glc_log(rgb->glc, GLC_INFORMATION, "rgb",
 		 "using %d bit lookup table (%zd bytes)", LOOKUP_BITS, lookup_size);
 	rgb->lookup_table = malloc(lookup_size);
 
