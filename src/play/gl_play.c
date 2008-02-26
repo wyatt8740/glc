@@ -32,9 +32,10 @@
 #include "../common/thread.h"
 #include "gl_play.h"
 
-struct gl_play_private_s {
+struct gl_play_s {
 	glc_t *glc;
 	glc_thread_t play_thread;
+	int running;
 
 	glc_ctx_i ctx_i;
 	GLenum format;
@@ -58,60 +59,93 @@ struct gl_play_private_s {
 	int cancel;
 };
 
+int gl_play_thread_create_callback(void *ptr, void **threadptr);
 int gl_play_read_callback(glc_thread_state_t *state);
 void gl_play_finish_callback(void *ptr, int err);
 
-int gl_play_create_ctx(struct gl_play_private_s *gl_play);
-int gl_play_update_ctx(struct gl_play_private_s *gl_play);
-int gl_play_update_viewport(struct gl_play_private_s *gl_play, int x, int y,
+int gl_play_create_ctx(gl_play_t gl_play);
+int gl_play_update_ctx(gl_play_t gl_play);
+int gl_play_update_viewport(gl_play_t gl_play, int x, int y,
 			    unsigned int w, unsigned int h);
-int gl_play_toggle_fullscreen(struct gl_play_private_s *gl_play);
+int gl_play_toggle_fullscreen(gl_play_t gl_play);
 
-int gl_play_draw_picture(struct gl_play_private_s *gl_play, char *from);
+int gl_play_draw_picture(gl_play_t gl_play, char *from);
 
-int gl_play_handle_xevents(struct gl_play_private_s *gl_play, glc_thread_state_t *state);
+int gl_play_handle_xevents(gl_play_t gl_play, glc_thread_state_t *state);
 
-void *gl_play_init(glc_t *glc, ps_buffer_t *from, glc_ctx_i ctx)
+int gl_play_init(gl_play_t *gl_play, glc_t *glc)
 {
-	struct gl_play_private_s *gl_play = (struct gl_play_private_s *) malloc(sizeof(struct gl_play_private_s));
-	memset(gl_play, 0, sizeof(struct gl_play_private_s));
+	*gl_play = (gl_play_t) malloc(sizeof(struct gl_play_s));
+	memset(*gl_play, 0, sizeof(struct gl_play_s));
 
-	gl_play->glc = glc;
+	(*gl_play)->glc = glc;
+	(*gl_play)->ctx_i = 1;
+
+	(*gl_play)->play_thread.flags = GLC_THREAD_READ;
+	(*gl_play)->play_thread.ptr = *gl_play;
+	(*gl_play)->play_thread.thread_create_callback = &gl_play_thread_create_callback;
+	(*gl_play)->play_thread.read_callback = &gl_play_read_callback;
+	(*gl_play)->play_thread.finish_callback = &gl_play_finish_callback;
+	(*gl_play)->play_thread.threads = 1;
+
+	return 0;
+}
+
+int gl_play_destroy(gl_play_t gl_play)
+{
+	free(gl_play);
+	return 0;
+}
+
+int gl_play_set_stream_number(gl_play_t gl_play, glc_ctx_i ctx)
+{
 	gl_play->ctx_i = ctx;
+	return 0;
+}
 
-	gl_play->play_thread.flags = GLC_THREAD_READ;
-	gl_play->play_thread.ptr = gl_play;
-	gl_play->play_thread.read_callback = &gl_play_read_callback;
-	gl_play->play_thread.finish_callback = &gl_play_finish_callback;
-	gl_play->play_thread.threads = 1;
+int gl_play_process_start(gl_play_t gl_play, ps_buffer_t *from)
+{
+	int ret;
+	if (gl_play->running)
+		return EAGAIN;
 
-	gl_play->dpy = XOpenDisplay(NULL);
+	if ((ret = glc_thread_create(gl_play->glc, &gl_play->play_thread, from, NULL)))
+		return ret;
+	gl_play->running = 1;
+
+	return 0;
+}
+
+int gl_play_process_wait(gl_play_t gl_play)
+{
+	if (!gl_play->running)
+		return EAGAIN;
+
+	glc_thread_wait(&gl_play->play_thread);
+	gl_play->running = 0;
+
+	return 0;
+}
+
+int gl_play_thread_create_callback(void *ptr, void **threadptr)
+{
+	gl_play_t gl_play = (gl_play_t) ptr;
+
+	if (!gl_play->dpy)
+		gl_play->dpy = XOpenDisplay(NULL);
 
 	if (!gl_play->dpy) {
 		util_log(gl_play->glc, GLC_ERROR, "gl_play",
 			 "can't open display");
-		return NULL;
+		return EAGAIN;
 	}
-
-	if (glc_thread_create(glc, &gl_play->play_thread, from, NULL))
-		return NULL;
-
-	return gl_play;
-}
-
-int gl_play_wait(void *priv)
-{
-	struct gl_play_private_s *gl_play = priv;
-
-	glc_thread_wait(&gl_play->play_thread);
-	free(gl_play);
 
 	return 0;
 }
 
 void gl_play_finish_callback(void *ptr, int err)
 {
-	struct gl_play_private_s *gl_play = (struct gl_play_private_s *) ptr;
+	gl_play_t gl_play = (gl_play_t) ptr;
 
 	if (err)
 		util_log(gl_play->glc, GLC_ERROR, "gl_play",
@@ -126,9 +160,10 @@ void gl_play_finish_callback(void *ptr, int err)
 	}
 
 	XCloseDisplay(gl_play->dpy);
+	gl_play->dpy = NULL;
 }
 
-int gl_play_draw_picture(struct gl_play_private_s *gl_play, char *from)
+int gl_play_draw_picture(gl_play_t gl_play, char *from)
 {
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, gl_play->texture);
@@ -147,15 +182,15 @@ int gl_play_draw_picture(struct gl_play_private_s *gl_play, char *from)
 	return 0;
 }
 
-int gl_play_create_ctx(struct gl_play_private_s *gl_play)
+int gl_play_create_ctx(gl_play_t gl_play)
 {
-	int attribs[] = { GLX_RGBA,
-			  GLX_RED_SIZE, 1,
-			  GLX_GREEN_SIZE, 1,
-			  GLX_BLUE_SIZE, 1,
-			  GLX_DOUBLEBUFFER,
-			  GLX_DEPTH_SIZE, 1,
-			  None };
+	int attribs[] = {GLX_RGBA,
+			 GLX_RED_SIZE, 1,
+			 GLX_GREEN_SIZE, 1,
+			 GLX_BLUE_SIZE, 1,
+			 GLX_DOUBLEBUFFER,
+			 GLX_DEPTH_SIZE, 1,
+			 None};
 	XVisualInfo *visinfo;
 	XSetWindowAttributes winattr;
 
@@ -192,7 +227,7 @@ int gl_play_create_ctx(struct gl_play_private_s *gl_play)
 	return gl_play_update_ctx(gl_play);
 }
 
-int gl_play_update_ctx(struct gl_play_private_s *gl_play)
+int gl_play_update_ctx(gl_play_t gl_play)
 {
 	XSizeHints sizehints;
 
@@ -224,7 +259,7 @@ int gl_play_update_ctx(struct gl_play_private_s *gl_play)
 	return gl_play_update_viewport(gl_play, 0, 0, gl_play->w, gl_play->h);
 }
 
-int gl_play_update_viewport(struct gl_play_private_s *gl_play, int x, int y,
+int gl_play_update_viewport(gl_play_t gl_play, int x, int y,
 			    unsigned int w, unsigned int h)
 {
 	/* make sure old viewport is clear */
@@ -255,7 +290,7 @@ int gl_play_update_viewport(struct gl_play_private_s *gl_play, int x, int y,
 	return 0;
 }
 
-int gl_play_toggle_fullscreen(struct gl_play_private_s *gl_play)
+int gl_play_toggle_fullscreen(gl_play_t gl_play)
 {
 	XClientMessageEvent event;
 
@@ -280,7 +315,7 @@ int gl_play_toggle_fullscreen(struct gl_play_private_s *gl_play)
 	return 0;
 }
 
-int gl_handle_xevents(struct gl_play_private_s *gl_play, glc_thread_state_t *state)
+int gl_handle_xevents(gl_play_t gl_play, glc_thread_state_t *state)
 {
 	XEvent event;
 	XConfigureEvent *ce;
@@ -341,7 +376,7 @@ int gl_handle_xevents(struct gl_play_private_s *gl_play, glc_thread_state_t *sta
 
 int gl_play_read_callback(glc_thread_state_t *state)
 {
-	struct gl_play_private_s *gl_play = (struct gl_play_private_s *) state->ptr;
+	gl_play_t gl_play = (gl_play_t) state->ptr;
 
 	glc_ctx_message_t *ctx_msg;
 	glc_picture_header_t *pic_hdr;

@@ -376,7 +376,7 @@ int play_stream(struct play_s *play)
 	ps_bufferattr_t attr;
 	ps_buffer_t uncompressed_buffer, compressed_buffer,
 		    rgb_buffer, color_buffer, scale_buffer;
-	void *demux;
+	demux_t demux;
 	color_t color;
 	scale_t scale;
 	unpack_t unpack;
@@ -427,6 +427,10 @@ int play_stream(struct play_s *play)
 	if (play->override_color_correction)
 		color_override(color, play->brightness, play->contrast,
 			       play->red_gamma, play->green_gamma, play->blue_gamma);
+	if ((ret = demux_init(&demux, &play->glc)))
+		goto err;
+	demux_set_video_buffer_size(demux, play->uncompressed_size);
+	demux_set_audio_buffer_size(demux, play->uncompressed_size / 10);
 
 	/* construct a pipeline for playback */
 	if ((ret = unpack_process_start(unpack, &compressed_buffer, &uncompressed_buffer)))
@@ -437,7 +441,7 @@ int play_stream(struct play_s *play)
 		goto err;
 	if ((ret = color_process_start(color, &scale_buffer, &color_buffer)))
 		goto err;
-	if ((demux = demux_init(&play->glc, &color_buffer)) == NULL)
+	if ((ret = demux_process_start(demux, &color_buffer)))
 		goto err;
 
 	/* the pipeline is ready - lets give it some data */
@@ -445,7 +449,7 @@ int play_stream(struct play_s *play)
 		goto err;
 
 	/* we've done our part - just wait for the threads */
-	if ((ret = demux_wait(demux)))
+	if ((ret = demux_process_wait(demux)))
 		goto err; /* wait for demux, since when it quits, others should also */
 	if ((ret = color_process_wait(color)))
 		goto err;
@@ -461,6 +465,7 @@ int play_stream(struct play_s *play)
 	rgb_destroy(rgb);
 	scale_destroy(scale);
 	color_destroy(color);
+	demux_destroy(demux);
 
 	ps_buffer_destroy(&compressed_buffer);
 	ps_buffer_destroy(&uncompressed_buffer);
