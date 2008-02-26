@@ -37,7 +37,8 @@ struct yuv4mpeg_s {
 	FILE *to;
 
 	glc_utime_t time;
-	glc_utime_t fps;
+	glc_utime_t fps_usec;
+	double fps;
 
 	unsigned int size;
 	char *prev_pic;
@@ -60,7 +61,8 @@ int yuv4mpeg_init(yuv4mpeg_t *yuv4mpeg, glc_t *glc)
 	memset(*yuv4mpeg, 0, sizeof(struct yuv4mpeg_s));
 
 	(*yuv4mpeg)->glc = glc;
-	(*yuv4mpeg)->fps = 1000000 / 30;
+	(*yuv4mpeg)->fps = 30;
+	(*yuv4mpeg)->fps_usec = 1000000 / (*yuv4mpeg)->fps;
 	(*yuv4mpeg)->filename_format = "video%02d.glc";
 	(*yuv4mpeg)->ctx = 1;
 	(*yuv4mpeg)->interpolate = 1;
@@ -86,7 +88,7 @@ int yuv4mpeg_set_filename(yuv4mpeg_t yuv4mpeg, const char *filename)
 	return 0;
 }
 
-int yuv4mpeg_set_ctx(yuv4mpeg_t yuv4mpeg, glc_ctx_i ctx)
+int yuv4mpeg_set_stream_number(yuv4mpeg_t yuv4mpeg, glc_ctx_i ctx)
 {
 	yuv4mpeg->ctx = ctx;
 	return 0;
@@ -94,7 +96,8 @@ int yuv4mpeg_set_ctx(yuv4mpeg_t yuv4mpeg, glc_ctx_i ctx)
 
 int yuv4mpeg_set_fps(yuv4mpeg_t yuv4mpeg, double fps)
 {
-	yuv4mpeg->fps = 1000000 / fps;
+	yuv4mpeg->fps = fps;
+	yuv4mpeg->fps_usec = 1000000 / fps;
 	return 0;
 }
 
@@ -135,10 +138,18 @@ void yuv4mpeg_finish_callback(void *priv, int err)
 	if (err)
 		util_log(yuv4mpeg->glc, GLC_ERROR, "yuv4mpeg", "%s (%d)", strerror(err), err);
 
+	if (yuv4mpeg->to) {
+		fclose(yuv4mpeg->to);
+		yuv4mpeg->to = NULL;
+	}
+
 	if (yuv4mpeg->prev_pic) {
 		free(yuv4mpeg->prev_pic);
 		yuv4mpeg->prev_pic = NULL;
 	}
+
+	yuv4mpeg->file_count = 0;
+	yuv4mpeg->time = 0;
 }
 
 int yuv4mpeg_read_callback(glc_thread_state_t *state)
@@ -197,11 +208,11 @@ int yuv4mpeg_handle_hdr(yuv4mpeg_t yuv4mpeg, glc_ctx_message_t *ctx_msg)
 
 	/* calculate fps in p/q */
 	/** \todo something more intelligent perhaps... */
-	p = yuv4mpeg->glc->fps;
+	p = yuv4mpeg->fps;
 	q = 1;
-	while ((p != q * yuv4mpeg->glc->fps) && (q < 1000)) {
+	while ((p != q * yuv4mpeg->fps) && (q < 1000)) {
 		q *= 10;
-		p = q * yuv4mpeg->glc->fps;
+		p = q * yuv4mpeg->fps;
 	}
 
 	fprintf(yuv4mpeg->to, "YUV4MPEG2 W%d H%d F%d:%d Ip\n", ctx_msg->w, ctx_msg->h, p, q);
@@ -214,13 +225,13 @@ int yuv4mpeg_handle_pic(yuv4mpeg_t yuv4mpeg, glc_picture_header_t *pic_hdr, char
 		return 0;
 
 	if (yuv4mpeg->time < pic_hdr->timestamp) {
-		while (yuv4mpeg->time + yuv4mpeg->fps < pic_hdr->timestamp) {
+		while (yuv4mpeg->time + yuv4mpeg->fps_usec < pic_hdr->timestamp) {
 			if (yuv4mpeg->interpolate)
 				yuv4mpeg_write_pic(yuv4mpeg, yuv4mpeg->prev_pic);
-			yuv4mpeg->time += yuv4mpeg->fps;
+			yuv4mpeg->time += yuv4mpeg->fps_usec;
 		}
 		yuv4mpeg_write_pic(yuv4mpeg, data);
-		yuv4mpeg->time += yuv4mpeg->fps;
+		yuv4mpeg->time += yuv4mpeg->fps_usec;
 	}
 
 	if (yuv4mpeg->interpolate)
