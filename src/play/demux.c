@@ -50,75 +50,117 @@ struct demux_stream_s {
 	struct demux_stream_s *next;
 };
 
-struct demux_private_s {
+struct demux_s {
 	glc_t *glc;
 	ps_buffer_t *from;
 
 	pthread_t thread;
+	int running;
 
-	ps_bufferattr_t bufferattr;
+	const char *alsa_playback_device;
+
+	ps_bufferattr_t video_bufferattr;
+	ps_bufferattr_t audio_bufferattr;
 
 	struct demux_ctx_s *ctx;
 	struct demux_stream_s *stream;
 };
 
-int demux_close(struct demux_private_s *demux);
+int demux_close(demux_t demux);
 void *demux_thread(void *argptr);
 
-int demux_video_message(struct demux_private_s *demux, glc_message_header_t *header,
+int demux_video_message(demux_t demux, glc_message_header_t *header,
 			char *data, size_t size);
-int demux_video_close(struct demux_private_s *demux);
-int demux_video_get_ctx(struct demux_private_s *demux, glc_ctx_i ctx_i, struct demux_ctx_s **ctx);
-int demux_video_ctx_send(struct demux_private_s *demux, struct demux_ctx_s *ctx,
+int demux_video_close(demux_t demux);
+int demux_video_get_ctx(demux_t demux, glc_ctx_i ctx_i, struct demux_ctx_s **ctx);
+int demux_video_ctx_send(demux_t demux, struct demux_ctx_s *ctx,
 			 glc_message_header_t *header, char *data, size_t size);
-int demux_video_ctx_clean(struct demux_private_s *demux, struct demux_ctx_s *ctx);
+int demux_video_ctx_clean(demux_t demux, struct demux_ctx_s *ctx);
 
-int demux_audio_message(struct demux_private_s *demux, glc_message_header_t *header,
+int demux_audio_message(demux_t demux, glc_message_header_t *header,
 			char *data, size_t size);
-int demux_audio_close(struct demux_private_s *demux);
-int demux_audio_get_stream(struct demux_private_s *demux, glc_audio_i audio_i,
+int demux_audio_close(demux_t demux);
+int demux_audio_get_stream(demux_t demux, glc_audio_i audio_i,
 			   struct demux_stream_s **stream);
-int demux_audio_stream_send(struct demux_private_s *demux, struct demux_stream_s *stream,
+int demux_audio_stream_send(demux_t demux, struct demux_stream_s *stream,
 			 glc_message_header_t *header, char *data, size_t size);
-int demux_audio_stream_clean(struct demux_private_s *demux, struct demux_stream_s *stream);
+int demux_audio_stream_clean(demux_t demux, struct demux_stream_s *stream);
 
-void *demux_init(glc_t *glc, ps_buffer_t *from)
+int demux_init(demux_t *demux, glc_t *glc)
 {
-	pthread_attr_t attr;
-	struct demux_private_s *demux = malloc(sizeof(struct demux_private_s));
-	memset(demux, 0, sizeof(struct demux_private_s));
+	*demux = malloc(sizeof(struct demux_s));
+	memset(*demux, 0, sizeof(struct demux_s));
 
-	demux->glc = glc;
-	demux->from = from;
+	(*demux)->glc = glc;
+	(*demux)->alsa_playback_device = "default";
 
-	ps_bufferattr_init(&demux->bufferattr);
-	/** \todo fix this!!!!!!!!!!! */
-	ps_bufferattr_setsize(&demux->bufferattr, 1024 * 1024 * 10);
+	ps_bufferattr_init(&(*demux)->video_bufferattr);
+	ps_bufferattr_init(&(*demux)->audio_bufferattr);
 
-	pthread_attr_init(&attr);
-	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	ps_bufferattr_setsize(&(*demux)->video_bufferattr, 1024 * 1024 * 10);
+	ps_bufferattr_setsize(&(*demux)->audio_bufferattr, 1024 * 1024 * 1);
 
-	if (pthread_create(&demux->thread, &attr, demux_thread, demux))
-		return NULL;
-
-	pthread_attr_destroy(&attr);
-
-	return demux;
+	return 0;
 }
 
-int demux_wait(void *demuxpriv)
+int demux_destroy(demux_t demux)
 {
-	struct demux_private_s *demux = demuxpriv;
-
-	pthread_join(demux->thread, NULL);
+	ps_bufferattr_destroy(&demux->video_bufferattr);
+	ps_bufferattr_destroy(&demux->audio_bufferattr);
 	free(demux);
 
 	return 0;
 }
 
-int demux_close(struct demux_private_s *demux)
+int demux_set_video_buffer_size(demux_t demux, size_t size)
 {
-	ps_bufferattr_destroy(&demux->bufferattr);
+	return ps_bufferattr_setsize(&demux->video_bufferattr, size);
+}
+
+int demux_set_audio_buffer_size(demux_t demux, size_t size)
+{
+	return ps_bufferattr_setsize(&demux->audio_bufferattr, size);
+}
+
+int demux_set_alsa_playback_device(demux_t demux, const char *device)
+{
+	demux->alsa_playback_device = device;
+	return 0;
+}
+
+int demux_process_start(demux_t demux, ps_buffer_t *from)
+{
+	int ret;
+	pthread_attr_t attr;
+	if (demux->running)
+		return EAGAIN;
+
+	demux->from = from;
+
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	if ((ret = pthread_create(&demux->thread, &attr, demux_thread, demux)))
+		return ret;
+	demux->running = 1;
+
+	pthread_attr_destroy(&attr);
+	return 0;
+}
+
+int demux_process_wait(demux_t demux)
+{
+	if (!demux->running)
+		return EAGAIN;
+
+	pthread_join(demux->thread, NULL);
+	demux->running = 0;
+
+	return 0;
+}
+
+int demux_close(demux_t demux)
+{
 	int ret = 0;
 
 	if (demux->ctx != NULL) {
@@ -138,7 +180,7 @@ int demux_close(struct demux_private_s *demux)
 
 void *demux_thread(void *argptr)
 {
-	struct demux_private_s *demux = (struct demux_private_s *) argptr;
+	demux_t demux = (demux_t ) argptr;
 	glc_message_header_t msg_hdr;
 	size_t data_size;
 	char *data;
@@ -197,7 +239,7 @@ err:
 	goto finish;
 }
 
-int demux_video_message(struct demux_private_s *demux, glc_message_header_t *header,
+int demux_video_message(demux_t demux, glc_message_header_t *header,
 			char *data, size_t size)
 {
 	struct demux_ctx_s *ctx;
@@ -232,7 +274,7 @@ int demux_video_message(struct demux_private_s *demux, glc_message_header_t *hea
 	return 0;
 }
 
-int demux_video_ctx_send(struct demux_private_s *demux, struct demux_ctx_s *ctx,
+int demux_video_ctx_send(demux_t demux, struct demux_ctx_s *ctx,
 			 glc_message_header_t *header, char *data, size_t size)
 {
 	int ret;
@@ -254,7 +296,7 @@ err:
 	return 0;
 }
 
-int demux_video_close(struct demux_private_s *demux)
+int demux_video_close(demux_t demux)
 {
 	struct demux_ctx_s *del;
 
@@ -272,7 +314,7 @@ int demux_video_close(struct demux_private_s *demux)
 	return 0;
 }
 
-int demux_video_get_ctx(struct demux_private_s *demux, glc_ctx_i ctx_i, struct demux_ctx_s **ctx)
+int demux_video_get_ctx(demux_t demux, glc_ctx_i ctx_i, struct demux_ctx_s **ctx)
 {
 	int ret;
 	*ctx = demux->ctx;
@@ -288,7 +330,7 @@ int demux_video_get_ctx(struct demux_private_s *demux, glc_ctx_i ctx_i, struct d
 		memset(*ctx, 0, sizeof(struct demux_ctx_s));
 		(*ctx)->ctx_i = ctx_i;
 
-		if ((ret = ps_buffer_init(&(*ctx)->buffer, &demux->bufferattr)))
+		if ((ret = ps_buffer_init(&(*ctx)->buffer, &demux->video_bufferattr)))
 			return ret;
 		if ((ret = ps_packet_init(&(*ctx)->packet, &(*ctx)->buffer)))
 			return ret;
@@ -303,7 +345,7 @@ int demux_video_get_ctx(struct demux_private_s *demux, glc_ctx_i ctx_i, struct d
 	return 0;
 }
 
-int demux_video_ctx_clean(struct demux_private_s *demux, struct demux_ctx_s *ctx)
+int demux_video_ctx_clean(demux_t demux, struct demux_ctx_s *ctx)
 {
 	int ret;
 	ctx->running = 0;
@@ -317,7 +359,7 @@ int demux_video_ctx_clean(struct demux_private_s *demux, struct demux_ctx_s *ctx
 	return 0;
 }
 
-int demux_audio_message(struct demux_private_s *demux, glc_message_header_t *header,
+int demux_audio_message(demux_t demux, glc_message_header_t *header,
 			char *data, size_t size)
 {
 	struct demux_stream_s *stream;
@@ -352,7 +394,7 @@ int demux_audio_message(struct demux_private_s *demux, glc_message_header_t *hea
 	return 0;
 }
 
-int demux_audio_close(struct demux_private_s *demux)
+int demux_audio_close(demux_t demux)
 {
 	struct demux_stream_s *del;
 
@@ -370,7 +412,7 @@ int demux_audio_close(struct demux_private_s *demux)
 	return 0;
 }
 
-int demux_audio_get_stream(struct demux_private_s *demux, glc_audio_i audio_i,
+int demux_audio_get_stream(demux_t demux, glc_audio_i audio_i,
 			   struct demux_stream_s **stream)
 {
 	int ret;
@@ -387,7 +429,7 @@ int demux_audio_get_stream(struct demux_private_s *demux, glc_audio_i audio_i,
 		memset(*stream, 0, sizeof(struct demux_stream_s));
 		(*stream)->audio_i = audio_i;
 
-		if ((ret = ps_buffer_init(&(*stream)->buffer, &demux->bufferattr)))
+		if ((ret = ps_buffer_init(&(*stream)->buffer, &demux->audio_bufferattr)))
 			return ret;
 		if ((ret = ps_packet_init(&(*stream)->packet, &(*stream)->buffer)))
 			return ret;
@@ -403,7 +445,7 @@ int demux_audio_get_stream(struct demux_private_s *demux, glc_audio_i audio_i,
 	return 0;
 }
 
-int demux_audio_stream_send(struct demux_private_s *demux, struct demux_stream_s *stream,
+int demux_audio_stream_send(demux_t demux, struct demux_stream_s *stream,
 			 glc_message_header_t *header, char *data, size_t size)
 {
 	int ret;
@@ -424,7 +466,7 @@ err:
 	return 0;
 }
 
-int demux_audio_stream_clean(struct demux_private_s *demux, struct demux_stream_s *stream)
+int demux_audio_stream_clean(demux_t demux, struct demux_stream_s *stream)
 {
 	int ret;
 	stream->running = 0;
