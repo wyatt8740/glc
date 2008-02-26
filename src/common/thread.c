@@ -7,9 +7,7 @@
  */
 
 /**
- * \addtogroup common
- *  \{
- * \defgroup thread generic thread
+ * \addtogroup thread
  *  \{
  */
 
@@ -23,6 +21,8 @@
 #include "glc.h"
 #include "thread.h"
 #include "util.h"
+#include "log.h"
+#include "state.h"
 
 /**
  * \brief thread private variables
@@ -44,16 +44,6 @@ struct glc_thread_private_s {
 
 void *glc_thread(void *argptr);
 
-/**
- * \brief create thread
- *
- * Creates thread.threads threads (glc_thread()).
- * \param glc glc
- * \param thread thread information structure
- * \param from buffer where data is read from
- * \param to buffer where data is written to
- * \return 0 on success otherwise an error code
- */
 int glc_thread_create(glc_t *glc, glc_thread_t *thread, ps_buffer_t *from, ps_buffer_t *to)
 {
 	int ret;
@@ -84,7 +74,7 @@ int glc_thread_create(glc_t *glc, glc_thread_t *thread, ps_buffer_t *from, ps_bu
 	for (t = 0; t < thread->threads; t++) {
 		private->running_threads++;
 		if ((ret = pthread_create(&private->pthread_thread[t], &attr, glc_thread, private))) {
-			util_log(private->glc, GLC_ERROR, "glc_thread",
+			glc_log(private->glc, GLC_ERROR, "glc_thread",
 				 "can't create thread: %s (%d)", strerror(ret), ret);
 			private->running_threads--;
 			return ret;
@@ -95,11 +85,6 @@ int glc_thread_create(glc_t *glc, glc_thread_t *thread, ps_buffer_t *from, ps_bu
 	return 0;
 }
 
-/**
- * \brief block until threads have finished and clean up
- * \param thread thread
- * \return 0 on success otherwise an error code
- */
 int glc_thread_wait(glc_thread_t *thread)
 {
 	struct glc_thread_private_s *private = thread->priv;
@@ -108,7 +93,7 @@ int glc_thread_wait(glc_thread_t *thread)
 
 	for (t = 0; t < thread->threads; t++) {
 		if ((ret = pthread_join(private->pthread_thread[t], NULL))) {
-			util_log(private->glc, GLC_ERROR, "glc_thread",
+			glc_log(private->glc, GLC_ERROR, "glc_thread",
 				 "can't join thread: %s (%d)", strerror(ret), ret);
 			return ret;
 		}
@@ -281,7 +266,7 @@ void *glc_thread(void *argptr)
 
 		state.flags = 0;
 		write_size_set = 0;
-	} while ((!(private->glc->flags & GLC_CANCEL)) &&
+	} while ((!glc_state_test(private->glc, GLC_STATE_CANCEL)) &&
 		 (state.header.type != GLC_MESSAGE_CLOSE) &&
 		 (!private->stop));
 
@@ -300,7 +285,7 @@ finish:
 
 		/* error might have happened @ write buffer
 		   so there could be blocking threads */
-		if ((private->glc->flags & GLC_CANCEL) &&
+		if ((glc_state_test(private->glc, GLC_STATE_CANCEL)) &&
 		    (thread->flags & GLC_THREAD_WRITE))
 			ps_buffer_cancel(private->to);
 	}
@@ -337,12 +322,11 @@ err:
 	if (ret == EINTR)
 		ret = 0;
 	else {
-		private->glc->flags |= GLC_CANCEL;
-		util_log(private->glc, GLC_ERROR, "glc_thread", "%s (%d)", strerror(ret), ret);
+		glc_state_set(private->glc, GLC_STATE_CANCEL);
+		glc_log(private->glc, GLC_ERROR, "glc_thread", "%s (%d)", strerror(ret), ret);
 	}
 
 	goto finish;
 }
 
-/**  \} */
 /**  \} */

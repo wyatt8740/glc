@@ -7,189 +7,91 @@
  */
 
 /**
- * \addtogroup common
- *  \{
- * \defgroup util utility functions
+ * \addtogroup util
  *  \{
  */
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <sys/time.h>
 #include <string.h>
 #include <unistd.h>
-#include <time.h>
 #include <errno.h>
-#include <packetstream.h>
-#include <pthread.h>
+#include <time.h>
 
 #include "glc.h"
+#include "core.h"
+#include "log.h"
 #include "util.h"
 
 /**
  * \brief util private structure
  */
-struct util_private_s {
-	glc_t *glc;
-	struct timeval init_time;
-	glc_stime_t timediff;
-	FILE *log_file;
-	pthread_mutex_t log_mutex;
-
-	glc_audio_i audio_streams;
-	pthread_mutex_t audio_streams_mutex;
+struct glc_util_s {
+	double fps;
+	int pid;
 };
-
-int util_app_name(char **path, u_int32_t *path_size);
-int util_utc_date(char **date, u_int32_t *date_size);
-
-void util_write_log_prefix(glc_t *glc, FILE *stream, int level, const char *module);
-
-glc_utime_t util_real_time(glc_t *glc);
-
-/**
- * \brief initialize utilities
- *
- * Initializes utilities and sets global startup time.
- * \param glc glc to attach utilities to
- * \return 0 on success otherwise an error code
- */
-int util_init(glc_t *glc)
-{
-	struct util_private_s *util = malloc(sizeof(struct util_private_s));
-	memset(util, 0, sizeof(struct util_private_s));
-
-	util->glc = glc;
-	gettimeofday(&util->init_time, NULL);
-	util->audio_streams = 0;
-	pthread_mutex_init(&util->log_mutex, NULL);
-	pthread_mutex_init(&util->audio_streams_mutex, NULL);
-
-	glc->util = util;
-	return 0;
-}
-
-/**
- * \brief free utilities
- * \param glc glc
- * \return 0 on success otherwise an error code
- */
-int util_free(glc_t *glc)
-{
-	struct util_private_s *util = (struct util_private_s *) glc->util;
-	pthread_mutex_destroy(&util->log_mutex);
-	pthread_mutex_destroy(&util->audio_streams_mutex);
-	free(util);
-	return 0;
-}
-
-/**
- * \brief current time in microseconds with timediff applied
- *
- * Time is absolute time - startup time - active time difference.
- * \see util_timediff()
- * \param glc glc
- * \return current relative time
- */
-glc_utime_t util_time(glc_t *glc)
-{
-	return util_real_time(glc) - ((struct util_private_s *) glc->util)->timediff;
-}
-
-/**
- * \brief current time in microseconds without timediff
- * \param glc glc
- * \return time elapsed since initialization
- */
-glc_utime_t util_real_time(glc_t *glc)
-{
-	struct util_private_s *util = (struct util_private_s *) glc->util;
-	struct timeval tv;
-
-	gettimeofday(&tv, NULL);
-
-	tv.tv_sec -= util->init_time.tv_sec;
-	tv.tv_usec -= util->init_time.tv_usec;
-
-	if (tv.tv_usec < 0) {
-		tv.tv_sec--;
-		tv.tv_usec += 1000000;
-	}
-
-	return (glc_utime_t) (tv.tv_sec * 1000000 + (glc_utime_t) tv.tv_usec);
-}
-
-/**
- * \brief apply time difference
- *
- * Adds difference to active time difference.
- * \param glc glc
- * \param diff new time difference
- * \return 0 on success otherwise an error code
- */
-int util_timediff(glc_t *glc, glc_stime_t diff)
-{
-	struct util_private_s *util = (struct util_private_s *) glc->util;
-	util_log(glc, GLC_DEBUG, "util", "applying %ld usec time difference", diff);
-	util->timediff += diff;
-	return 0;
-}
-
-/**
- * \brief allocate info structure
- * \param glc glc
- * \return 0 on success otherwise an error code
- */
-int util_create_info(glc_t *glc)
-{
-	glc->info = (glc_stream_info_t *) malloc(sizeof(glc_stream_info_t));
-	memset(glc->info, 0, sizeof(glc_stream_info_t));
-	return 0;
-}
-
-/**
- * \brief initialize info structure based on current capture environment
- * \param glc glc
- * \return 0 on success otherwise an error code
- */
-int util_init_info(glc_t *glc)
-{
-	glc->info->signature = GLC_SIGNATURE;
-	glc->info->version = GLC_STREAM_VERSION;
-	glc->info->flags = 0;
-	glc->info->pid = getpid();
-	glc->info->fps = glc->fps;
-	util_app_name(&glc->info_name, &glc->info->name_size);
-	util_utc_date(&glc->info_date, &glc->info->date_size);
-
-	return 0;
-}
-
-/**
- * \brief free info structure
- * \param glc glc
- * \return 0 on success otherwise an error code
- */
-int util_free_info(glc_t *glc)
-{
-	if (glc->info_name)
-		free(glc->info_name);
-	if (glc->info_date)
-		free(glc->info_date);
-	if (glc->info)
-		free(glc->info);
-	return 0;
-}
 
 /**
  * \brief acquire application name
  *
  * Currently this function resolves /proc/self/exe.
+ * \param glc glc
  * \param path returned application name
  * \param path_size size of name string, including 0
  * \return 0 on success otherwise an error code
  */
-int util_app_name(char **path, u_int32_t *path_size)
+int glc_util_app_name(glc_t *glc, char **path, u_int32_t *path_size);
+
+/**
+ * \brief acquire current date as UTC string
+ * \param glc glc
+ * \param date returned date
+ * \param date_size size of date string, including 0
+ * \return 0 on success otherwise an error code
+ */
+int glc_util_utc_date(glc_t *glc, char **date, u_int32_t *date_size);
+
+int glc_util_init(glc_t *glc)
+{
+	glc->util = (glc_util_t) malloc(sizeof(struct glc_util_s));
+	memset(glc->util, 0, sizeof(struct glc_util_s));
+
+	glc->util->fps = 30;
+	glc->util->pid = getpid();
+
+	return 0;
+}
+
+int glc_util_destroy(glc_t *glc)
+{
+	free(glc->util);
+	return 0;
+}
+
+int glc_util_info_fps(glc_t *glc, double fps)
+{
+	glc->util->fps = fps;
+	return 0;
+}
+
+int glc_util_info_create(glc_t *glc, glc_stream_info_t **stream_info,
+			 char **info_name, char **info_date)
+{
+	*stream_info = (glc_stream_info_t *) malloc(sizeof(glc_stream_info_t));
+
+	(*stream_info)->signature = GLC_SIGNATURE;
+	(*stream_info)->version = GLC_STREAM_VERSION;
+	(*stream_info)->flags = 0;
+	(*stream_info)->pid = glc->util->pid;
+	(*stream_info)->fps = glc->util->fps;
+
+	glc_util_app_name(glc, info_name, &(*stream_info)->name_size);
+	glc_util_utc_date(glc, info_date, &(*stream_info)->date_size);
+
+	return 0;
+}
+
+int glc_util_app_name(glc_t *glc, char **path, u_int32_t *path_size)
 {
 	*path = (char *) malloc(1024);
 	ssize_t len;
@@ -207,13 +109,7 @@ int util_app_name(char **path, u_int32_t *path_size)
 	return 0;
 }
 
-/**
- * \brief acquire current date as UTC string
- * \param date returned date
- * \param date_size size of date string, including 0
- * \return 0 on success otherwise an error code
- */
-int util_utc_date(char **date, u_int32_t *date_size)
+int glc_util_utc_date(glc_t *glc, char **date, u_int32_t *date_size)
 {
 	time_t t = time(NULL);
 	char *strt = ctime(&t);
@@ -228,22 +124,7 @@ int util_utc_date(char **date, u_int32_t *date_size)
 	return 0;
 }
 
-/**
- * \brief number of CPUs in system
- * \return number of online CPUs
- */
-long int util_cpus()
-{
-	return sysconf(_SC_NPROCESSORS_ONLN);
-}
-
-/**
- * \brief write "end of stream" message to buffer
- * \param glc glc
- * \param to buffer where to write close message
- * \return 0 on success otherwise an error code
- */
-int util_write_end_of_stream(glc_t *glc, ps_buffer_t *to)
+int glc_util_write_end_of_stream(glc_t *glc, ps_buffer_t *to)
 {
 	int ret = 0;
 	ps_packet_t packet;
@@ -265,192 +146,40 @@ finish:
 	return ret;
 }
 
-/**
- * \brief give unique audio stream
- * \param glc glc
- * \return unique audio stream number
- */
-glc_audio_i util_audio_stream_id(glc_t *glc)
+int glc_util_log_info(glc_t *glc)
 {
-	struct util_private_s *util = glc->util;
-	glc_audio_i id;
+	char *name, *date;
+	u_int32_t unused;
+	glc_util_app_name(glc, &name, &unused);
+	glc_util_utc_date(glc, &date, &unused);
 
-	pthread_mutex_lock(&util->audio_streams_mutex);
-	id = ++util->audio_streams;
-	pthread_mutex_unlock(&util->audio_streams_mutex);
+	glc_log(glc, GLC_INFORMATION, "util", "system information\n" \
+		"  threads hint = %ld", glc_threads_hint(glc));
 
-	return id;
-}
+	glc_log(glc, GLC_INFORMATION, "util", "stream information\n" \
+		"  signature    = 0x%08x\n" \
+		"  version      = 0x%02x\n" \
+		"  flags        = %d\n" \
+		"  fps          = %f\n" \
+		"  pid          = %d\n" \
+		"  name         = %s\n" \
+		"  date         = %s",
+		GLC_SIGNATURE, GLC_STREAM_VERSION, 0, glc->util->fps,
+		glc->util->pid, name, date);
 
-/**
- * \brief initialize log
- * \param glc glc
- * \return 0 on success otherwise an error code
- */
-int util_log_init(glc_t *glc)
-{
-	struct util_private_s *util = glc->util;
-
-	if (!(util->log_file = fopen(glc->log_file, "w")))
-		return errno;
-
-	util_log(glc, GLC_INFORMATION, "util", "opened %s for log", glc->log_file);
-	return 0;
-}
-
-/**
- * \brief write message to log
- *
- * Message is actually written to log if level is
- * lesser than, or equal to current log verbosity level and
- * logging is enabled.
- *
- * Errors are always written to stderr also.
- * \param glc glc
- * \param level message level
- * \param module module
- * \param format passed to fprintf()
- * \param ... passed to fprintf()
- */
-void util_log(glc_t *glc, int level, const char *module, const char *format, ...)
-{
-	struct util_private_s *util = glc->util;
-	va_list ap;
-
-	if (((!(glc->flags & GLC_LOG)) && (level > GLC_ERROR)) |
-	    (level > glc->log_level))
-		return;
-
-	if ((level <= GLC_ERROR) &&
-	    (!(glc->flags & GLC_NOERR))) {
-		va_start(ap, format);
-
-		util_write_log_prefix(glc, stderr, level, module);
-		vfprintf(stderr, format, ap);
-		fputc('\n', stderr);
-
-		va_end(ap);
-	}
-
-	if (!(glc->flags & GLC_LOG))
-		return;
-
-	va_start(ap, format);
-
-	/* this is highly threaded application and we want
-	   non-corrupted logs */
-	pthread_mutex_lock(&util->log_mutex);
-	util_write_log_prefix(glc, util->log_file, level, module);
-	vfprintf(util->log_file, format, ap);
-	fputc('\n', util->log_file);
-
-	pthread_mutex_unlock(&util->log_mutex);
-
-	va_end(ap);
-}
-
-/**
- * \brief close log
- * \param glc glc
- * \return 0 on success otherwise an error code
- */
-int util_log_close(glc_t *glc)
-{
-	struct util_private_s *util = glc->util;
-
-	if (!(glc->flags & GLC_LOG))
-		return EINVAL;
-
-	util_log(glc, GLC_INFORMATION, "util", "log closed");
-	if (fclose(util->log_file))
-		return errno;
+	free(name);
+	free(date);
 
 	return 0;
 }
 
-/**
- * \brief write glc version information to log
- * \param glc glc
- */
-void util_log_version(glc_t *glc)
+int glc_util_log_version(glc_t *glc)
 {
-	struct util_private_s *util = glc->util;
-
-	if (!(glc->flags & GLC_LOG))
-		return;
-
-	util_write_log_prefix(glc, util->log_file, GLC_INFORMATION, "util");
-	fprintf(util->log_file, "version %s\n", GLC_VERSION);
-
-	if (glc->log_level >= GLC_DEBUG) {
-		util_write_log_prefix(glc, util->log_file, GLC_DEBUG, "util");
-		fprintf(util->log_file, "%s %s, %s\n",
-			__DATE__, __TIME__, __VERSION__);
-	}
+	glc_log(glc, GLC_INFORMATION, "util",
+		"version %s", GLC_VERSION);
+	glc_log(glc, GLC_DEBUG, "util",
+		"%s %s, %s", __DATE__, __TIME__, __VERSION__);
+	return 0;
 }
 
-/**
- * \brief write stream and system information to log
- * \param glc glc
- */
-void util_log_info(glc_t *glc)
-{
-	struct util_private_s *util = glc->util;
-
-	if ((!(glc->flags & GLC_LOG)) | (glc->log_level < GLC_INFORMATION))
-		return;
-
-	util_write_log_prefix(glc, util->log_file, GLC_INFORMATION, "util");
-	fprintf(util->log_file, "system information\n");
-	fprintf(util->log_file, "  processors  = %ld\n", util_cpus());
-
-	util_write_log_prefix(glc, util->log_file, GLC_INFORMATION, "util");
-	fprintf(util->log_file, "stream information\n");
-	fprintf(util->log_file, "  signature   = 0x%08x\n", glc->info->signature);
-	fprintf(util->log_file, "  version     = 0x%02x\n", glc->info->version);
-	fprintf(util->log_file, "  flags       = %d\n", glc->info->flags);
-	fprintf(util->log_file, "  fps         = %f\n", glc->info->fps);
-	fprintf(util->log_file, "  pid         = %d\n", glc->info->pid);
-	fprintf(util->log_file, "  name        = %s\n", glc->info_name);
-	fprintf(util->log_file, "  date        = %s\n", glc->info_date);
-}
-
-/**
- * \brief write standard log prefix to stream
- * \param glc glc
- * \param stream stream
- * \param level message level
- * \param module module
- */
-void util_write_log_prefix(glc_t *glc, FILE *stream, int level, const char *module)
-{
-	const char *level_str = NULL;
-
-	/* human-readable msg level */
-	switch (level) {
-		case GLC_ERROR:
-			level_str = "error";
-			break;
-		case GLC_WARNING:
-			level_str = "warning";
-			break;
-		case GLC_PERFORMANCE:
-			level_str = "perf";
-			break;
-		case GLC_INFORMATION:
-			level_str = "info";
-			break;
-		case GLC_DEBUG:
-			level_str = "dbg";
-			break;
-		default:
-			level_str = "unknown";
-			break;
-	}
-
-	fprintf(stream, "[%7.2fs %10s %5s ] ",
-		(double) util_real_time(glc) / 1000000.0, module, level_str);
-}
-
-/**  \} */
 /**  \} */

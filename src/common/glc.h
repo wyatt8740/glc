@@ -77,15 +77,6 @@ typedef u_int64_t glc_size_t;
 /** flags */
 typedef u_int32_t glc_flags_t;
 
-/** glc is capturing */
-#define GLC_CAPTURE                         0x1
-/** glc is cancelled */
-#define GLC_CANCEL                          0x2
-/** enable log */
-#define GLC_LOG                             0x4
-/** disable writing errors to stderr */
-#define GLC_NOERR                           0x8
-
 /**
  * \brief stream info structure
  *
@@ -116,29 +107,25 @@ typedef struct {
 /** sizeof(glc_stream_info_t) */
 #define GLC_STREAM_INFO_SIZE             32
 
+typedef struct glc_core_s* glc_core_t;
+typedef struct glc_util_s* glc_util_t;
+typedef struct glc_log_s* glc_log_t;
+typedef struct glc_state_s* glc_state_t;
+
 /**
- * \brief global settings
- * \todo separate flags into global, capture, export...
+ * \brief glc structure
  */
 typedef struct {
-	/** active flags */
-	glc_flags_t flags;
-	/** log file */
-	char *log_file;
-	/** log verbosity */
-	int log_level;
-	/** fps */
-	double fps;
-
-	/** util uses this to store internal state */
-	void *util;
-
-	/** stream info structure */
-	glc_stream_info_t *info;
-	/** captured program's name */
-	char *info_name;
-	/** date */
-	char *info_date;
+	/** core internal state */
+	glc_core_t core;
+	/** util internal state */
+	glc_util_t util;
+	/** log internal state */
+	glc_log_t log;
+	/** state internal structure */
+	glc_state_t state;
+	/** state flags */
+	glc_flags_t state_flags;
 } glc_t;
 
 /** error */

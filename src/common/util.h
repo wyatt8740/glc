@@ -2,12 +2,14 @@
  * \file src/common/util.h
  * \brief utility functions interface
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup util
+ * \addtogroup common
+ *  \{
+ * \defgroup util utility functions
  *  \{
  */
 
@@ -18,30 +20,62 @@
 #include <stdarg.h>
 #include "glc.h"
 
-__PUBLIC int util_init(glc_t *glc);
-__PUBLIC int util_free(glc_t *glc);
+/**
+ * \brief initialize utilities
+ * \param glc glc
+ * \return 0 on success otherwise an error code
+ */
+__PRIVATE int glc_util_init(glc_t *glc);
 
-__PUBLIC int util_log_init(glc_t *glc);
-__PUBLIC __attribute__((format(printf, 4, 5)))
-	void util_log(glc_t *glc, int level, const char *module, const char *format, ...);
-__PUBLIC int util_log_close(glc_t *glc);
+/**
+ * \brief destroy utilities
+ * \param glc glc
+ * \return 0 on success otherwise an error code
+ */
+__PRIVATE int glc_util_destroy(glc_t *glc);
 
-__PUBLIC glc_utime_t util_time(glc_t *glc);
-__PUBLIC int util_timediff(glc_t *glc, glc_stime_t diff);
+/**
+ * \brief set fps hint for stream information
+ * \param glc glc
+ * \param fps fps
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int glc_util_info_fps(glc_t *glc, double fps);
 
-__PUBLIC int util_create_info(glc_t *glc);
-__PUBLIC int util_init_info(glc_t *glc);
-__PUBLIC int util_free_info(glc_t *glc);
+/**
+ * \brief create stream information
+ * \param glc glc
+ * \param stream_info returned stream information structure
+ * \param info_name returned application name
+ * \param info_date returned date
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int glc_util_info_create(glc_t *glc, glc_stream_info_t **stream_info,
+				  char **info_name, char **info_date);
 
-__PUBLIC void util_log_version(glc_t *glc);
-__PUBLIC void util_log_info(glc_t *glc);
+/**
+ * \brief write version message into log
+ * \param glc glc
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int glc_util_log_version(glc_t *glc);
 
-__PUBLIC long int util_cpus();
+/**
+ * \brief write system information into log
+ * \param glc glc
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int glc_util_log_info(glc_t *glc);
 
-__PUBLIC glc_audio_i util_audio_stream_id(glc_t *glc);
-
-__PUBLIC int util_write_end_of_stream(glc_t *glc, ps_buffer_t *to);
+/**
+ * \brief write 'end of stream'-packet into buffer
+ * \param glc glc
+ * \param to target buffer
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int glc_util_write_end_of_stream(glc_t *glc, ps_buffer_t *to);
 
 #endif
 
+/**  \} */
 /**  \} */

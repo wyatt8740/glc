@@ -7,7 +7,9 @@
  */
 
 /**
- * \addtogroup thread
+ * \addtogroup common
+ *  \{
+ * \defgroup thread generic thread
  *  \{
  */
 
@@ -106,9 +108,26 @@ typedef struct {
 	void (*finish_callback)(void *, int);
 } glc_thread_t;
 
+/**
+ * \brief create thread
+ *
+ * Creates thread.threads threads (glc_thread()).
+ * \param glc glc
+ * \param thread thread information structure
+ * \param from buffer where data is read from
+ * \param to buffer where data is written to
+ * \return 0 on success otherwise an error code
+ */
 __PUBLIC int glc_thread_create(glc_t *glc, glc_thread_t *thread, ps_buffer_t *from, ps_buffer_t *to);
+
+/**
+ * \brief block until threads have finished and clean up
+ * \param thread thread
+ * \return 0 on success otherwise an error code
+ */
 __PUBLIC int glc_thread_wait(glc_thread_t *thread);
 
 #endif
 
+/**  \} */
 /**  \} */
