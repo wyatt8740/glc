@@ -23,13 +23,14 @@
 #include <sched.h>
 #include <pthread.h>
 
-#include "../common/glc.h"
-#include "../common/core.h"
-#include "../common/log.h"
-#include "../common/util.h"
-#include "../common/state.h"
-#include "../core/pack.h"
-#include "../core/file.h"
+#include <glc/common/glc.h>
+#include <glc/common/core.h>
+#include <glc/common/log.h>
+#include <glc/common/util.h>
+#include <glc/common/state.h>
+#include <glc/core/pack.h>
+#include <glc/core/file.h>
+
 #include "lib.h"
 
 #define MAIN_COMPRESS_NONE         0x2

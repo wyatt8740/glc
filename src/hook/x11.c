@@ -18,13 +18,13 @@
 #include <unistd.h>
 #include <X11/keysym.h>
 
-#include "../common/glc.h"
-#include "../common/core.h"
-#include "../common/log.h"
-#include "../common/state.h"
-#include "../common/util.h"
+#include <glc/common/glc.h>
+#include <glc/common/core.h>
+#include <glc/common/log.h>
+#include <glc/common/state.h>
+#include <glc/common/util.h>
+
 #include "lib.h"
-#include "../capture/gl_capture.h"
 
 struct x11_private_s {
 	glc_t *glc;

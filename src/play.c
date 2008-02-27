@@ -13,25 +13,25 @@
 #include <string.h>
 #include <errno.h>
 
-#include "common/glc.h"
-#include "common/core.h"
-#include "common/log.h"
-#include "common/util.h"
-#include "common/state.h"
+#include <glc/common/glc.h>
+#include <glc/common/core.h>
+#include <glc/common/log.h>
+#include <glc/common/util.h>
+#include <glc/common/state.h>
 
-#include "core/file.h"
-#include "core/pack.h"
-#include "core/rgb.h"
-#include "core/color.h"
-#include "core/info.h"
-#include "core/ycbcr.h"
-#include "core/scale.h"
+#include <glc/core/file.h>
+#include <glc/core/pack.h>
+#include <glc/core/rgb.h>
+#include <glc/core/color.h>
+#include <glc/core/info.h>
+#include <glc/core/ycbcr.h>
+#include <glc/core/scale.h>
 
-#include "export/img.h"
-#include "export/wav.h"
-#include "export/yuv4mpeg.h"
+#include <glc/export/img.h>
+#include <glc/export/wav.h>
+#include <glc/export/yuv4mpeg.h>
 
-#include "play/demux.h"
+#include <glc/play/demux.h>
 
 enum play_action {action_play, action_info, action_img, action_yuv4mpeg, action_wav, action_val};
 

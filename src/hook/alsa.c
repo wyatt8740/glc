@@ -17,12 +17,13 @@
 #include <elfhacks.h>
 #include <alsa/asoundlib.h>
 
-#include "../common/util.h"
-#include "../common/core.h"
-#include "../common/log.h"
+#include <glc/common/util.h>
+#include <glc/common/core.h>
+#include <glc/common/log.h>
+#include <glc/capture/audio_hook.h>
+#include <glc/capture/audio_capture.h>
+
 #include "lib.h"
-#include "../capture/audio_hook.h"
-#include "../capture/audio_capture.h"
 
 struct alsa_capture_stream_s {
 	audio_capture_t capture;

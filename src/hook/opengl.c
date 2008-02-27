@@ -17,13 +17,14 @@
 #include <string.h>
 #include <dlfcn.h>
 
-#include "../common/glc.h"
-#include "../common/core.h"
-#include "../common/log.h"
-#include "../common/util.h"
-#include "../core/scale.h"
-#include "../core/ycbcr.h"
-#include "../capture/gl_capture.h"
+#include <glc/common/glc.h>
+#include <glc/common/core.h>
+#include <glc/common/log.h>
+#include <glc/common/util.h>
+#include <glc/core/scale.h>
+#include <glc/core/ycbcr.h>
+#include <glc/capture/gl_capture.h>
+
 #include "lib.h"
 
 struct opengl_private_s {

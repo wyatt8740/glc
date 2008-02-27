@@ -14,7 +14,6 @@
 #ifndef _LIB_H
 #define _LIB_H
 
-#include "../common/glc.h"
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/extensions/xf86vmode.h>
@@ -23,6 +22,8 @@
 #include <alsa/asoundlib.h>
 #include <packetstream.h>
 #include <pthread.h>
+
+#include <glc/common/glc.h>
 
 #define LIB_CAPTURING    0x1
 
