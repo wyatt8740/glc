@@ -1,5 +1,5 @@
 /**
- * \file src/common/util.h
+ * \file glc/common/util.h
  * \brief utility functions interface
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007-2008

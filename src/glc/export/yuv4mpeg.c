@@ -1,15 +1,13 @@
 /**
- * \file src/export/yuv4mpeg.c
+ * \file glc/export/yuv4mpeg.c
  * \brief yuv4mpeg output
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup export
- *  \{
- * \defgroup yuv4mpeg yuv4mpeg output
+ * \addtogroup yuv4mpeg
  *  \{
  */
 
@@ -250,5 +248,4 @@ int yuv4mpeg_write_pic(yuv4mpeg_t yuv4mpeg, char *pic)
 	return 0;
 }
 
-/**  \} */
 /**  \} */

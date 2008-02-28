@@ -1,13 +1,15 @@
 /**
- * \file src/core/rgb.h
+ * \file glc/core/rgb.h
  * \brief convert Y'CbCr to BGR
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup rgb
+ * \addtogroup core
+ *  \{
+ * \defgroup rgb convert Y'CbCr to BGR
  *  \{
  */
 
@@ -58,4 +60,5 @@ __PUBLIC int rgb_process_wait(rgb_t rgb);
 
 #endif
 
+/**  \} */
 /**  \} */

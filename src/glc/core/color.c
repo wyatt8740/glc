@@ -1,15 +1,13 @@
 /**
- * \file src/core/color.c
+ * \file glc/core/color.c
  * \brief color correction
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup core
- *  \{
- * \defgroup color color correction
+ * \addtogroup color
  *  \{
  */
 
@@ -528,5 +526,4 @@ int color_generate_rgb_lookup_table(color_t color,
 	return 0;
 }
 
-/**  \} */
 /**  \} */

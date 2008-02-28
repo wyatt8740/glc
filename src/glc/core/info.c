@@ -1,15 +1,13 @@
 /**
- * \file src/core/info.c
+ * \file glc/core/info.c
  * \brief stream information
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup core
- *  \{
- * \defgroup info stream information
+ * \addtogroup info
  *  \{
  */
 
@@ -472,5 +470,4 @@ void print_bytes(FILE *stream, size_t bytes)
 		fprintf(stream, "%d B\n", (int) bytes);
 }
 
-/**  \} */
 /**  \} */

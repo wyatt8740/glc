@@ -1,13 +1,15 @@
 /**
- * \file src/export/yuv4mpeg.h
+ * \file glc/export/yuv4mpeg.h
  * \brief yuv4mpeg output
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup yuv4mpeg
+ * \addtogroup export
+ *  \{
+ * \defgroup yuv4mpeg yuv4mpeg output
  *  \{
  */
 
@@ -104,4 +106,5 @@ __PUBLIC int yuv4mpeg_process_wait(yuv4mpeg_t yuv4mpeg);
 
 #endif
 
+/**  \} */
 /**  \} */

@@ -1,13 +1,15 @@
 /**
- * \file src/capture/gl_capture.h
+ * \file glc/capture/gl_capture.h
  * \brief OpenGL capture
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup gl_capture
+ * \addtogroup capture
+ *  \{
+ * \defgroup gl_capture OpenGL capture
  *  \{
  */
 
@@ -169,6 +171,7 @@ __PUBLIC int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable
  */
 __PUBLIC int gl_capture_refresh_color_correction(gl_capture_t gl_capture);
 
-/**  \} */
-
 #endif
+
+/**  \} */
+/**  \} */

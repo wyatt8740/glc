@@ -1,15 +1,13 @@
 /**
- * \file src/play/demux.c
+ * \file glc/play/demux.c
  * \brief audio/picture stream demuxer
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup play
- *  \{
- * \defgroup demux audio/picture stream demuxer
+ * \addtogroup demux
  *  \{
  */
 
@@ -499,5 +497,4 @@ int demux_audio_stream_clean(demux_t demux, struct demux_stream_s *stream)
 	return 0;
 }
 
-/**  \} */
 /**  \} */

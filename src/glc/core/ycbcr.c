@@ -1,15 +1,13 @@
 /**
- * \file src/core/ycbcr.c
+ * \file glc/core/ycbcr.c
  * \brief convert BGR to Y'CbCr and scale
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup core
- *  \{
- * \defgroup ycbcr convert BGR to Y'CbCr and scale
+ * \addtogroup ycbcr
  *  \{
  */
 
@@ -587,5 +585,4 @@ int ycbcr_generate_map(ycbcr_t ycbcr, struct ycbcr_ctx_s *ctx)
 	return 0;
 }
 
-/**  \} */
 /**  \} */

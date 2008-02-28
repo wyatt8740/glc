@@ -1,13 +1,15 @@
 /**
- * \file src/play/gl_play.h
+ * \file glc/play/gl_play.h
  * \brief OpenGL playback
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup gl_play
+ * \addtogroup play
+ *  \{
+ * \defgroup gl_play OpenGL playback
  *  \{
  */
 
@@ -66,4 +68,5 @@ __PUBLIC int gl_play_process_wait(gl_play_t gl_play);
 
 #endif
 
+/**  \} */
 /**  \} */

@@ -1,15 +1,13 @@
 /**
- * \file src/capture/audio_capture.c
+ * \file glc/capture/audio_capture.c
  * \brief audio capture
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup capture
- *  \{
- * \defgroup audio_capture audio capture
+ * \addtogroup audio_capture
  *  \{
  */
 
@@ -477,5 +475,4 @@ int audio_capture_xrun(audio_capture_t audio_capture, int err)
 	return -err;
 }
 
-/**  \} */
 /**  \} */

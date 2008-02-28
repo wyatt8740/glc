@@ -1,5 +1,5 @@
 /**
- * \file src/export/img.c
+ * \file glc/export/img.c
  * \brief export to images
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007-2008
@@ -7,9 +7,7 @@
  */
 
 /**
- * \addtogroup export
- *  \{
- * \defgroup img export to images
+ * \addtogroup img
  *  \{
  */
 
@@ -322,5 +320,4 @@ int img_write_png(img_t img, const unsigned char *pic,
 	return 0;
 }
 
-/**  \} */
 /**  \} */

@@ -1,15 +1,13 @@
 /**
- * \file src/capture/audio_hook.c
+ * \file glc/capture/audio_hook.c
  * \brief audio capture hooks
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup capture
- *  \{
- * \defgroup audio_hook audio capture hooks
+ * \addtogroup audio_hook
  *  \{
  */
 
@@ -706,5 +704,4 @@ int audio_hook_stream_init(audio_hook_t audio_hook, struct audio_hook_stream_s *
 	return 0;
 }
 
-/**  \} */
 /**  \} */

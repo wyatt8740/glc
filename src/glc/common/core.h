@@ -1,5 +1,5 @@
 /**
- * \file src/common/core.h
+ * \file glc/common/core.h
  * \brief glc core interface
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007-2008

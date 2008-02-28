@@ -1,5 +1,5 @@
 /**
- * \file src/common/log.h
+ * \file glc/common/log.h
  * \brief glc log interface
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007-2008

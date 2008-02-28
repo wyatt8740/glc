@@ -1,15 +1,13 @@
 /**
- * \file src/core/file.c
+ * \file glc/core/file.c
  * \brief file io
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup core
- *  \{
- * \defgroup file file io
+ * \addtogroup file
  *  \{
  */
 
@@ -411,5 +409,4 @@ err:
 	return ret;
 }
 
-/**  \} */
 /**  \} */

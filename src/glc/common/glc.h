@@ -1,5 +1,5 @@
 /**
- * \file src/common/glc.h
+ * \file glc/common/glc.h
  * \brief glc types and structures
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007-2008
@@ -28,7 +28,6 @@
 */
 
 /**
- * \defgroup hook wrapper library
  * \defgroup capture capture
  * \defgroup core core
  * \defgroup export export format filters

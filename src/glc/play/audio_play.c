@@ -1,15 +1,13 @@
 /**
- * \file src/play/audio_play.c
+ * \file glc/play/audio_play.c
  * \brief audio playback
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup play
- *  \{
- * \defgroup audio_play audio playback
+ * \addtogroup audio_play
  *  \{
  */
 
@@ -314,5 +312,4 @@ int audio_play_xrun(audio_play_t audio_play, int err)
 	return -err;
 }
 
-/**  \} */
 /**  \} */

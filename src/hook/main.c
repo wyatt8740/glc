@@ -1,8 +1,8 @@
 /**
- * \file src/hook/main.c
+ * \file hook/main.c
  * \brief main wrapper library
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 

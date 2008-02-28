@@ -1,5 +1,5 @@
 /**
- * \file src/common/log.c
+ * \file glc/common/log.c
  * \brief logging
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007-2008

@@ -1,13 +1,15 @@
 /**
- * \file src/export/wav.h
+ * \file glc/export/wav.h
  * \brief export audio to wav
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup wav
+ * \addtogroup export
+ *  \{
+ * \defgroup wav export audio to wav
  *  \{
  */
 
@@ -106,4 +108,5 @@ __PUBLIC int wav_process_wait(wav_t wav);
 
 #endif
 
+/**  \} */
 /**  \} */

@@ -1,13 +1,15 @@
 /**
- * \file src/export/img.h
+ * \file glc/export/img.h
  * \brief export to images
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup img
+ * \addtogroup export
+ *  \{
+ * \defgroup img export to images
  *  \{
  */
 
@@ -107,4 +109,5 @@ __PUBLIC int img_process_wait(img_t img);
 
 #endif
 
+/**  \} */
 /**  \} */

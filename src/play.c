@@ -1,5 +1,5 @@
 /**
- * \file src/play.c
+ * \file play.c
  * \brief stream player
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007-2008

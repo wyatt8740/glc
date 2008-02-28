@@ -1,13 +1,15 @@
 /**
- * \file src/core/file.h
+ * \file glc/core/file.h
  * \brief file io
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup file
+ * \addtogroup core
+ *  \{
+ * \defgroup file file io
  *  \{
  */
 
@@ -177,4 +179,5 @@ __PUBLIC int file_destroy(file_t file);
 
 #endif
 
+/**  \} */
 /**  \} */

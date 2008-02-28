@@ -1,13 +1,15 @@
 /**
- * \file src/capture/audio_capture.h
+ * \file glc/capture/audio_capture.h
  * \brief audio capture
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup audio_capture
+ * \addtogroup capture
+ *  \{
+ * \defgroup audio_capture audio capture
  *  \{
  */
 
@@ -91,4 +93,5 @@ __PUBLIC int audio_capture_destroy(audio_capture_t audio_capture);
 
 #endif
 
+/**  \} */
 /**  \} */

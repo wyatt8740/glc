@@ -1,13 +1,15 @@
 /**
- * \file src/core/scale.h
+ * \file glc/core/scale.h
  * \brief software scaler
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup scale
+ * \addtogroup core
+ *  \{
+ * \defgroup scale software scaler
  *  \{
  */
 
@@ -83,4 +85,5 @@ __PUBLIC int scale_destroy(scale_t scale);
 
 #endif
 
+/**  \} */
 /**  \} */

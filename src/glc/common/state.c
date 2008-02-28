@@ -1,5 +1,5 @@
 /**
- * \file src/common/state.c
+ * \file glc/common/state.c
  * \brief glc state
  * \author Pyry Haulos <pyry.haulos@gmail.com>
  * \date 2007-2008

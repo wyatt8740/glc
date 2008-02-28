@@ -1,15 +1,13 @@
 /**
- * \file src/core/scale.c
+ * \file glc/core/scale.c
  * \brief software scaler
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup core
- *  \{
- * \defgroup scale software scaler
+ * \addtogroup scale
  *  \{
  */
 
@@ -720,5 +718,4 @@ int scale_generate_ycbcr_map(scale_t scale, struct scale_ctx_s *ctx)
 	return 0;
 }
 
-/**  \} */
 /**  \} */

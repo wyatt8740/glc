@@ -1,13 +1,15 @@
 /**
- * \file src/core/pack.h
+ * \file glc/core/pack.h
  * \brief stream compression
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup pack
+ * \addtogroup core
+ *  \{
+ * \defgroup pack stream compression
  *  \{
  */
 
@@ -127,4 +129,5 @@ __PUBLIC int unpack_destroy(unpack_t unpack);
 
 #endif
 
+/**  \} */
 /**  \} */

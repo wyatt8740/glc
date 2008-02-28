@@ -1,13 +1,15 @@
 /**
- * \file src/capture/audio_hook.h
+ * \file glc/capture/audio_hook.h
  * \brief audio capture hooks
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup audio_hook
+ * \addtogroup capture
+ *  \{
+ * \defgroup audio_hook audio capture hooks
  *  \{
  */
 
@@ -149,7 +151,7 @@ __PUBLIC int audio_hook_alsa_n(audio_hook_t audio_hook, snd_pcm_t *pcm, void **b
 /**
  * \brief hook function for snd_pcm_mmap_begin()
  * \code
- * if (snd_pcm_mmap_begin(pcm, areas, offset, frames))
+ * if (snd_pcm_mmap_begin(pcm, areas, offset, frames) >= 0)
  * 	audio_hook_alsa_mmap_begin(audio_hook, pcm, *areas, *offset, *frames);
  * \endcode
  * \param audio_hook audio_hook object
@@ -182,4 +184,5 @@ __PUBLIC int audio_hook_alsa_mmap_commit(audio_hook_t audio_hook, snd_pcm_t *pcm
 
 #endif
 
+/**  \} */
 /**  \} */

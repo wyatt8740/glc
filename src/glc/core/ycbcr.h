@@ -1,13 +1,15 @@
 /**
- * \file src/core/ycbcr.h
+ * \file glc/core/ycbcr.h
  * \brief convert BGR to Y'CbCr and scale
  * \author Pyry Haulos <pyry.haulos@gmail.com>
- * \date 2007
+ * \date 2007-2008
  * For conditions of distribution and use, see copyright notice in glc.h
  */
 
 /**
- * \addtogroup ycbcr
+ * \addtogroup core
+ *  \{
+ * \defgroup ycbcr convert BGR to Y'CbCr and scale
  *  \{
  */
 
@@ -72,4 +74,5 @@ __PUBLIC int ycbcr_destroy(ycbcr_t ycbcr);
 
 #endif
 
+/**  \} */
 /**  \} */
