@@ -82,6 +82,8 @@ __PUBLIC int gl_capture_try_pbo(gl_capture_t gl_capture, int try_pbo);
 
 /**
  * \brief set pixel format
+ *
+ * Default pixel format is GL_BGRA.
  * \param gl_capture gl_capture object
  * \param format pixel format (currently GL_BGR and GL_BGRA are supported)
  * \return 0 on succcess otherwise an error code
