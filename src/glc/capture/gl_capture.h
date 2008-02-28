@@ -46,6 +46,8 @@ __PUBLIC int gl_capture_set_buffer(gl_capture_t gl_capture, ps_buffer_t *buffer)
 
 /**
  * \brief set OpenGL read buffer for capturing
+ *
+ * Default read buffer is GL_FRONT.
  * \param gl_capture gl_capture object
  * \param buffer GL_BACK or GL_FRONT
  * \return 0 on success otherwise an error code
