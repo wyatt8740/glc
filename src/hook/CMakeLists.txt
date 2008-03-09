@@ -1,0 +1,21 @@
+
+SET(HOOK_SRC lib.h
+	     main.c
+	     opengl.c
+	     alsa.c
+	     x11.c)
+
+ADD_LIBRARY(glc-hook SHARED ${HOOK_SRC})
+TARGET_LINK_LIBRARIES(glc-hook glc-core glc-capture elfhacks)
+SET_TARGET_PROPERTIES(glc-hook PROPERTIES
+		      OUTPUT_NAME glc-hook
+		      VERSION ${GLC_VER}
+		      SOVERSION ${GLC_SOVER})
+
+IF (UNIX)
+  IF (NOT MLIBDIR)
+    SET(MLIBDIR "lib")
+  ENDIF (NOT MLIBDIR)
+  INSTALL(TARGETS glc-hook
+  	  LIBRARY DESTINATION ${MLIBDIR})
+ENDIF (UNIX)

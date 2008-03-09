@@ -1,0 +1,29 @@
+
+INCLUDE_DIRECTORIES(${GLC_SOURCE_DIR}/src)
+LINK_DIRECTORIES(${GLC_SOURCE_DIR}/src/glc)
+
+IF (UNIX)
+  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
+ENDIF (UNIX)
+
+IF (BINARIES)
+  ADD_EXECUTABLE(capture capture.c)
+  SET_TARGET_PROPERTIES(capture PROPERTIES
+  			OUTPUT_NAME glc-capture)
+
+  ADD_EXECUTABLE(play play.c)
+  TARGET_LINK_LIBRARIES(play glc-core glc-play glc-export)
+  SET_TARGET_PROPERTIES(play PROPERTIES
+  			OUTPUT_NAME glc-play)
+
+  IF (UNIX)
+    INSTALL(TARGETS capture play
+    	  RUNTIME DESTINATION bin)
+  ENDIF (UNIX)
+ENDIF (BINARIES)
+
+SUBDIRS(glc)
+
+IF (HOOK)
+  SUBDIRS(hook)
+ENDIF (HOOK)
