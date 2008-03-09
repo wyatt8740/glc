@@ -61,18 +61,18 @@ ENDMACRO(ADD_GLC_LIBRARY)
 
 IF (QUICKLZ)
   ADD_DEFINITIONS(-D__QUICKLZ)
-  INCLUDE_DIRECTORIES(../../support/quicklz)
-  SET(QUICKLZ_SRC ../../support/quicklz/quicklz.h
-  		  ../../support/quicklz/quicklz.c)
+  INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/support/quicklz)
+  SET(QUICKLZ_SRC ${PROJECT_SOURCE_DIR}/support/quicklz/quicklz.h
+  		  ${PROJECT_SOURCE_DIR}/support/quicklz/quicklz.c)
 ENDIF (QUICKLZ)
 
 IF (LZO)
   ADD_DEFINITIONS(-D__MINILZO)
-  INCLUDE_DIRECTORIES(../../support/minilzo)
-  SET(LZO_SRC ../../support/minilzo/minilzo.c
-  	      ../../support/minilzo/lzoconf.h
-  	      ../../support/minilzo/lzodefs.h
-  	      ../../support/minilzo/minilzo.h)
+  INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/support/minilzo)
+  SET(LZO_SRC ${PROJECT_SOURCE_DIR}/support/minilzo/minilzo.c
+  	      ${PROJECT_SOURCE_DIR}/support/minilzo/lzoconf.h
+  	      ${PROJECT_SOURCE_DIR}/support/minilzo/lzodefs.h
+  	      ${PROJECT_SOURCE_DIR}/support/minilzo/minilzo.h)
 ENDIF (LZO)
 
 SET(GLC_CORE_SRC "${COMMON_HDR};${CORE_HDR};${COMMON_SRC};${CORE_SRC};${LZO_SRC};${QUICKLZ_SRC}")
