@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # glc-build.sh -- glc build and install script
-# Copyright (C) 2007 Pyry Haulos
+# Copyright (C) 2007-2008 Pyry Haulos
 #
 
 info () {
@@ -94,6 +94,8 @@ if [ "${DESTDIR}" != "" ]; then
 	fi
 fi
 
+[ "${DESTDIR}" == "" ] && DESTDIR="/usr"
+
 SUDOMAKE="sudo make"
 [ -w "${DESTDIR}" ] && SUDOMAKE="make"
 
@@ -102,11 +104,6 @@ ask "  (${DEFAULT_CFLAGS})"
 ask-prompt
 read CFLAGS
 [ "${CFLAGS}" == "" ] && CFLAGS="${DEFAULT_CFLAGS}"
-
-ask "Enter linker optimizations. (-Wl,-O1)"
-ask-prompt
-read LDFLAGS
-[ "${LDFLAGS}" == "" ] && LDFLAGS="-Wl,-O1"
 
 USE_GIT="n"
 ask "Use git (y/n)"
@@ -137,129 +134,171 @@ else
 	unpack glc
 fi
 
+MLIBDIR="lib"
+[ $BUILD64 == 1 ] && MLIBDIR="lib64"
+
 info "Building elfhacks..."
-cd elfhacks
-make CFLAGS="${CFLAGS}" LDFLAGS="${LDFLAGS}" > /dev/null \
-	|| die "Can't compile elfhacks"
+[ -d elfhacks/build ] || mkdir elfhacks/build
+cd elfhacks/build
+cmake .. \
+	-DCMAKE_INSTALL_PREFIX:PATH="${DESTDIR}" \
+	-DCMAKE_C_FLAGS="${CFLAGS}" > /dev/null \
+	-DMLIBDIR="${MLIBDIR}" \
+	|| die "Can't compile elfhacks (cmake failed)"
+make > /dev/null || die "Can't compile elfhacks"
 if [ $BUILD64 == 1 ]; then
-	make CFLAGS="${CFLAGS} -m32" LDFLAGS="${LDFLAGS} -m32" BUILD="build32" > /dev/null \
-		|| die "Can't compile 32-bit elfhacks"
+	cd ..
+	[ -d build32 ] || mkdir build32
+	cd build32
+	cmake .. \
+		-DCMAKE_INSTALL_PREFIX:PATH="${DESTDIR}" \
+		-DCMAKE_C_FLAGS="${CFLAGS} -m32" > /dev/null \
+		-DMLIBDIR="lib32" \
+		|| die "Can't compile 32-bit elfhacks (cmake failed)"
+	make > /dev/null || die "Can't compile 32-bit elfhacks"
 fi
-cd ..
+cd ../..
 
 info "Building packetstream..."
-cd packetstream
-make CFLAGS="${CFLAGS}" LDFLAGS="${LDFLAGS}" > /dev/null \
-	|| die "Can't compile packetstream"
+[ -d packetstream/build ] || mkdir packetstream/build
+cd packetstream/build
+cmake .. \
+	-DCMAKE_INSTALL_PREFIX:PATH="${DESTDIR}" \
+	-DCMAKE_C_FLAGS="${CFLAGS}" > /dev/null \
+	-DMLIBDIR="${MLIBDIR}" \
+	|| die "Can't compile packetstream (cmake failed)"
+make > /dev/null || die "Can't compile packetstream"
 if [ $BUILD64 == 1 ]; then
-	make CFLAGS="${CFLAGS} -m32" LDFLAGS="${LDFLAGS} -m32" BUILD="build32" > /dev/null \
-		|| die "Can't compile 32-bit packetstream"
+	cd ..
+	[ -d build32 ] || mkdir build32
+	cd build32
+	cmake .. \
+		-DCMAKE_INSTALL_PREFIX:PATH="${DESTDIR}" \
+		-DCMAKE_C_FLAGS="${CFLAGS} -m32" > /dev/null \
+		-DMLIBDIR="lib32" \
+		|| die "Can't compile 32-bit packetstream (cmake failed)"
+	make > /dev/null || die "Can't compile 32-bit packetstream"
 fi
-cd ..
+cd ../..
 
 info "Building glc..."
-cd glc
-LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:../elfhacks/build:../packetstream/build" \
-	make \
-	CFLAGS="${CFLAGS} -I../elfhacks/src -I../packetstream/src" \
-	LDFLAGS="${LDFLAGS} -L../elfhacks/build -L../packetstream/build" \
-	> /dev/null || die "Can't compile glc"
+
+export CMAKE_INCLUDE_PATH="${PWD}/elfhacks/src:${PWD}/packetstream/src"
+export CMAKE_LIBRARY_PATH="${PWD}/elfhacks/build/src:${PWD}/packetstream/build/src"
+
+[ -d glc/build ] || mkdir glc/build
+cd glc/build
+
+cmake .. \
+	-DCMAKE_INSTALL_PREFIX:PATH="${DESTDIR}" \
+	-DCMAKE_C_FLAGS="${CFLAGS}" > /dev/null \
+	-DMLIBDIR="${MLIBDIR}" \
+	 || die "Can't compile glc (cmake failed)"
+make > /dev/null || die "Can't compile glc"
 if [ $BUILD64 == 1 ]; then
-	LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:../elfhacks/build32:../packetstream/build32" \
-		make mlib \
-		CFLAGS="${CFLAGS} -m32 -I../elfhacks/src -I../packetstream/src " \
-		LDFLAGS="${LDFLAGS} -m32 -L../elfhacks/build32 -L../packetstream/build32" \
-		BUILD="build32" \
-		> /dev/null || die "Can't compile 32-bit glc"
+	cd ../..
+	export CMAKE_LIBRARY_PATH="${PWD}/elfhacks/build32/src:${PWD}/packetstream/build32/src"
+	[ -d glc/build32 ] || mkdir glc/build32
+	cd glc/build32
+
+	cmake .. \
+		-DCMAKE_INSTALL_PREFIX:PATH="${DESTDIR}" \
+		-DCMAKE_C_FLAGS="${CFLAGS} -m32" > /dev/null \
+		-DBINARIES:BOOL=OFF \
+		-DMLIBDIR="lib32" \
+		|| die "Can't compile 32-bit glc (cmake failed)"
+	make > /dev/null || die "Can't compile 32-bit glc"
 fi
-cd ..
+cd ../..
 
 info "Installing elfhacks..."
-cd elfhacks
+cd elfhacks/build
 if [ $BUILD64 == 1 ]; then
-	$SUDOMAKE install MLIBDIR="lib64" DESTDIR="${DESTDIR}" > /dev/null \
+	$SUDOMAKE install > /dev/null \
 		|| die "Can't install 64-bit elfhacks"
-	$SUDOMAKE install MLIBDIR="lib32" DESTDIR="${DESTDIR}" BUILD="build32" > /dev/null \
+	cd ../build32
+	$SUDOMAKE install > /dev/null \
 		|| die "Can't install 32-bit elfhacks"
 else
-	$SUDOMAKE install DESTDIR="${DESTDIR}" > /dev/null \
+	$SUDOMAKE install > /dev/null \
 		|| die "Can't install elfhacks"
 fi
-cd ..
+cd ../..
 
 info "Installing packetstream..."
-cd packetstream
-
+cd packetstream/build
 if [ $BUILD64 == 1 ]; then
-	$SUDOMAKE install MLIBDIR="lib64" DESTDIR="${DESTDIR}" > /dev/null \
+	$SUDOMAKE install > /dev/null \
 		|| die "Can't install 64-bit packetstream"
-	$SUDOMAKE install MLIBDIR="lib32" DESTDIR="${DESTDIR}" BUILD="build32" > /dev/null \
+	cd ../build32
+	$SUDOMAKE install > /dev/null \
 		|| die "Can't install 32-bit packetstream"
 else
-	$SUDOMAKE install DESTDIR="${DESTDIR}" > /dev/null \
+	$SUDOMAKE install > /dev/null \
 		|| die "Can't install packetstream"
 fi
-cd ..
+cd ../..
 
 info "Installing glc..."
-cd glc
+cd glc/build
 if [ $BUILD64 == 1 ]; then
-	$SUDOMAKE install MLIBDIR="lib64" DESTDIR="${DESTDIR}" > /dev/null \
+	$SUDOMAKE install > /dev/null \
 		|| die "Can't install 64-bit glc"
-	$SUDOMAKE install-mlib MLIBDIR="lib32" DESTDIR="${DESTDIR}" BUILD="build32" > /dev/null \
+	cd ../build32
+	$SUDOMAKE install > /dev/null \
 		|| die "Can't install 32-bit glc"
 else
-	$SUDOMAKE install MLIBDIR="lib" DESTDIR="${DESTDIR}" > /dev/null \
+	$SUDOMAKE install > /dev/null \
 		|| die "Can't install glc"
 fi
-cd ..
+cd ../..
 
 info "Done :)"
 
-LD_LIBRARY_PATH_ADD="${DESTDIR}/usr/lib"
-[ $BUILD64 == 1 ] && LD_LIBRARY_PATH_ADD="${DESTDIR}/usr/lib64:${DESTDIR}/usr/lib32"
+# TODO more complete escape
+RDIR=`echo "${DESTDIR}" | sed 's/ /\\ /g'`
+
+LD_LIBRARY_PATH_ADD="${RDIR}/lib"
+[ $BUILD64 == 1 ] && LD_LIBRARY_PATH_ADD="${RDIR}/lib64:${RDIR}/lib32"
 
 if [ "${DESTDIR}" != "" ]; then
 	info "You may need to add following lines to your .bashrc:"
-	echo "export PATH=\"\${PATH}:${DESTDIR}/usr/bin\""
+	echo "export PATH=\"\${PATH}:${RDIR}/bin\""
 	echo "export LD_LIBRARY_PATH=\"\${LD_LIBRARY_PATH}:${LD_LIBRARY_PATH_ADD}\""
 fi
 
 RM="rm"
 [ -w "${DESTDIR}/usr/bin/glc-play" ] || RM="sudo ${RM}"
 
-# TODO more complete escape
-RDIR=`echo "${DESTDIR}" | sed 's/ /\\ /g'`
-
 info "If you want to remove glc, execute:"
 if [ $BUILD64 == 1 ]; then
 	echo "${RM} \\"
-	echo "${RDIR}/usr/lib64/libglc-core.so* \\"
-	echo "${RDIR}/usr/lib64/libglc-capture.so* \\"
-	echo "${RDIR}/usr/lib64/libglc-play.so* \\"
-	echo "${RDIR}/usr/lib64/libglc-export.so* \\"
-	echo "${RDIR}/usr/lib64/libglc-hook.so* \\"
-	echo "${RDIR}/usr/lib64/libelfhacks.so* \\"
-	echo "${RDIR}/usr/lib64/libpacketstream.so* \\"
-	echo "${RDIR}/usr/lib64/libelfhacks.so* \\"
-	echo "${RDIR}/usr/lib32/libglc-core.so* \\"
-	echo "${RDIR}/usr/lib32/libglc-capture.so* \\"
-	echo "${RDIR}/usr/lib32/libglc-play.so* \\"
-	echo "${RDIR}/usr/lib32/libglc-export.so* \\"
-	echo "${RDIR}/usr/lib32/libglc-hook.so* \\"
-	echo "${RDIR}/usr/lib32/libelfhacks.so* \\"
-	echo "${RDIR}/usr/lib32/libpacketstream.so* \\"
+	echo "${RDIR}/lib64/libglc-core.so* \\"
+	echo "${RDIR}/lib64/libglc-capture.so* \\"
+	echo "${RDIR}/lib64/libglc-play.so* \\"
+	echo "${RDIR}/lib64/libglc-export.so* \\"
+	echo "${RDIR}/lib64/libglc-hook.so* \\"
+	echo "${RDIR}/lib64/libelfhacks.so* \\"
+	echo "${RDIR}/lib64/libpacketstream.so* \\"
+	echo "${RDIR}/lib64/libelfhacks.so* \\"
+	echo "${RDIR}/lib32/libglc-core.so* \\"
+	echo "${RDIR}/lib32/libglc-capture.so* \\"
+	echo "${RDIR}/lib32/libglc-play.so* \\"
+	echo "${RDIR}/lib32/libglc-export.so* \\"
+	echo "${RDIR}/lib32/libglc-hook.so* \\"
+	echo "${RDIR}/lib32/libelfhacks.so* \\"
+	echo "${RDIR}/lib32/libpacketstream.so* \\"
 else
 	echo "${RM} \\"
-	echo "${RDIR}/usr/lib/libglc-core.so* \\"
-	echo "${RDIR}/usr/lib/libglc-capture.so* \\"
-	echo "${RDIR}/usr/lib/libglc-play.so* \\"
-	echo "${RDIR}/usr/lib/libglc-export.so* \\"
-	echo "${RDIR}/usr/lib/libglc-hook.so* \\"
-	echo "${RDIR}/usr/lib/libelfhacks.so* \\"
-	echo "${RDIR}/usr/lib/libpacketstream.so* \\"
+	echo "${RDIR}/lib/libglc-core.so* \\"
+	echo "${RDIR}/lib/libglc-capture.so* \\"
+	echo "${RDIR}/lib/libglc-play.so* \\"
+	echo "${RDIR}/lib/libglc-export.so* \\"
+	echo "${RDIR}/lib/libglc-hook.so* \\"
+	echo "${RDIR}/lib/libelfhacks.so* \\"
+	echo "${RDIR}/lib/libpacketstream.so* \\"
 fi
-echo "${RDIR}/usr/include/elfhacks.h \\"
-echo "${RDIR}/usr/include/packetstream.h \\"
-echo "${RDIR}/usr/bin/glc-capture \\"
-echo "${RDIR}/usr/bin/glc-play"
+echo "${RDIR}/include/elfhacks.h \\"
+echo "${RDIR}/include/packetstream.h \\"
+echo "${RDIR}/bin/glc-capture \\"
+echo "${RDIR}/bin/glc-play"
