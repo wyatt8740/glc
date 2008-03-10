@@ -1,3 +1,7 @@
+0.5.1 (2008/03/10)
+   New CMake build system.
+   Some minor bugfixes.
+
 0.5.0 (2008/02/28)
    Reorganized old core into core, util, state and log parts.
    Filter configuration moved from core. Core now contains only core
