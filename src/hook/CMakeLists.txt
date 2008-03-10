@@ -1,4 +1,10 @@
 
+FIND_PACKAGE(ELFHACKS)
+
+IF (ELFHACKS_FOUND)
+  INCLUDE_DIRECTORIES(${ELFHACKS_INCLUDE_DIR})
+ENDIF (ELFHACKS_FOUND)
+
 SET(HOOK_SRC lib.h
 	     main.c
 	     opengl.c
@@ -6,7 +12,7 @@ SET(HOOK_SRC lib.h
 	     x11.c)
 
 ADD_LIBRARY(glc-hook SHARED ${HOOK_SRC})
-TARGET_LINK_LIBRARIES(glc-hook glc-core glc-capture elfhacks)
+TARGET_LINK_LIBRARIES(glc-hook glc-core glc-capture ${ELFHACKS_LIBRARY} ${PACKETSTREAM_LIBRARY})
 SET_TARGET_PROPERTIES(glc-hook PROPERTIES
 		      OUTPUT_NAME glc-hook
 		      VERSION ${GLC_VER}
