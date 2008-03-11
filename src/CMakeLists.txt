@@ -6,6 +6,7 @@ SET(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake_modules")
 
 IF (UNIX)
   SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
+  ADD_DEFINITIONS("-D_GNU_SOURCE")
 ENDIF (UNIX)
 
 
