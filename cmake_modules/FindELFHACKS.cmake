@@ -1,11 +1,5 @@
 FIND_PATH(ELFHACKS_INCLUDE_DIR elfhacks.h /usr/include /usr/local/include)
-
-FIND_LIBRARY(ELFHACKS_LIBRARY NAMES elfhacks
-			      PATH
-			      /usr/lib
-			      /usr/lib32
-			      /usr/lib64
-			      /usr/local/lib)
+FIND_LIBRARY(ELFHACKS_LIBRARY NAMES elfhacks PATH /usr/lib /usr/local/lib)
 
 IF (ELFHACKS_INCLUDE_DIR AND ELFHACKS_LIBRARY)
    SET(ELFHACKS_FOUND TRUE)

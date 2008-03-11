@@ -142,7 +142,8 @@ info "Building elfhacks..."
 cd elfhacks/build
 cmake .. \
 	-DCMAKE_INSTALL_PREFIX:PATH="${DESTDIR}" \
-	-DCMAKE_C_FLAGS="${CFLAGS}" > /dev/null \
+	-DCMAKE_BUILD_TYPE="Release" \
+	-DCMAKE_C_FLAGS_RELEASE_RELEASE="${CFLAGS}" > /dev/null \
 	-DMLIBDIR="${MLIBDIR}" \
 	|| die "Can't compile elfhacks (cmake failed)"
 make > /dev/null || die "Can't compile elfhacks"
@@ -152,7 +153,8 @@ if [ $BUILD64 == 1 ]; then
 	cd build32
 	cmake .. \
 		-DCMAKE_INSTALL_PREFIX:PATH="${DESTDIR}" \
-		-DCMAKE_C_FLAGS="${CFLAGS} -m32" > /dev/null \
+		-DCMAKE_BUILD_TYPE="Release" \
+		-DCMAKE_C_FLAGS_RELEASE="${CFLAGS} -m32" > /dev/null \
 		-DMLIBDIR="lib32" \
 		|| die "Can't compile 32-bit elfhacks (cmake failed)"
 	make > /dev/null || die "Can't compile 32-bit elfhacks"
@@ -164,7 +166,8 @@ info "Building packetstream..."
 cd packetstream/build
 cmake .. \
 	-DCMAKE_INSTALL_PREFIX:PATH="${DESTDIR}" \
-	-DCMAKE_C_FLAGS="${CFLAGS}" > /dev/null \
+	-DCMAKE_BUILD_TYPE="Release" \
+	-DCMAKE_C_FLAGS_RELEASE="${CFLAGS}" > /dev/null \
 	-DMLIBDIR="${MLIBDIR}" \
 	|| die "Can't compile packetstream (cmake failed)"
 make > /dev/null || die "Can't compile packetstream"
@@ -174,7 +177,8 @@ if [ $BUILD64 == 1 ]; then
 	cd build32
 	cmake .. \
 		-DCMAKE_INSTALL_PREFIX:PATH="${DESTDIR}" \
-		-DCMAKE_C_FLAGS="${CFLAGS} -m32" > /dev/null \
+		-DCMAKE_BUILD_TYPE="Release" \
+		-DCMAKE_C_FLAGS_RELEASE="${CFLAGS} -m32" > /dev/null \
 		-DMLIBDIR="lib32" \
 		|| die "Can't compile 32-bit packetstream (cmake failed)"
 	make > /dev/null || die "Can't compile 32-bit packetstream"
@@ -191,7 +195,8 @@ cd glc/build
 
 cmake .. \
 	-DCMAKE_INSTALL_PREFIX:PATH="${DESTDIR}" \
-	-DCMAKE_C_FLAGS="${CFLAGS}" > /dev/null \
+	-DCMAKE_BUILD_TYPE="Release" \
+	-DCMAKE_C_FLAGS_RELEASE="${CFLAGS}" > /dev/null \
 	-DMLIBDIR="${MLIBDIR}" \
 	 || die "Can't compile glc (cmake failed)"
 make > /dev/null || die "Can't compile glc"
@@ -203,7 +208,8 @@ if [ $BUILD64 == 1 ]; then
 
 	cmake .. \
 		-DCMAKE_INSTALL_PREFIX:PATH="${DESTDIR}" \
-		-DCMAKE_C_FLAGS="${CFLAGS} -m32" > /dev/null \
+		-DCMAKE_BUILD_TYPE="Release" \
+		-DCMAKE_C_FLAGS_RELEASE="${CFLAGS} -m32" > /dev/null \
 		-DBINARIES:BOOL=OFF \
 		-DMLIBDIR="lib32" \
 		|| die "Can't compile 32-bit glc (cmake failed)"

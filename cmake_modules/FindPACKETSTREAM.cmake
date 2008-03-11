@@ -1,11 +1,5 @@
 FIND_PATH(PACKETSTREAM_INCLUDE_DIR packetstream.h /usr/include /usr/local/include)
-
-FIND_LIBRARY(PACKETSTREAM_LIBRARY NAMES packetstream
-				  PATH
-				  /usr/lib
-				  /usr/lib64
-				  /usr/lib32
-				  /usr/local/lib)
+FIND_LIBRARY(PACKETSTREAM_LIBRARY NAMES packetstream PATH /usr/lib /usr/local/lib)
 
 IF (PACKETSTREAM_INCLUDE_DIR AND PACKETSTREAM_LIBRARY)
    SET(PACKETSTREAM_FOUND TRUE)
