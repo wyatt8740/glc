@@ -253,7 +253,7 @@ int audio_play_play(audio_play_t audio_play, glc_audio_header_t *audio_hdr, char
 	if (time + audio_play->silence_threshold + duration < audio_hdr->timestamp)
 		usleep(audio_hdr->timestamp - time - duration);
 	else if (time > audio_hdr->timestamp) {
-		glc_log(audio_play->glc, GLC_WARNING, "audio_play", "dropped packet");
+		glc_log(audio_play->glc, GLC_DEBUG, "audio_play", "dropped packet");
 		return 0;
 	}
 
