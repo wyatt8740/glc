@@ -20,6 +20,10 @@
 #include <stdio.h>
 #include <glc/common/glc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * \brief initialize log
  * \param glc glc
@@ -87,6 +91,10 @@ __PUBLIC int glc_log_close(glc_t *glc);
  */
 __PUBLIC void glc_log(glc_t *glc, int level, const char *module, const char *format, ...)
 	__attribute__((format(printf, 4, 5)));
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

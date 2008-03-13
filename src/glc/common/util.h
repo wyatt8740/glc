@@ -20,6 +20,10 @@
 #include <stdarg.h>
 #include <glc/common/glc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * \brief initialize utilities
  * \param glc glc
@@ -74,6 +78,10 @@ __PUBLIC int glc_util_log_info(glc_t *glc);
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int glc_util_write_end_of_stream(glc_t *glc, ps_buffer_t *to);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

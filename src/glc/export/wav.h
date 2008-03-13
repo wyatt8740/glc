@@ -19,6 +19,10 @@
 #include <packetstream.h>
 #include <glc/common/glc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * \brief wav object
  */
@@ -105,6 +109,10 @@ __PUBLIC int wav_process_start(wav_t wav, ps_buffer_t *from);
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int wav_process_wait(wav_t wav);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

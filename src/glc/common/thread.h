@@ -19,6 +19,10 @@
 #include <packetstream.h>
 #include <glc/common/glc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** currently unused legacy */
 #define GLC_THREAD_UNUSED1                    1
 /** currently unused legacy */
@@ -126,6 +130,10 @@ __PUBLIC int glc_thread_create(glc_t *glc, glc_thread_t *thread, ps_buffer_t *fr
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int glc_thread_wait(glc_thread_t *thread);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

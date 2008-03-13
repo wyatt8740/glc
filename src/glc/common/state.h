@@ -18,6 +18,10 @@
 
 #include <glc/common/glc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** all stream operations should cancel */
 #define GLC_STATE_CANCEL     0x1
 
@@ -108,6 +112,10 @@ __PUBLIC glc_utime_t glc_state_time(glc_t *glc);
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int glc_state_time_add_diff(glc_t *glc, glc_stime_t diff);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

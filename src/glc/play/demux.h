@@ -19,6 +19,10 @@
 #include <packetstream.h>
 #include <glc/common/glc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * \brief demux object
  */
@@ -89,6 +93,10 @@ __PUBLIC int demux_process_start(demux_t demux, ps_buffer_t *from);
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int demux_process_wait(demux_t demux);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

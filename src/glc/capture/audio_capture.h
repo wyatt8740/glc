@@ -19,6 +19,10 @@
 #include <packetstream.h>
 #include <glc/common/glc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * \brief audio_capture object
  */
@@ -90,6 +94,10 @@ __PUBLIC int audio_capture_stop(audio_capture_t audio_capture);
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int audio_capture_destroy(audio_capture_t audio_capture);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

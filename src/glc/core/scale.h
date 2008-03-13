@@ -19,6 +19,10 @@
 #include <packetstream.h>
 #include <glc/common/glc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * \brief scale object
  */
@@ -82,6 +86,10 @@ __PUBLIC int scale_process_wait(scale_t scale);
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int scale_destroy(scale_t scale);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

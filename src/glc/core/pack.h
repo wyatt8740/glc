@@ -19,6 +19,10 @@
 #include <packetstream.h>
 #include <glc/common/glc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * \brief pack object
  */
@@ -126,6 +130,10 @@ __PUBLIC int unpack_process_wait(unpack_t unpack);
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int unpack_destroy(unpack_t unpack);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

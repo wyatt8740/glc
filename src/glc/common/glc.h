@@ -47,6 +47,10 @@
 #include <sys/types.h>
 #include <semaphore.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** always export this object  */
 #define __PUBLIC __attribute__ ((visibility ("default")))
 /** always hide this object */
@@ -306,6 +310,10 @@ typedef struct {
 } glc_container_message_t;
 /** sizeof(glc_container_message_t) */
 #define GLC_CONTAINER_MESSAGE_SIZE        9
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

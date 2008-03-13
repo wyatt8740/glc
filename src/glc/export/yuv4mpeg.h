@@ -19,6 +19,10 @@
 #include <packetstream.h>
 #include <glc/common/glc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * \brief yuv4mpeg object
  */
@@ -103,6 +107,10 @@ __PUBLIC int yuv4mpeg_process_start(yuv4mpeg_t yuv4mpeg, ps_buffer_t *from);
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int yuv4mpeg_process_wait(yuv4mpeg_t yuv4mpeg);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

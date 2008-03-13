@@ -18,6 +18,10 @@
 
 #include <glc/common/glc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * \brief initialize glc
  *
@@ -66,6 +70,10 @@ __PUBLIC long int glc_threads_hint(glc_t *glc);
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int glc_set_threads_hint(glc_t *glc, long int count);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

@@ -20,6 +20,10 @@
 #include <alsa/asoundlib.h>
 #include <glc/common/glc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * \brief audio_hook object
  */
@@ -181,6 +185,10 @@ __PUBLIC int audio_hook_alsa_mmap_begin(audio_hook_t audio_hook, snd_pcm_t *pcm,
  */
 __PUBLIC int audio_hook_alsa_mmap_commit(audio_hook_t audio_hook, snd_pcm_t *pcm,
 					 snd_pcm_uframes_t offset, snd_pcm_uframes_t frames);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

@@ -19,6 +19,10 @@
 #include <glc/common/glc.h>
 #include <packetstream.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * \brief ycbcr object
  */
@@ -71,6 +75,10 @@ __PUBLIC int ycbcr_process_wait(ycbcr_t ycbcr);
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int ycbcr_destroy(ycbcr_t ycbcr);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

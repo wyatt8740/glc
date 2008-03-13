@@ -19,6 +19,10 @@
 #include <packetstream.h>
 #include <glc/common/glc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * \brief audio_play object
  */
@@ -76,6 +80,10 @@ __PUBLIC int audio_play_process_start(audio_play_t audio_play, ps_buffer_t *from
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int audio_play_process_wait(audio_play_t audio_play);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

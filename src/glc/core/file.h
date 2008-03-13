@@ -19,6 +19,10 @@
 #include <packetstream.h>
 #include <glc/common/glc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * \brief file object
  */
@@ -176,6 +180,10 @@ __PUBLIC int file_read(file_t file, ps_buffer_t *to);
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int file_destroy(file_t file);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

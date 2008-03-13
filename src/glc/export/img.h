@@ -19,6 +19,10 @@
 #include <packetstream.h>
 #include <glc/common/glc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** BMP format */
 #define IMG_BMP     0x1
 /** PNG format */
@@ -106,6 +110,10 @@ __PUBLIC int img_process_start(img_t img, ps_buffer_t *from);
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int img_process_wait(img_t img);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

@@ -21,6 +21,10 @@
 #include <packetstream.h>
 #include <glc/common/glc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * \brief gl_capture object
  */
@@ -174,6 +178,10 @@ __PUBLIC int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int gl_capture_refresh_color_correction(gl_capture_t gl_capture);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

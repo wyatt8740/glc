@@ -19,6 +19,10 @@
 #include <packetstream.h>
 #include <glc/common/glc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * \brief color object
  */
@@ -77,6 +81,10 @@ __PUBLIC int color_process_start(color_t color, ps_buffer_t *from, ps_buffer_t *
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int color_process_wait(color_t color);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

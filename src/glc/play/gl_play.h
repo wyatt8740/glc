@@ -19,6 +19,10 @@
 #include <packetstream.h>
 #include <glc/common/glc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * \brief gl_play object
  */
@@ -65,6 +69,10 @@ __PUBLIC int gl_play_process_start(gl_play_t gl_play, ps_buffer_t *from);
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int gl_play_process_wait(gl_play_t gl_play);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 
