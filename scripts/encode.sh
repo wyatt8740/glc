@@ -11,7 +11,8 @@ BITRATE="2000"
 QP="20"
 CRF="18"
 METHOD="qp"
-OUT="video.avi"
+OFORMAT="mp4"
+OUT="video.${OFORMAT}"
 PASSLOG="pass.log"
 AUDIOTMP="audio.mp3.tmp"
 MULTIPASS="no"
@@ -74,9 +75,10 @@ if [ "${MULTIPASS}" == "no" ]; then
 			-ovc x264 \
 			-x264encopts "${X264_OPTS}" \
 			-oac copy \
-			 ${OPTS} \
-			 -of avi \
-			 -o "${OUT}"
+			${OPTS} \
+			-of lavf \
+			-lavfopts format="${OFORMAT}" \
+			-o "${OUT}"
 else
 	glc-play "${FILE}" -o - -y "${CTX}" | \
 		mencoder - \
@@ -86,7 +88,8 @@ else
 			-x264encopts "${X264_OPTS}:pass=1" \
 			-passlogfile "${PASSLOG}" \
 			${OPTS} \
-			-of avi \
+			-of lavf \
+			-lavfopts format="${OFORMAT}" \
 			-o "${OUT}"
 	glc-play "${FILE}" -o - -y "${CTX}" | \
 		mencoder - \
@@ -97,7 +100,8 @@ else
 			-passlogfile "${PASSLOG}" \
 			-oac copy \
 			${OPTS} \
-			-of avi \
+			-of lavf \
+			-lavfopts format="${OFORMAT}" \
 			-o "${OUT}"
 fi
 
