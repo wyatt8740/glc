@@ -642,17 +642,19 @@ int gl_play_read_callback(glc_thread_state_t *state)
 			return EINVAL;
 		}
 
+		/* check if we have to draw this frame */
+		time = glc_state_time(gl_play->glc);
+		if (time > pic_hdr->timestamp + gl_play->fps) {
+			glc_log(gl_play->glc, GLC_DEBUG, "gl_play", "dropped frame");
+			return 0;
+		}
+
 		/* draw first, measure and sleep after */
 		gl_play_draw_picture(gl_play, &state->read_data[GLC_PICTURE_HEADER_SIZE]);
 
 		time = glc_state_time(gl_play->glc);
-
 		if (pic_hdr->timestamp > time)
 			usleep(pic_hdr->timestamp - time);
-		else if (time > pic_hdr->timestamp + gl_play->fps) {
-			glc_log(gl_play->glc, GLC_DEBUG, "gl_play", "dropped frame");
-			return 0;
-		}
 
 		glXSwapBuffers(gl_play->dpy, gl_play->win);
 	}
