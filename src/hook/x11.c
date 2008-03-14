@@ -246,7 +246,7 @@ void get_real_x11()
 
 	return;
 err:
-	fprintf(stderr, "(glc:x11) can't get real X11\n");
+	fprintf(stderr, "(glc) can't get real X11\n");
 	exit(1);
 }
 

@@ -318,7 +318,7 @@ void get_real_alsa()
 	alsa_loaded = 1;
 	return;
 err:
-	fprintf(stderr, "(glc:alsa) can't get real alsa");
+	fprintf(stderr, "(glc) can't get real alsa");
 	exit(1);
 }
 

@@ -142,7 +142,7 @@ void init_glc()
 	glc_log(&mpriv.glc, GLC_DEBUG, "main", "LD_PRELOAD=%s", getenv("LD_PRELOAD"));
 	return;
 err:
-	fprintf(stderr, "glc: %s (%d)\n", strerror(ret), ret);
+	fprintf(stderr, "(glc) %s (%d)\n", strerror(ret), ret);
 	exit(ret); /* glc initialization is critical */
 }
 
@@ -298,7 +298,7 @@ void lib_close()
 	free(mpriv.stream_file);
 	return;
 err:
-	fprintf(stderr, "(glc) cleanup and finish failed\n%s (%d)\n", strerror(ret), ret);
+	fprintf(stderr, "(glc) cleanup: %s (%d)\n", strerror(ret), ret);
 	return;
 }
 

@@ -284,7 +284,7 @@ void get_real_opengl()
 	if (opengl.glXGetProcAddressARB)
 		return;
 err:
-	fprintf(stderr, "(glc:opengl) can't get real OpenGL\n");
+	fprintf(stderr, "(glc) can't get real OpenGL\n");
 	exit(1);
 }
 
