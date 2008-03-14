@@ -416,7 +416,7 @@ void *audio_capture_thread(void *argptr)
 
 			if (read != audio_capture->period_size)
 				glc_log(audio_capture->glc, GLC_WARNING, "audio_capture",
-					 "read %ld, expected %ld", read * audio_capture->bytes_per_frame,
+					 "read %ld, expected %zd", read * audio_capture->bytes_per_frame,
 					 audio_capture->period_size_in_bytes);
 			else if (read < 0)
 				glc_log(audio_capture->glc, GLC_ERROR, "audio_capture",

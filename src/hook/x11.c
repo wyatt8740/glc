@@ -296,6 +296,7 @@ __PUBLIC Bool XCheckWindowEvent(Display *display, Window w, long event_mask, XEv
 
 Bool __x11_XCheckWindowEvent(Display *display, Window w, long event_mask, XEvent *event_return)
 {
+	INIT_GLC
 	Bool ret = x11.XCheckWindowEvent(display, w, event_mask, event_return);
 	if (ret)
 		x11_event(display, event_return);
@@ -322,6 +323,7 @@ __PUBLIC Bool XCheckMaskEvent(Display *display, long event_mask, XEvent *event_r
 
 Bool __x11_XCheckMaskEvent(Display *display, long event_mask, XEvent *event_return)
 {
+	INIT_GLC
 	Bool ret = x11.XCheckMaskEvent(display, event_mask, event_return);
 	if (ret)
 		x11_event(display, event_return);
@@ -335,6 +337,7 @@ __PUBLIC Bool XCheckTypedEvent(Display *display, int event_type, XEvent *event_r
 
 Bool __x11_XCheckTypedEvent(Display *display, int event_type, XEvent *event_return)
 {
+	INIT_GLC
 	Bool ret = x11.XCheckTypedEvent(display, event_type, event_return);
 	if (ret)
 		x11_event(display, event_return);
@@ -348,6 +351,7 @@ __PUBLIC Bool XCheckTypedWindowEvent(Display *display, Window w, int event_type,
 
 Bool __x11_XCheckTypedWindowEvent(Display *display, Window w, int event_type, XEvent *event_return)
 {
+	INIT_GLC
 	Bool ret = x11.XCheckTypedWindowEvent(display, w, event_type, event_return);
 	if (ret)
 		x11_event(display, event_return);
@@ -374,6 +378,7 @@ __PUBLIC Bool XCheckIfEvent(Display *display, XEvent *event_return, Bool (*predi
 
 Bool __x11_XCheckIfEvent(Display *display, XEvent *event_return, Bool (*predicate)(), XPointer arg)
 {
+	INIT_GLC
 	Bool ret = x11.XCheckIfEvent(display, event_return, predicate, arg);
 	if (ret)
 		x11_event(display, event_return);
@@ -401,7 +406,6 @@ __PUBLIC Bool XF86VidModeSetGamma(Display *display, int screen, XF86VidModeGamma
 Bool __x11_XF86VidModeSetGamma(Display *display, int screen, XF86VidModeGamma *Gamma)
 {
 	INIT_GLC
-
 	if (x11.XF86VidModeSetGamma == NULL)
 		return False; /* might not be present */
 
