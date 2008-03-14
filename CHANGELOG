@@ -1,3 +1,8 @@
+0.5.2 (2008/03/14)
+   Implement video playback using power-of-two textures when
+    GL_ARB_texture_non_power_of_two extension is not available.
+   Fix some X11 hooks related segfaults (wine crashing at winex11).
+
 0.5.1 (2008/03/10)
    New CMake build system.
    Some minor bugfixes.

@@ -6,7 +6,7 @@
  */
 
 /* glc.h -- ALSA & OpenGL video capture tool
-  version 0.5.1, March 10th, 2008
+  version 0.5.2, March 14th, 2008
 
   Copyright (C) 2007-2008 Pyry Haulos <pyry.haulos@gmail.com>
 
@@ -61,7 +61,7 @@ extern "C" {
 /** file signature = "GLC" */
 #define GLC_SIGNATURE                0x00434c47
 /** glc version string */
-#define GLC_VERSION                     "0.5.1"
+#define GLC_VERSION                     "0.5.2"
 
 /** unsigned time in microseconds */
 typedef u_int64_t glc_utime_t;
