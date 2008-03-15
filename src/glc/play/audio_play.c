@@ -39,7 +39,7 @@ struct audio_play_s {
 	glc_audio_i audio_i;
 	snd_pcm_t *pcm;
 	const char *device;
-	
+
 	unsigned int channels;
 	unsigned int rate;
 	glc_flags_t flags;
@@ -138,7 +138,7 @@ void audio_play_finish_callback(void *priv, int err)
 	if (err)
 		glc_log(audio_play->glc, GLC_ERROR, "audio_play", "%s (%d)",
 			 strerror(err), err);
-	
+
 	if (audio_play->pcm) {
 		snd_pcm_close(audio_play->pcm);
 		audio_play->pcm = NULL;
@@ -159,7 +159,7 @@ int audio_play_read_callback(glc_thread_state_t *state)
 	else if (state->header.type == GLC_MESSAGE_AUDIO)
 		return audio_play_play(audio_play, (glc_audio_header_t *) state->read_data,
 				       &state->read_data[GLC_AUDIO_HEADER_SIZE]);
-	
+
 	return 0;
 }
 
@@ -187,8 +187,17 @@ int audio_play_hw(audio_play_t audio_play, glc_audio_format_message_t *fmt_msg)
 		access = SND_PCM_ACCESS_RW_NONINTERLEAVED;
 
 	if ((ret = snd_pcm_open(&audio_play->pcm, audio_play->device,
-				SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK)) < 0)
-		goto err;
+				SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK)) < 0) {
+		if (ret != -ENOENT)
+			goto err;
+
+		/* omg... */
+		glc_log(audio_play->glc, GLC_WARNING, "audio_play",
+			"pcm %s not found, trying again...", audio_play->device);
+		if ((ret = snd_pcm_open(&audio_play->pcm, audio_play->device,
+					SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK)) < 0)
+			goto err;
+	}
 	if ((ret = snd_pcm_hw_params_malloc(&hw_params)) < 0)
 		goto err;
 	if ((ret = snd_pcm_hw_params_any(audio_play->pcm, hw_params)) < 0)
@@ -221,11 +230,15 @@ int audio_play_hw(audio_play_t audio_play, glc_audio_format_message_t *fmt_msg)
 
 	audio_play->bufs = (void **) malloc(sizeof(void *) * audio_play->channels);
 
+	glc_log(audio_play->glc, GLC_INFORMATION, "audio_play",
+		"opened pcm %s for playback", audio_play->device);
+
 	snd_pcm_hw_params_free(hw_params);
 	return 0;
 err:
-	glc_log(audio_play->glc, GLC_ERROR, "audio_play", "can't initialize pcm: %s (%d)",
-		 snd_strerror(ret), ret);
+	glc_log(audio_play->glc, GLC_ERROR, "audio_play",
+		"can't initialize pcm %s: %s (%d)",
+		audio_play->device, snd_strerror(ret), ret);
 	if (hw_params)
 		snd_pcm_hw_params_free(hw_params);
 	return -ret;
@@ -245,11 +258,11 @@ int audio_play_play(audio_play_t audio_play, glc_audio_header_t *audio_hdr, char
 			 audio_play->audio_i);
 		return EINVAL;
 	}
-	
+
 	frames = snd_pcm_bytes_to_frames(audio_play->pcm, audio_hdr->size);
 	glc_utime_t time = glc_state_time(audio_play->glc);
 	glc_utime_t duration = (1000000 * frames) / audio_play->rate;
-	
+
 	if (time + audio_play->silence_threshold + duration < audio_hdr->timestamp)
 		usleep(audio_hdr->timestamp - time - duration);
 	else if (time > audio_hdr->timestamp) {
@@ -261,8 +274,8 @@ int audio_play_play(audio_play_t audio_play, glc_audio_header_t *audio_hdr, char
 
 	while (rem > 0) {
 		/* alsa is horrible... */
-		snd_pcm_wait(audio_play->pcm, duration);
-		
+		/*snd_pcm_wait(audio_play->pcm, duration);*/
+
 		if (audio_play->flags & GLC_AUDIO_INTERLEAVED)
 			ret = snd_pcm_writei(audio_play->pcm,
 					    &data[snd_pcm_frames_to_bytes(audio_play->pcm, frames - rem)],
