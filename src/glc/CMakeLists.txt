@@ -26,10 +26,10 @@ SET(CORE_SRC core/color.c
 	     core/scale.c
 	     core/ycbcr.c)
 
-SET(CAPTURE_HDR capture/audio_capture.h
+SET(CAPTURE_HDR capture/alsa_capture.h
 		capture/alsa_hook.h
 		capture/gl_capture.h)
-SET(CAPTURE_SRC capture/audio_capture.c
+SET(CAPTURE_SRC capture/alsa_capture.c
 		capture/alsa_hook.c
 		capture/gl_capture.c)
 

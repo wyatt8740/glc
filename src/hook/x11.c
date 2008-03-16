@@ -140,7 +140,7 @@ void x11_event(Display *dpy, XEvent *event)
 				return;
 
 			if (lib.flags & LIB_CAPTURING) { /* stop */
-				alsa_capture_stop();
+				alsa_capture_stop_all();
 				opengl_capture_stop();
 
 				lib.flags &= ~LIB_CAPTURING;
@@ -154,10 +154,10 @@ void x11_event(Display *dpy, XEvent *event)
 							 strerror(ret), ret);
 						return; /* don't set GLC_CAPTURE flag */
 					}
-					alsa_capture_start();
+					alsa_capture_start_all();
 					opengl_capture_start();
 				} else {
-					alsa_capture_start();
+					alsa_capture_start_all();
 					opengl_capture_start();
 				}
 

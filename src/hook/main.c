@@ -110,7 +110,7 @@ void init_glc()
 	if (lib.flags & LIB_CAPTURING) {
 		if ((ret = start_glc()))
 			goto err;
-		alsa_capture_start();
+		alsa_capture_start_all();
 		opengl_capture_start();
 	}
 

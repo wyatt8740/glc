@@ -21,12 +21,12 @@
 #include <glc/common/core.h>
 #include <glc/common/log.h>
 #include <glc/capture/alsa_hook.h>
-#include <glc/capture/audio_capture.h>
+#include <glc/capture/alsa_capture.h>
 
 #include "lib.h"
 
 struct alsa_capture_stream_s {
-	audio_capture_t capture;
+	alsa_capture_t capture;
 	char *device;
 	unsigned int channels;
 	unsigned int rate;
@@ -162,10 +162,10 @@ int alsa_start(ps_buffer_t *buffer)
 
 	/* start capture streams */
 	while (stream != NULL) {
-		audio_capture_init(&stream->capture, alsa.glc);
-		audio_capture_set_device(stream->capture, stream->device);
-		audio_capture_set_rate(stream->capture, stream->rate);
-		audio_capture_set_channels(stream->capture, stream->channels);
+		alsa_capture_init(&stream->capture, alsa.glc);
+		alsa_capture_set_device(stream->capture, stream->device);
+		alsa_capture_set_rate(stream->capture, stream->rate);
+		alsa_capture_set_channels(stream->capture, stream->channels);
 
 		stream = stream->next;
 	}
@@ -194,7 +194,7 @@ int alsa_close()
 		alsa.capture_stream = alsa.capture_stream->next;
 
 		if (del->capture)
-			audio_capture_destroy(del->capture);
+			alsa_capture_destroy(del->capture);
 
 		free(del->device);
 		free(del);
@@ -203,7 +203,7 @@ int alsa_close()
 	return 0;
 }
 
-int alsa_capture_stop()
+int alsa_capture_stop_all()
 {
 	struct alsa_capture_stream_s *stream = alsa.capture_stream;
 
@@ -212,7 +212,7 @@ int alsa_capture_stop()
 
 	while (stream != NULL) {
 		if (stream->capture)
-			audio_capture_start(stream->capture);
+			alsa_capture_start(stream->capture);
 		stream = stream->next;
 	}
 
@@ -223,7 +223,7 @@ int alsa_capture_stop()
 	return 0;
 }
 
-int alsa_capture_start()
+int alsa_capture_start_all()
 {
 	struct alsa_capture_stream_s *stream = alsa.capture_stream;
 
@@ -232,7 +232,7 @@ int alsa_capture_start()
 
 	while (stream != NULL) {
 		if (stream->capture)
-			audio_capture_start(stream->capture);
+			alsa_capture_start(stream->capture);
 		stream = stream->next;
 	}
 
