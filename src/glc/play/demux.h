@@ -77,9 +77,9 @@ __PUBLIC int demux_set_alsa_playback_device(demux_t demux, const char *device);
  * \brief start demux process
  *
  * demux demuxes glc stream. For each video and audio stream is
- * created own gl_play/audio_play object and stream buffer.
+ * created own gl_play/alsa_play object and stream buffer.
  *
- * demux takes care of initializing and cleaning up gl_play/audio_play
+ * demux takes care of initializing and cleaning up gl_play/alsa_play
  * objects.
  * \param demux demux object
  * \param from source buffer

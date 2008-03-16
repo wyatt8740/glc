@@ -28,7 +28,7 @@
 
 #include "demux.h"
 #include "gl_play.h"
-#include "audio_play.h"
+#include "alsa_play.h"
 
 struct demux_ctx_s {
 	glc_ctx_i ctx_i;
@@ -47,7 +47,7 @@ struct demux_stream_s {
 	ps_packet_t packet;
 
 	int running;
-	audio_play_t audio_play;
+	alsa_play_t alsa_play;
 
 	struct demux_stream_s *next;
 };
@@ -215,7 +215,7 @@ void *demux_thread(void *argptr)
 		if ((msg_hdr.type == GLC_MESSAGE_CLOSE) |
 		    (msg_hdr.type == GLC_MESSAGE_AUDIO_FORMAT) |
 		    (msg_hdr.type == GLC_MESSAGE_AUDIO)) {
-			/* handle msg to audio_play */
+			/* handle msg to alsa_play */
 			demux_audio_message(demux, &msg_hdr, data, data_size);
 		}
 
@@ -442,15 +442,15 @@ int demux_audio_get_stream(demux_t demux, glc_audio_i audio_i,
 		if ((ret = ps_packet_init(&(*stream)->packet, &(*stream)->buffer)))
 			return ret;
 
-		if ((ret = audio_play_init(&(*stream)->audio_play, demux->glc)))
+		if ((ret = alsa_play_init(&(*stream)->alsa_play, demux->glc)))
 			return ret;
-		if ((ret = audio_play_set_stream_number((*stream)->audio_play,
+		if ((ret = alsa_play_set_stream_number((*stream)->alsa_play,
 							(*stream)->audio_i)))
 			return ret;
-		if ((ret = audio_play_set_alsa_playback_device((*stream)->audio_play,
+		if ((ret = alsa_play_set_alsa_playback_device((*stream)->alsa_play,
 							       demux->alsa_playback_device)))
 			return ret;
-		if ((ret = audio_play_process_start((*stream)->audio_play,
+		if ((ret = alsa_play_process_start((*stream)->alsa_play,
 						    &(*stream)->buffer)))
 			return ret;
 		(*stream)->running = 1;
@@ -487,9 +487,9 @@ int demux_audio_stream_clean(demux_t demux, struct demux_stream_s *stream)
 	int ret;
 	stream->running = 0;
 
-	if ((ret = audio_play_process_wait(stream->audio_play)))
+	if ((ret = alsa_play_process_wait(stream->alsa_play)))
 		return ret;
-	audio_play_destroy(stream->audio_play);
+	alsa_play_destroy(stream->alsa_play);
 
 	ps_packet_destroy(&stream->packet);
 	ps_buffer_destroy(&stream->buffer);

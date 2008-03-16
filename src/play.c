@@ -371,7 +371,7 @@ int play_stream(struct play_s *play)
 	 rgb -(rgb)->               does conversion to BGR
 	 scale -(scale)->           does rescaling
 	 color -(color)->           applies color correction
-	 demux -(...)-> gl_play, audio_play
+	 demux -(...)-> gl_play, alsa_play
 
 	 Each filter, except demux and file, has glc_threads_hint(glc) worker
 	 threads. Packet order in stream is preserved. Demux creates
