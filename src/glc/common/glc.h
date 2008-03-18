@@ -220,7 +220,7 @@ typedef struct {
 	glc_video_format_t format;
 } glc_video_format_message_t;
 /** sizeof(glc_video_format_message_t) */
-#define GLC_CTX_MESSAGE_SIZE             17
+#define GLC_VIDEO_FORMAT_MESSAGE_SIZE    17
 
 /** double-word aligned rows (GL_PACK_ALIGNMENT = 8) */
 #define GLC_VIDEO_DWORD_ALIGNED         0x1
