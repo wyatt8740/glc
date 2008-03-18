@@ -50,9 +50,12 @@ struct gl_play_s {
 	GLenum format;
 	unsigned int w, h;
 	unsigned int pack_alignment;
-	glc_utime_t last, fps;
+	glc_utime_t last;
 	size_t row;
 	size_t bpp;
+
+	glc_utime_t sleep_threshold;
+	glc_utime_t skip_threshold;
 
 	Display *dpy;
 	Window win;
@@ -100,6 +103,8 @@ int gl_play_init(gl_play_t *gl_play, glc_t *glc)
 
 	(*gl_play)->glc = glc;
 	(*gl_play)->ctx_i = 1;
+	(*gl_play)->sleep_threshold = 100; /* 100us */
+	(*gl_play)->skip_threshold = 25000; /* 25ms */
 
 	(*gl_play)->play_thread.flags = GLC_THREAD_READ;
 	(*gl_play)->play_thread.ptr = *gl_play;
@@ -644,7 +649,7 @@ int gl_play_read_callback(glc_thread_state_t *state)
 
 		/* check if we have to draw this frame */
 		time = glc_state_time(gl_play->glc);
-		if (time > pic_hdr->timestamp + gl_play->fps) {
+		if (time > pic_hdr->timestamp + gl_play->skip_threshold) {
 			glc_log(gl_play->glc, GLC_DEBUG, "gl_play", "dropped frame");
 			return 0;
 		}
@@ -652,8 +657,11 @@ int gl_play_read_callback(glc_thread_state_t *state)
 		/* draw first, measure and sleep after */
 		gl_play_draw_picture(gl_play, &state->read_data[GLC_PICTURE_HEADER_SIZE]);
 
+		/* wait until actual drawing is done */
+		glFinish();
+
 		time = glc_state_time(gl_play->glc);
-		if (pic_hdr->timestamp > time)
+		if (pic_hdr->timestamp > time + gl_play->sleep_threshold)
 			usleep(pic_hdr->timestamp - time);
 
 		glXSwapBuffers(gl_play->dpy, gl_play->win);
