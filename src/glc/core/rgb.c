@@ -79,14 +79,14 @@ unsigned char YCbCrJPEG_TO_RGB_Bd(unsigned char Y, unsigned char Cb, unsigned ch
 	return CLAMP_256(B);
 }
 
-struct rgb_ctx_s {
-	glc_ctx_i ctx_i;
+struct rgb_video_stream_s {
+	glc_stream_id_t id;
 	unsigned int w, h;
 	int convert;
 	size_t size;
 	
 	pthread_rwlock_t update;
-	struct rgb_ctx_s *next;
+	struct rgb_video_stream_s *next;
 };
 
 struct rgb_s {
@@ -96,22 +96,22 @@ struct rgb_s {
 
 	unsigned char *lookup_table;
 
-	struct rgb_ctx_s *ctx;
+	struct rgb_video_stream_s *ctx;
 };
 
 int rgb_read_callback(glc_thread_state_t *state);
 int rgb_write_callback(glc_thread_state_t *state);
 void rgb_finish_callback(void *ptr, int err);
 
-void rgb_get_ctx(rgb_t rgb, glc_ctx_i ctx_i,
-		struct rgb_ctx_s **ctx);
+void rgbget_video_stream(rgb_t rgb, glc_stream_id_t id,
+		struct rgb_video_stream_s **ctx);
 
-int rgb_ctx_msg(rgb_t rgb, glc_ctx_message_t *ctx_msg);
-int rgb_convert(rgb_t rgb, struct rgb_ctx_s *ctx,
+int rgb_video_format_message(rgb_t rgb, glc_video_format_message_t *video_format_message);
+int rgb_convert(rgb_t rgb, struct rgb_video_stream_s *ctx,
 		unsigned char *from, unsigned char *to);
 
 int rgb_init_lookup(rgb_t rgb);
-int rgb_convert_lookup(rgb_t rgb, struct rgb_ctx_s *ctx,
+int rgb_convert_lookup(rgb_t rgb, struct rgb_video_stream_s *ctx,
 		       unsigned char *from, unsigned char *to);
 
 int rgb_init(rgb_t *rgb, glc_t *glc)
@@ -168,7 +168,7 @@ int rgb_process_wait(rgb_t rgb)
 void rgb_finish_callback(void *ptr, int err)
 {
 	rgb_t rgb = (rgb_t) ptr;
-	struct rgb_ctx_s *del;
+	struct rgb_video_stream_s *del;
 
 	if (err)
 		glc_log(rgb->glc, GLC_ERROR, "rgb", "%s (%d)", strerror(err), err);
@@ -185,21 +185,21 @@ void rgb_finish_callback(void *ptr, int err)
 int rgb_read_callback(glc_thread_state_t *state)
 {
 	rgb_t rgb = (rgb_t) state->ptr;
-	struct rgb_ctx_s *ctx;
-	glc_picture_header_t *pic_hdr;
+	struct rgb_video_stream_s *ctx;
+	glc_video_data_header_t *pic_hdr;
 
-	if (state->header.type == GLC_MESSAGE_CTX)
-		rgb_ctx_msg(rgb, (glc_ctx_message_t *) state->read_data);
+	if (state->header.type == GLC_MESSAGE_VIDEO_FORMAT)
+		rgb_video_format_message(rgb, (glc_video_format_message_t *) state->read_data);
 
-	if (state->header.type == GLC_MESSAGE_PICTURE) {
-		pic_hdr = (glc_picture_header_t *) state->read_data;
-		rgb_get_ctx(rgb, pic_hdr->ctx, &ctx);
+	if (state->header.type == GLC_MESSAGE_VIDEO_DATA) {
+		pic_hdr = (glc_video_data_header_t *) state->read_data;
+		rgbget_video_stream(rgb, pic_hdr->id, &ctx);
 		state->threadptr = ctx;
 
 		pthread_rwlock_rdlock(&ctx->update);
 
 		if (ctx->convert)
-			state->write_size = GLC_PICTURE_HEADER_SIZE + ctx->size;
+			state->write_size = GLC_VIDEO_DATA_HEADER_SIZE + ctx->size;
 		else {
 			state->flags |= GLC_THREAD_COPY;
 			pthread_rwlock_unlock(&ctx->update);
@@ -213,84 +213,83 @@ int rgb_read_callback(glc_thread_state_t *state)
 int rgb_write_callback(glc_thread_state_t *state)
 {
 	rgb_t rgb = (rgb_t) state->ptr;
-	struct rgb_ctx_s *ctx = state->threadptr;
+	struct rgb_video_stream_s *ctx = state->threadptr;
 
-	memcpy(state->write_data, state->read_data, GLC_PICTURE_HEADER_SIZE);
+	memcpy(state->write_data, state->read_data, GLC_VIDEO_DATA_HEADER_SIZE);
 	rgb_convert_lookup(rgb, ctx,
-		    (unsigned char *) &state->read_data[GLC_PICTURE_HEADER_SIZE],
-		    (unsigned char *) &state->write_data[GLC_PICTURE_HEADER_SIZE]);
+		    (unsigned char *) &state->read_data[GLC_VIDEO_DATA_HEADER_SIZE],
+		    (unsigned char *) &state->write_data[GLC_VIDEO_DATA_HEADER_SIZE]);
 	pthread_rwlock_unlock(&ctx->update);
 
 	return 0;
 }
 
-void rgb_get_ctx(rgb_t rgb, glc_ctx_i ctx_i,
-		struct rgb_ctx_s **ctx)
+void rgbget_video_stream(rgb_t rgb, glc_stream_id_t id,
+		struct rgb_video_stream_s **ctx)
 {
 	*ctx = rgb->ctx;
 
 	while (*ctx != NULL) {
-		if ((*ctx)->ctx_i == ctx_i)
+		if ((*ctx)->id == id)
 			break;
 		*ctx = (*ctx)->next;
 	}
 
 	if (*ctx == NULL) {
-		*ctx = malloc(sizeof(struct rgb_ctx_s));
-		memset(*ctx, 0, sizeof(struct rgb_ctx_s));
+		*ctx = malloc(sizeof(struct rgb_video_stream_s));
+		memset(*ctx, 0, sizeof(struct rgb_video_stream_s));
 		
 		(*ctx)->next = rgb->ctx;
 		rgb->ctx = *ctx;
-		(*ctx)->ctx_i = ctx_i;
+		(*ctx)->id = id;
 		pthread_rwlock_init(&(*ctx)->update, NULL);
 	}
 }
 
-int rgb_ctx_msg(rgb_t rgb, glc_ctx_message_t *ctx_msg)
+int rgb_video_format_message(rgb_t rgb, glc_video_format_message_t *video_format_message)
 {
-	struct rgb_ctx_s *ctx;
-	rgb_get_ctx(rgb, ctx_msg->ctx, &ctx);
+	struct rgb_video_stream_s *video;
+	rgbget_video_stream(rgb, video_format_message->id, &video);
 
-	if (!(ctx_msg->flags & GLC_CTX_YCBCR_420JPEG))
+	if (!(video_format_message->flags & GLC_VIDEO_YCBCR_420JPEG))
 		return 0; /* just don't convert */
 	
-	pthread_rwlock_wrlock(&ctx->update);
+	pthread_rwlock_wrlock(&video->update);
 
-	ctx->w = ctx_msg->w;
-	ctx->h = ctx_msg->h;
-	ctx->size = ctx->w * ctx->h * 3; /* convert to BGR */
-	ctx->convert = 1;
+	video->w = video_format_message->width;
+	video->h = video_format_message->height;
+	video->size = video->w * video->h * 3; /* convert to BGR */
+	video->convert = 1;
 
-	ctx_msg->flags &= ~GLC_CTX_YCBCR_420JPEG;
-	ctx_msg->flags |= GLC_CTX_BGR;
+	video_format_message->format = GLC_VIDEO_BGR;
 
-	pthread_rwlock_unlock(&ctx->update);
+	pthread_rwlock_unlock(&video->update);
 
 	return 0;
 }
 
-int rgb_convert(rgb_t rgb, struct rgb_ctx_s *ctx,
+int rgb_convert(rgb_t rgb, struct rgb_video_stream_s *video,
 		unsigned char *from, unsigned char *to)
 {
 	unsigned int x, y, Cpix;
 	unsigned char *Y, *Cb, *Cr;
 
 	Y = from;
-	Cb = &from[ctx->h * ctx->w];
-	Cr = &from[ctx->h * ctx->w + (ctx->h / 2) * (ctx->w / 2)];
+	Cb = &from[video->h * video->w];
+	Cr = &from[video->h * video->w + (video->h / 2) * (video->w / 2)];
 	Cpix = 0;
 
 #define CONVERT(xadd, yrgbadd, yadd) 								  \
-	to[((x + (xadd)) + ((ctx->h - y) + (yrgbadd)) * ctx->w) * 3 + 2] = 			  \
-		YCbCrJPEG_TO_RGB_Rd(Y[(x + (xadd)) + (y + (yadd)) * ctx->w], Cb[Cpix], Cr[Cpix]); \
-	to[((x + (xadd)) + ((ctx->h - y) + (yrgbadd)) * ctx->w) * 3 + 1] = 			  \
-		YCbCrJPEG_TO_RGB_Gd(Y[(x + (xadd)) + (y + (yadd)) * ctx->w], Cb[Cpix], Cr[Cpix]); \
-	to[((x + (xadd)) + ((ctx->h - y) + (yrgbadd)) * ctx->w) * 3 + 0] = 			  \
-		YCbCrJPEG_TO_RGB_Bd(Y[(x + (xadd)) + (y + (yadd)) * ctx->w], Cb[Cpix], Cr[Cpix]);
+	to[((x + (xadd)) + ((video->h - y) + (yrgbadd)) * video->w) * 3 + 2] = 			  \
+		YCbCrJPEG_TO_RGB_Rd(Y[(x + (xadd)) + (y + (yadd)) * video->w], Cb[Cpix], Cr[Cpix]); \
+	to[((x + (xadd)) + ((video->h - y) + (yrgbadd)) * video->w) * 3 + 1] = 			  \
+		YCbCrJPEG_TO_RGB_Gd(Y[(x + (xadd)) + (y + (yadd)) * video->w], Cb[Cpix], Cr[Cpix]); \
+	to[((x + (xadd)) + ((video->h - y) + (yrgbadd)) * video->w) * 3 + 0] = 			  \
+		YCbCrJPEG_TO_RGB_Bd(Y[(x + (xadd)) + (y + (yadd)) * video->w], Cb[Cpix], Cr[Cpix]);
 
 	/* YCBCR_420JPEG frame dimensions are always divisible by two */
-	for (y = 0; y < ctx->h; y += 2) {
-		for (x = 0; x < ctx->w; x += 2) {
+	for (y = 0; y < video->h; y += 2) {
+		for (x = 0; x < video->w; x += 2) {
 			CONVERT(0, -1, 0)
 			CONVERT(1, -1, 0)
 			CONVERT(0, -2, 1)
@@ -326,7 +325,7 @@ int rgb_init_lookup(rgb_t rgb)
 	return 0;
 }
 
-int rgb_convert_lookup(rgb_t rgb, struct rgb_ctx_s *ctx,
+int rgb_convert_lookup(rgb_t rgb, struct rgb_video_stream_s *video,
 		       unsigned char *from, unsigned char *to)
 {
 	unsigned int x, y, Cpix;
@@ -334,23 +333,23 @@ int rgb_convert_lookup(rgb_t rgb, struct rgb_ctx_s *ctx,
 	unsigned char *Y, *Cb, *Cr;
 
 	Y = from;
-	Cb = &from[ctx->h * ctx->w];
-	Cr = &from[ctx->h * ctx->w + (ctx->h / 2) * (ctx->w / 2)];
+	Cb = &from[video->h * video->w];
+	Cr = &from[video->h * video->w + (video->h / 2) * (video->w / 2)];
 	Cpix = 0;
 
 #define CONVERT(xadd, yrgbadd, yadd) 						\
-	color = LOOKUP_POS(Y[(x + (xadd)) + (y + (yadd)) * ctx->w],		\
+	color = LOOKUP_POS(Y[(x + (xadd)) + (y + (yadd)) * video->w],		\
 			   Cb[Cpix], Cr[Cpix]);					\
-	to[((x + (xadd)) + ((ctx->h - y) + (yrgbadd)) * ctx->w) * 3 + 2] =	\
+	to[((x + (xadd)) + ((video->h - y) + (yrgbadd)) * video->w) * 3 + 2] =	\
 		rgb->lookup_table[color + 0];					\
-	to[((x + (xadd)) + ((ctx->h - y) + (yrgbadd)) * ctx->w) * 3 + 1] =	\
+	to[((x + (xadd)) + ((video->h - y) + (yrgbadd)) * video->w) * 3 + 1] =	\
 		rgb->lookup_table[color + 1];					\
-	to[((x + (xadd)) + ((ctx->h - y) + (yrgbadd)) * ctx->w) * 3 + 0] =	\
+	to[((x + (xadd)) + ((video->h - y) + (yrgbadd)) * video->w) * 3 + 0] =	\
 		rgb->lookup_table[color + 2];
 
 	/* YCBCR_420JPEG frame dimensions are always divisible by two */
-	for (y = 0; y < ctx->h; y += 2) {
-		for (x = 0; x < ctx->w; x += 2) {
+	for (y = 0; y < video->h; y += 2) {
+		for (x = 0; x < video->w; x += 2) {
 			CONVERT(0, -1, 0)
 			CONVERT(1, -1, 0)
 			CONVERT(0, -2, 1)
