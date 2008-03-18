@@ -28,9 +28,11 @@ SET(CORE_SRC core/color.c
 
 SET(CAPTURE_HDR capture/alsa_capture.h
 		capture/alsa_hook.h
+		capture/audio_capture.h
 		capture/gl_capture.h)
 SET(CAPTURE_SRC capture/alsa_capture.c
 		capture/alsa_hook.c
+		capture/audio_capture.c
 		capture/gl_capture.c)
 
 SET(PLAY_HDR play/alsa_play.h

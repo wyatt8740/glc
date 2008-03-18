@@ -337,7 +337,8 @@ int gl_capture_destroy(gl_capture_t gl_capture)
 
 		if (del->pbo)
 			gl_capture_destroy_pbo(gl_capture, del);
-		
+
+		ps_packet_destroy(&del->packet);
 		free(del);
 	}
 
