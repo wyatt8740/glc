@@ -28,7 +28,7 @@ extern "C" {
 /**
  * \brief video stream object
  */
-typedef struct glc_state_ctx_s* glc_state_ctx_t;
+typedef struct glc_state_video_s* glc_state_video_t;
 
 /**
  * \brief audio stream object
@@ -52,21 +52,21 @@ __PUBLIC int glc_state_destroy(glc_t *glc);
 /**
  * \brief acquire a new video stream
  * \param glc glc
- * \param ctx_i returned video stream number
- * \param ctx returned video stream object
+ * \param id returned video stream identifier
+ * \param video returned video stream object
  * \return 0 on success otherwise an error code
  */
-__PUBLIC int glc_state_ctx_new(glc_t *glc, glc_ctx_i *ctx_i,
-			       glc_state_ctx_t *ctx);
+__PUBLIC int glc_state_video_new(glc_t *glc, glc_stream_id_t *id,
+				 glc_state_video_t *video);
 
 /**
  * \brief acquire a new audio stream
  * \param glc glc
- * \param audio_i returned audio stream number
+ * \param id returned audio stream identifier
  * \param audio returned audio stream object
  * \return 0 on success otherwise an error code
  */
-__PUBLIC int glc_state_audio_new(glc_t *glc, glc_audio_i *audio_i,
+__PUBLIC int glc_state_audio_new(glc_t *glc, glc_stream_id_t *id,
 				 glc_state_audio_t *audio);
 
 /**

@@ -21,14 +21,14 @@
 #include "log.h"
 #include "state.h"
 
-struct glc_state_ctx_s {
-	glc_ctx_i ctx_i;
+struct glc_state_video_s {
+	glc_stream_id_t id;
 
-	struct glc_state_ctx_s *next;
+	struct glc_state_video_s *next;
 };
 
 struct glc_state_audio_s {
-	glc_audio_i audio_i;
+	glc_stream_id_t id;
 
 	struct glc_state_audio_s *next;
 };
@@ -39,13 +39,13 @@ struct glc_state_s {
 	pthread_rwlock_t time_rwlock;
 	glc_stime_t time_difference;
 
-	pthread_rwlock_t ctx_rwlock;
-	struct glc_state_ctx_s *ctx;
-	glc_ctx_i ctx_count;
+	pthread_rwlock_t video_rwlock;
+	struct glc_state_video_s *video;
+	glc_stream_id_t video_count;
 
 	pthread_rwlock_t audio_rwlock;
 	struct glc_state_audio_s *audio;
-	glc_audio_i audio_count;
+	glc_stream_id_t audio_count;
 };
 
 int glc_state_init(glc_t *glc)
@@ -57,7 +57,7 @@ int glc_state_init(glc_t *glc)
 	pthread_rwlock_init(&glc->state->state_rwlock, NULL);
 	pthread_rwlock_init(&glc->state->time_rwlock, NULL);
 
-	pthread_rwlock_init(&glc->state->ctx_rwlock, NULL);
+	pthread_rwlock_init(&glc->state->video_rwlock, NULL);
 	pthread_rwlock_init(&glc->state->audio_rwlock, NULL);
 
 	return 0;
@@ -65,14 +65,14 @@ int glc_state_init(glc_t *glc)
 
 int glc_state_destroy(glc_t *glc)
 {
-	struct glc_state_ctx_s *ctx_del;
+	struct glc_state_video_s *video_del;
 	struct glc_state_audio_s *audio_del;
 
-	while (glc->state->ctx != NULL) {
-		ctx_del = glc->state->ctx;
-		glc->state->ctx = glc->state->ctx->next;
+	while (glc->state->video != NULL) {
+		video_del = glc->state->video;
+		glc->state->video = glc->state->video->next;
 
-		free(ctx_del);
+		free(video_del);
 	}
 
 	while (glc->state->audio != NULL) {
@@ -85,7 +85,7 @@ int glc_state_destroy(glc_t *glc)
 	pthread_rwlock_destroy(&glc->state->state_rwlock);
 	pthread_rwlock_destroy(&glc->state->time_rwlock);
 
-	pthread_rwlock_destroy(&glc->state->ctx_rwlock);
+	pthread_rwlock_destroy(&glc->state->video_rwlock);
 	pthread_rwlock_destroy(&glc->state->audio_rwlock);
 
 	free(glc->state);
@@ -94,35 +94,35 @@ int glc_state_destroy(glc_t *glc)
 	return 0;
 }
 
-int glc_state_ctx_new(glc_t *glc, glc_ctx_i *ctx_i,
-		      glc_state_ctx_t *ctx)
+int glc_state_video_new(glc_t *glc, glc_stream_id_t *id,
+			glc_state_video_t *video)
 {
-	*ctx = (glc_state_ctx_t) malloc(sizeof(struct glc_state_ctx_s));
-	memset(*ctx, 0, sizeof(struct glc_state_ctx_s));
+	*video = (glc_state_video_t) malloc(sizeof(struct glc_state_video_s));
+	memset(*video, 0, sizeof(struct glc_state_video_s));
 
-	pthread_rwlock_wrlock(&glc->state->ctx_rwlock);
-	(*ctx)->ctx_i = ++glc->state->ctx_count;
-	(*ctx)->next = glc->state->ctx;
-	glc->state->ctx = *ctx;
-	pthread_rwlock_unlock(&glc->state->ctx_rwlock);
+	pthread_rwlock_wrlock(&glc->state->video_rwlock);
+	(*video)->id = ++glc->state->video_count;
+	(*video)->next = glc->state->video;
+	glc->state->video = *video;
+	pthread_rwlock_unlock(&glc->state->video_rwlock);
 
-	*ctx_i = (*ctx)->ctx_i;
+	*id = (*video)->id;
 	return 0;
 }
 
-int glc_state_audio_new(glc_t *glc, glc_audio_i *audio_i,
+int glc_state_audio_new(glc_t *glc, glc_stream_id_t *id,
 			glc_state_audio_t *audio)
 {
 	*audio = (glc_state_audio_t) malloc(sizeof(struct glc_state_audio_s));
 	memset(*audio, 0, sizeof(struct glc_state_audio_s));
 
 	pthread_rwlock_wrlock(&glc->state->audio_rwlock);
-	(*audio)->audio_i = ++glc->state->audio_count;
+	(*audio)->id = ++glc->state->audio_count;
 	(*audio)->next = glc->state->audio;
 	glc->state->audio = *audio;
 	pthread_rwlock_unlock(&glc->state->audio_rwlock);
 
-	*audio_i = (*audio)->audio_i;
+	*id = (*audio)->id;
 	return 0;
 }
 
