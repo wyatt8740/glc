@@ -13,8 +13,8 @@
  *  \{
  */
 
-#ifndef _AUDIO_PLAY_H
-#define _AUDIO_PLAY_H
+#ifndef _ALSA_PLAY_H
+#define _ALSA_PLAY_H
 
 #include <packetstream.h>
 #include <glc/common/glc.h>

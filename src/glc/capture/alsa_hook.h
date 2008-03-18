@@ -13,8 +13,8 @@
  *  \{
  */
 
-#ifndef _AUDIO_HOOK_H
-#define _AUDIO_HOOK_H
+#ifndef _ALSA_HOOK_H
+#define _ALSA_HOOK_H
 
 #include <packetstream.h>
 #include <alsa/asoundlib.h>

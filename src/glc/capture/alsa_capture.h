@@ -13,8 +13,8 @@
  *  \{
  */
 
-#ifndef _AUDIO_CAPTURE_H
-#define _AUDIO_CAPTURE_H
+#ifndef _ALSA_CAPTURE_H
+#define _ALSA_CAPTURE_H
 
 #include <packetstream.h>
 #include <glc/common/glc.h>
