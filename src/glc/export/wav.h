@@ -65,10 +65,10 @@ __PUBLIC int wav_set_filename(wav_t wav, const char *filename);
  * Only audio from one audio stream will be written. Default
  * stream number is 1.
  * \param wav wav object
- * \param audio audio stream number
+ * \param id audio stream id
  * \return 0 on success otherwise an error code
  */
-__PUBLIC int wav_set_stream_number(wav_t wav, glc_audio_i audio);
+__PUBLIC int wav_set_stream_id(wav_t wav, glc_stream_id_t id);
 
 /**
  * \brief set interpolation

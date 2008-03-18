@@ -54,7 +54,7 @@ struct wav_s {
 	glc_thread_t thread;
 	int running;
 
-	glc_audio_i audio_i;
+	glc_stream_id_t id;
 	int interpolate;
 
 	unsigned int file_count;
@@ -78,7 +78,7 @@ int wav_read_callback(glc_thread_state_t *state);
 void wav_finish_callback(void *priv, int err);
 
 int wav_write_hdr(wav_t wav, glc_audio_format_message_t *fmt_msg);
-int wav_write_audio(wav_t wav, glc_audio_header_t *audio_msg, char *data);
+int wav_write_audio(wav_t wav, glc_audio_data_header_t *audio_msg, char *data);
 
 int wav_init(wav_t *wav, glc_t *glc)
 {
@@ -89,7 +89,7 @@ int wav_init(wav_t *wav, glc_t *glc)
 
 	(*wav)->filename_format = "audio%02d.wav";
 	(*wav)->silence_threshold = 200000; /* 0.2s */
-	(*wav)->audio_i = 1;
+	(*wav)->id = 1;
 	(*wav)->interpolate = 1;
 
 	(*wav)->silence_size = 1024;
@@ -148,9 +148,9 @@ int wav_set_filename(wav_t wav, const char *filename)
 	return 0;
 }
 
-int wav_set_stream_number(wav_t wav, glc_audio_i audio)
+int wav_set_stream_id(wav_t wav, glc_stream_id_t id)
 {
-	wav->audio_i = audio;
+	wav->id = id;
 	return 0;
 }
 
@@ -181,8 +181,8 @@ int wav_read_callback(glc_thread_state_t *state)
 
 	if (state->header.type == GLC_MESSAGE_AUDIO_FORMAT)
 		return wav_write_hdr(wav, (glc_audio_format_message_t *) state->read_data);
-	else if (state->header.type == GLC_MESSAGE_AUDIO)
-		return wav_write_audio(wav, (glc_audio_header_t *) state->read_data, &state->read_data[GLC_AUDIO_HEADER_SIZE]);
+	else if (state->header.type == GLC_MESSAGE_AUDIO_DATA)
+		return wav_write_audio(wav, (glc_audio_data_header_t *) state->read_data, &state->read_data[GLC_AUDIO_DATA_HEADER_SIZE]);
 	
 	return 0;
 }
@@ -192,24 +192,24 @@ int wav_write_hdr(wav_t wav, glc_audio_format_message_t *fmt_msg)
 	int sample_size;
 	char *filename;
 
-	if (fmt_msg->audio != wav->audio_i)
+	if (fmt_msg->id != wav->id)
 		return 0;
 	
-	if (fmt_msg->flags & GLC_AUDIO_S16_LE)
+	if (fmt_msg->format == GLC_AUDIO_S16_LE)
 		sample_size = 2;
-	else if (fmt_msg->flags & GLC_AUDIO_S24_LE)
+	else if (fmt_msg->format == GLC_AUDIO_S24_LE)
 		sample_size = 3;
-	else if (fmt_msg->flags & GLC_AUDIO_S32_LE)
+	else if (fmt_msg->format == GLC_AUDIO_S32_LE)
 		sample_size = 4;
 	else {
 		glc_log(wav->glc, GLC_ERROR, "wav",
-			 "unsupported format 0x%02x (stream %d)", fmt_msg->flags, fmt_msg->audio);
+			 "unsupported format 0x%02x (stream %d)", fmt_msg->flags, fmt_msg->id);
 		return ENOTSUP;
 	}
 
 	if (wav->to) {
 		glc_log(wav->glc, GLC_ERROR, "wav",
-			 "configuration update msg to stream %d", fmt_msg->audio);
+			 "configuration update msg to stream %d", fmt_msg->id);
 		fclose(wav->to);
 	}
 	
@@ -250,26 +250,26 @@ int wav_write_hdr(wav_t wav, glc_audio_format_message_t *fmt_msg)
 	return 0;
 }
 
-int wav_write_audio(wav_t wav, glc_audio_header_t *audio_hdr, char *data)
+int wav_write_audio(wav_t wav, glc_audio_data_header_t *audio_hdr, char *data)
 {
 	size_t need_silence, write_silence;
 	unsigned int c;
 	size_t samples, s;
 
-	if (audio_hdr->audio != wav->audio_i)
+	if (audio_hdr->id != wav->id)
 		return 0;
 	
 	glc_utime_t duration = (audio_hdr->size * 1000000) / wav->bps;
 
 	if (!wav->to) {
-		glc_log(wav->glc, GLC_ERROR, "wav", "broken stream %d", audio_hdr->audio);
+		glc_log(wav->glc, GLC_ERROR, "wav", "broken stream %d", audio_hdr->id);
 		return EINVAL;
 	}
 
 	wav->time += duration;
 
-	if (wav->time + wav->silence_threshold < audio_hdr->timestamp) {
-		need_silence = ((audio_hdr->timestamp - wav->time) * wav->bps) / 1000000;
+	if (wav->time + wav->silence_threshold < audio_hdr->time) {
+		need_silence = ((audio_hdr->time - wav->time) * wav->bps) / 1000000;
 		need_silence -= need_silence % (wav->sample_size * wav->channels);
 
 		wav->time += (need_silence * 1000000) / wav->bps;
