@@ -196,7 +196,7 @@ typedef struct {
 #define GLC_QUICKLZ_HEADER_SIZE           9
 
 /** video format type */
-typedef u_int8_t video_format_t;
+typedef u_int8_t glc_video_format_t;
 /** 24bit BGR, last row first */
 #define GLC_VIDEO_BGR                   0x1
 /** 32bit BGRA, last row first */
