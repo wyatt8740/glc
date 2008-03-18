@@ -221,8 +221,8 @@ int pack_read_callback(glc_thread_state_t *state)
 
 	/* compress only audio and pictures */
 	if ((state->read_size > pack->compress_min) &&
-	    ((state->header.type == GLC_MESSAGE_PICTURE) |
-	     (state->header.type == GLC_MESSAGE_AUDIO))) {
+	    ((state->header.type == GLC_MESSAGE_VIDEO_DATA) |
+	     (state->header.type == GLC_MESSAGE_AUDIO_DATA))) {
 		if (pack->compression == PACK_QUICKLZ) {
 #ifdef __QUICKLZ
 			state->write_size = GLC_CONTAINER_MESSAGE_SIZE
