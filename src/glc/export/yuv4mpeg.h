@@ -66,7 +66,7 @@ __PUBLIC int yuv4mpeg_set_filename(yuv4mpeg_t yuv4mpeg, const char *filename);
  * \param ctx video stream number
  * \return 0 on success otherwise an error code
  */
-__PUBLIC int yuv4mpeg_set_stream_number(yuv4mpeg_t yuv4mpeg, glc_ctx_i ctx);
+__PUBLIC int yuv4mpeg_set_stream_id(yuv4mpeg_t yuv4mpeg, glc_stream_id_t id);
 
 /**
  * \brief set fps
