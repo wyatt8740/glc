@@ -82,6 +82,18 @@ __PUBLIC int audio_capture_set_channels(audio_capture_t audio_capture,
 					u_int32_t channels);
 
 /**
+ * \brief ignore time
+ *
+ * If glc state time is ignored, audio_capture uses internal time which
+ * is incremented by (written frames)/rate seconds each time data is captured.
+ * \param audio_capture audio_capture object
+ * \param ignore_time 1 means state time is ignored,
+ *		      0 enables regular time calculations
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int audio_capture_ignore_time(audio_capture_t audio_capture, int ignore_time);
+
+/**
  * \brief start capturing
  *
  * If capturing is not active, all submitted data is discarded.

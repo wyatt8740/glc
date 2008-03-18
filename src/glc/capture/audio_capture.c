@@ -25,8 +25,9 @@
 
 #include "audio_capture.h"
 
-#define AUDIO_CAPTURE_CAPTURING     0x1
-#define AUDIO_CAPTURE_CFG_CHANGED   0x2
+#define AUDIO_CAPTURE_CAPTURING       0x1
+#define AUDIO_CAPTURE_CFG_CHANGED     0x2
+#define AUDIO_CAPTURE_IGNORE_TIME     0x4
 
 struct audio_capture_s {
 	glc_t *glc;
@@ -39,6 +40,8 @@ struct audio_capture_s {
 
 	glc_audio_i audio_i;
 	glc_state_audio_t state_audio;
+
+	glc_utime_t time;
 };
 
 int audio_capture_write_cfg(audio_capture_t audio_capture);
@@ -114,6 +117,16 @@ int audio_capture_set_channels(audio_capture_t audio_capture,
 		audio_capture->channels = channels;
 		audio_capture->flags |= AUDIO_CAPTURE_CFG_CHANGED;
 	}
+	return 0;
+}
+
+int audio_capture_ignore_time(audio_capture_t audio_capture, int ignore_time)
+{
+	if (ignore_time)
+		audio_capture->flags |= AUDIO_CAPTURE_IGNORE_TIME;
+	else
+		audio_capture->flags &= ~AUDIO_CAPTURE_IGNORE_TIME;
+
 	return 0;
 }
 
@@ -218,10 +231,18 @@ int audio_capture_data(audio_capture_t audio_capture,
 		audio_capture->flags &= ~AUDIO_CAPTURE_CFG_CHANGED;
 	}
 
+	if (!(audio_capture->flags & AUDIO_CAPTURE_IGNORE_TIME))
+		audio_capture->time = glc_state_time(audio_capture->glc);
+
 	msg_hdr.type = GLC_MESSAGE_AUDIO;
 	audio_hdr.audio = audio_capture->audio_i; /* should be set to valid one */
 	audio_hdr.size = size;
-	audio_hdr.timestamp = glc_state_time(audio_capture->glc);
+	audio_hdr.timestamp = audio_capture->time;
+
+	if (audio_capture->flags & AUDIO_CAPTURE_IGNORE_TIME)
+		audio_capture->time += (size * 1000000) /
+					(audio_capture_frames_to_bytes(audio_capture, 1) *
+					 audio_capture->rate);
 
 	if ((ret = ps_packet_open(&audio_capture->packet, PS_PACKET_WRITE)))
 		goto err;
