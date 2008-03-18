@@ -235,7 +235,7 @@ typedef struct {
 	glc_utime_t time;
 } glc_video_data_header_t;
 /** sizeof(glc_picture_header_size) */
-#define GLC_PICTURE_HEADER_SIZE          12
+#define GLC_VIDEO_DATA_HEADER_SIZE       12
 
 /** audio format type */
 typedef u_int8_t glc_audio_format_t;
@@ -279,7 +279,7 @@ typedef struct {
 	glc_size_t size;
 } glc_audio_data_header_t;
 /** sizeof(glc_audio_header_t) */
-#define GLC_AUDIO_HEADER_SIZE            20
+#define GLC_AUDIO_DATA_HEADER_SIZE       20
 
 /**
  * \brief color correction information message
