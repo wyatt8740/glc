@@ -40,6 +40,7 @@
 #define GL_CAPTURE_DRAW_INDICATOR   0x8
 #define GL_CAPTURE_CROP            0x10
 #define GL_CAPTURE_LOCK_FPS        0x20
+#define GL_CAPTURE_IGNORE_TIME     0x40
 
 typedef void (*FuncPtr)(void);
 typedef FuncPtr (*GLXGetProcAddressProc)(const GLubyte *procName);
@@ -260,6 +261,15 @@ int gl_capture_draw_indicator(gl_capture_t gl_capture, int draw_indicator)
 	} else
 		gl_capture->flags &= ~GL_CAPTURE_DRAW_INDICATOR;
 
+	return 0;
+}
+
+int gl_capture_ignore_time(gl_capture_t gl_capture, int ignore_time)
+{
+	if (ignore_time)
+		gl_capture->flags |= GL_CAPTURE_IGNORE_TIME;
+	else
+		gl_capture->flags &= ~GL_CAPTURE_IGNORE_TIME;
 	return 0;
 }
 
@@ -740,7 +750,13 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 	msg.type = GLC_MESSAGE_PICTURE;
 	pic.ctx = ctx->ctx_i;
 
-	now = glc_state_time(gl_capture->glc);
+	/* get current time */
+	if (gl_capture->flags & GL_CAPTURE_IGNORE_TIME)
+		now = ctx->last + gl_capture->fps;
+	else
+		now = glc_state_time(gl_capture->glc);
+
+	/* if we are using PBO we will actually write previous picture to buffer */
 	if (gl_capture->flags & GL_CAPTURE_USE_PBO)
 		pic.timestamp = ctx->pbo_timestamp;
 	else
@@ -748,17 +764,12 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 
 	/* has gl_capture->fps microseconds elapsed since last capture */
 	if ((now - ctx->last < gl_capture->fps) &&
-	    !(gl_capture->flags & GL_CAPTURE_LOCK_FPS))
+	    !(gl_capture->flags & GL_CAPTURE_LOCK_FPS) &&
+	    !(gl_capture->flags & GL_CAPTURE_IGNORE_TIME))
 		goto finish;
 
 	/* not really needed until now */
 	gl_capture_update_ctx(gl_capture, ctx);
-
-	if ((gl_capture->flags & GL_CAPTURE_USE_PBO) && (!ctx->pbo_active)) {
-		ret = gl_capture_start_pbo(gl_capture, ctx);
-		ctx->pbo_timestamp = glc_state_time(gl_capture->glc);
-		goto finish;
-	}
 
 	if (ps_packet_open(&ctx->packet, gl_capture->flags & GL_CAPTURE_LOCK_FPS ?
 					 PS_PACKET_WRITE :
@@ -770,14 +781,16 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 		goto cancel;
 
 	if (gl_capture->flags & GL_CAPTURE_USE_PBO) {
-		/* is this safe, what happens if this is called simultaneously? */
-		if ((ret = ps_packet_setsize(&ctx->packet, ctx->row * ctx->ch
-								+ GLC_MESSAGE_HEADER_SIZE
-								+ GLC_PICTURE_HEADER_SIZE)))
-			goto cancel;
+		if (ctx->pbo_active) {
+			/* is this safe, what happens if this is called simultaneously? */
+			if ((ret = ps_packet_setsize(&ctx->packet, ctx->row * ctx->ch
+									+ GLC_MESSAGE_HEADER_SIZE
+									+ GLC_PICTURE_HEADER_SIZE)))
+				goto cancel;
 
-		if ((ret = gl_capture_read_pbo(gl_capture, ctx)))
-			goto cancel;
+			if ((ret = gl_capture_read_pbo(gl_capture, ctx)))
+				goto cancel;
+		}
 
 		ret = gl_capture_start_pbo(gl_capture, ctx);
 		ctx->pbo_timestamp = now;
@@ -789,22 +802,27 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 		ret = gl_capture_get_pixels(gl_capture, ctx, dma);
 	}
 
-	if (gl_capture->flags & GL_CAPTURE_LOCK_FPS) {
+	if ((gl_capture->flags & GL_CAPTURE_LOCK_FPS) &&
+	    !(gl_capture->flags & GL_CAPTURE_IGNORE_TIME)) {
 		now = glc_state_time(gl_capture->glc);
 
 		if (now - ctx->last < gl_capture->fps)
 			usleep(gl_capture->fps + ctx->last - now);
 	}
 
+	/* increment by 1/fps seconds */
+	ctx->last += gl_capture->fps;
+
 	/*
 	 We should accept framedrops (eg. not allow this difference
 	 to grow unlimited.
 	*/
-	ctx->last += gl_capture->fps;
-	now = glc_state_time(gl_capture->glc);
+	if (!(gl_capture->flags & GL_CAPTURE_IGNORE_TIME)) {
+		now = glc_state_time(gl_capture->glc);
 
-	if (now - ctx->last > gl_capture->fps) /* reasonable choice? */
-		ctx->last = now - 0.5 * gl_capture->fps;
+		if (now - ctx->last > gl_capture->fps) /* reasonable choice? */
+			ctx->last = now - 0.5 * gl_capture->fps;
+	}
 
 	ps_packet_close(&ctx->packet);
 

@@ -107,6 +107,21 @@ __PUBLIC int gl_capture_set_pixel_format(gl_capture_t gl_capture, GLenum format)
 __PUBLIC int gl_capture_draw_indicator(gl_capture_t gl_capture, int draw_indicator);
 
 /**
+ * \brief ignore time
+ *
+ * If glc state time is ignored, gl_capture uses internal time which
+ * is incremented by 1/fps seconds each time a frame is captured.
+ *
+ * Setting this disables fps cap. No frames are dropped when this option
+ * is enabled.
+ * \param gl_capture gl_capture object
+ * \param ignore_time 1 means state time is ignored,
+ *		      0 enables regular time calculations
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int gl_capture_ignore_time(gl_capture_t gl_capture, int ignore_time);
+
+/**
  * \brief capture only selected area
  *
  * Calculated from top left corner. Use 0, 0, 0, 0 to disable cropping.
