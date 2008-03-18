@@ -30,20 +30,22 @@
 #define SCALE_RUNNING      0x1
 #define SCALE_SIZE         0x2
 
-struct scale_ctx_s;
+struct scale_video_stream_s;
 
 typedef void (*scale_proc)(scale_t scale,
-			   struct scale_ctx_s *ctx,
+			   struct scale_video_stream_s *video,
 			   unsigned char *from,
 			   unsigned char *to);
 
-struct scale_ctx_s {
-	glc_ctx_i ctx;
+struct scale_video_stream_s {
+	glc_stream_id_t id;
 	glc_flags_t flags;
+	glc_video_format_t format;
 	size_t size;
 	unsigned int w, h, sw, sh, bpp;
 	unsigned int row;
 	double scale;
+	int created;
 
 	unsigned int rw, rh, rx, ry;
 
@@ -53,13 +55,13 @@ struct scale_ctx_s {
 	scale_proc proc;
 
 	pthread_rwlock_t update;
-	struct scale_ctx_s *next;
+	struct scale_video_stream_s *next;
 };
 
 struct scale_s {
 	glc_t *glc;
 	glc_flags_t flags;
-	struct scale_ctx_s *ctx;
+	struct scale_video_stream_s *video;
 	glc_thread_t thread;
 
 	double scale;
@@ -70,23 +72,22 @@ int scale_read_callback(glc_thread_state_t *state);
 int scale_write_callback(glc_thread_state_t *state);
 void scale_finish_callback(void *ptr, int err);
 
-int scale_pic_msg(scale_t scale, struct scale_ctx_s *ctx, unsigned char *from, unsigned char *to);
-int scale_ctx_msg(scale_t scale, glc_ctx_message_t *ctx_msg, glc_thread_state_t *state);
-int scale_get_ctx(scale_t scale, glc_ctx_i ctx_i, struct scale_ctx_s **ctx);
+int scale_video_format_message(scale_t scale, glc_video_format_message_t *format_message, glc_thread_state_t *state);
+int scale_get_video_stream(scale_t scale, glc_stream_id_t id, struct scale_video_stream_s **video);
 
-int scale_generate_rgb_map(scale_t scale, struct scale_ctx_s *ctx);
-int scale_generate_ycbcr_map(scale_t scale, struct scale_ctx_s *ctx);
+int scale_generate_rgb_map(scale_t scale, struct scale_video_stream_s *video);
+int scale_generate_ycbcr_map(scale_t scale, struct scale_video_stream_s *video);
 
-void scale_rgb_convert(scale_t scale, struct scale_ctx_s *ctx,
+void scale_rgb_convert(scale_t scale, struct scale_video_stream_s *video,
 		       unsigned char *from, unsigned char *to);
-void scale_rgb_half(scale_t scale, struct scale_ctx_s *ctx,
+void scale_rgb_half(scale_t scale, struct scale_video_stream_s *video,
 		    unsigned char *from, unsigned char *to);
-void scale_rgb_scale(scale_t scale, struct scale_ctx_s *ctx,
+void scale_rgb_scale(scale_t scale, struct scale_video_stream_s *video,
 		     unsigned char *from, unsigned char *to);
 
-void scale_ycbcr_half(scale_t scale, struct scale_ctx_s *ctx,
+void scale_ycbcr_half(scale_t scale, struct scale_video_stream_s *video,
 		      unsigned char *from, unsigned char *to);
-void scale_ycbcr_scale(scale_t scale, struct scale_ctx_s *ctx,
+void scale_ycbcr_scale(scale_t scale, struct scale_video_stream_s *video,
 		       unsigned char *from, unsigned char *to);
 
 int scale_init(scale_t *scale, glc_t *glc)
@@ -152,7 +153,7 @@ int scale_process_wait(scale_t scale)
 	if (!(scale->flags & SCALE_RUNNING))
 		return EAGAIN;
 
-	/* finish callback frees ctx stuff */
+	/* finish callback frees video stuff */
 	glc_thread_wait(&scale->thread);
 	scale->flags &= ~SCALE_RUNNING;
 
@@ -162,14 +163,14 @@ int scale_process_wait(scale_t scale)
 void scale_finish_callback(void *ptr, int err)
 {
 	scale_t scale = ptr;
-	struct scale_ctx_s *del;
+	struct scale_video_stream_s *del;
 
 	if (err)
 		glc_log(scale->glc, GLC_ERROR, "scale", "%s (%d)", strerror(err), err);
 
-	while (scale->ctx != NULL) {
-		del = scale->ctx;
-		scale->ctx = scale->ctx->next;
+	while (scale->video != NULL) {
+		del = scale->video;
+		scale->video = scale->video->next;
 
 		if (del->pos)
 			free(del->pos);
@@ -183,24 +184,24 @@ void scale_finish_callback(void *ptr, int err)
 
 int scale_read_callback(glc_thread_state_t *state) {
 	scale_t scale = (scale_t) state->ptr;
-	struct scale_ctx_s *ctx;
-	glc_picture_header_t *pic_header;
+	struct scale_video_stream_s *video;
+	glc_video_data_header_t *video_data_header;
 
-	if (state->header.type == GLC_MESSAGE_CTX)
-		return scale_ctx_msg(scale, (glc_ctx_message_t *) state->read_data, state);
+	if (state->header.type == GLC_MESSAGE_VIDEO_FORMAT)
+		return scale_video_format_message(scale, (glc_video_format_message_t *) state->read_data, state);
 
-	if (state->header.type == GLC_MESSAGE_PICTURE) {
-		pic_header = (glc_picture_header_t *) state->read_data;
-		scale_get_ctx(scale, pic_header->ctx, &ctx);
-		state->threadptr = ctx;
+	if (state->header.type == GLC_MESSAGE_VIDEO_DATA) {
+		video_data_header = (glc_video_data_header_t *) state->read_data;
+		scale_get_video_stream(scale, video_data_header->id, &video);
+		state->threadptr = video;
 
-		pthread_rwlock_rdlock(&ctx->update);
+		pthread_rwlock_rdlock(&video->update);
 
-		if (ctx->proc)
-			state->write_size = ctx->size + GLC_PICTURE_HEADER_SIZE;
+		if (video->proc)
+			state->write_size = video->size + GLC_VIDEO_DATA_HEADER_SIZE;
 		else {
 			state->flags |= GLC_THREAD_COPY;
-			pthread_rwlock_unlock(&ctx->update);
+			pthread_rwlock_unlock(&video->update);
 		}
 	} else
 		state->flags |= GLC_THREAD_COPY;
@@ -210,77 +211,77 @@ int scale_read_callback(glc_thread_state_t *state) {
 
 int scale_write_callback(glc_thread_state_t *state) {
 	scale_t scale = (scale_t) state->ptr;
-	struct scale_ctx_s *ctx = state->threadptr;
+	struct scale_video_stream_s *video = state->threadptr;
 
-	memcpy(state->write_data, state->read_data, GLC_PICTURE_HEADER_SIZE);
-	ctx->proc(scale, ctx,
-		  (unsigned char *) &state->read_data[GLC_PICTURE_HEADER_SIZE],
-		  (unsigned char *) &state->write_data[GLC_PICTURE_HEADER_SIZE]);
-	pthread_rwlock_unlock(&ctx->update);
+	memcpy(state->write_data, state->read_data, GLC_VIDEO_DATA_HEADER_SIZE);
+	video->proc(scale, video,
+		  (unsigned char *) &state->read_data[GLC_VIDEO_DATA_HEADER_SIZE],
+		  (unsigned char *) &state->write_data[GLC_VIDEO_DATA_HEADER_SIZE]);
+	pthread_rwlock_unlock(&video->update);
 
 	return 0;
 }
 
-int scale_get_ctx(scale_t scale, glc_ctx_i ctx_i, struct scale_ctx_s **ctx)
+int scale_get_video_stream(scale_t scale, glc_stream_id_t id, struct scale_video_stream_s **video)
 {
-	struct scale_ctx_s *list = scale->ctx;
+	struct scale_video_stream_s *list = scale->video;
 
 	while (list != NULL) {
-		if (list->ctx == ctx_i)
+		if (list->id == id)
 			break;
 		list = list->next;
 	}
 
 	if (list == NULL) {
-		list = (struct scale_ctx_s *) malloc(sizeof(struct scale_ctx_s));
-		memset(list, 0, sizeof(struct scale_ctx_s));
+		list = (struct scale_video_stream_s *) malloc(sizeof(struct scale_video_stream_s));
+		memset(list, 0, sizeof(struct scale_video_stream_s));
 
-		list->next = scale->ctx;
-		scale->ctx = list;
-		list->ctx = ctx_i;
+		list->next = scale->video;
+		scale->video = list;
+		list->id = id;
 		pthread_rwlock_init(&list->update, NULL);
 	}
 
-	*ctx = list;
+	*video = list;
 	return 0;
 }
 
-void scale_rgb_convert(scale_t scale, struct scale_ctx_s *ctx,
+void scale_rgb_convert(scale_t scale, struct scale_video_stream_s *video,
 		       unsigned char *from, unsigned char *to)
 {
 	unsigned int x, y, ox, oy, op, tp;
-	unsigned int swi = ctx->sw * 3;
-	unsigned int shi = ctx->sh * 3;
+	unsigned int swi = video->sw * 3;
+	unsigned int shi = video->sh * 3;
 	ox = oy = 0;
 
 	/* just convert from different bpp to 3 */
 	for (y = 0; y < shi; y += 3) {
 		for (x = 0; x < swi; x += 3) {
-			tp = x + y * ctx->sw;
-			op = ox + oy * ctx->row;
+			tp = x + y * video->sw;
+			op = ox + oy * video->row;
 
 			to[tp + 0] = from[op + 0];
 			to[tp + 1] = from[op + 1];
 			to[tp + 2] = from[op + 2];
 
-			ox += ctx->bpp;
+			ox += video->bpp;
 		}
 		oy++;
 		ox = 0;
 	}
 }
 
-void scale_rgb_half(scale_t scale, struct scale_ctx_s *ctx,
+void scale_rgb_half(scale_t scale, struct scale_video_stream_s *video,
 		    unsigned char *from, unsigned char *to)
 {
 	unsigned int ox, oy, op1, op2, op3, op4;
 
-	for (oy = 0; oy < ctx->h; oy += 2) {
-		for (ox = 0; ox < ctx->w; ox += 2) {
-			op1 = ox * ctx->bpp + oy * ctx->row;
-			op2 = op1 + ctx->bpp;
-			op3 = op1 + ctx->row;
-			op4 = op2 + ctx->row;
+	for (oy = 0; oy < video->h; oy += 2) {
+		for (ox = 0; ox < video->w; ox += 2) {
+			op1 = ox * video->bpp + oy * video->row;
+			op2 = op1 + video->bpp;
+			op3 = op1 + video->row;
+			op4 = op2 + video->row;
 
 			*to++ = (from[op1 + 0] +
 				 from[op2 + 0] +
@@ -299,50 +300,50 @@ void scale_rgb_half(scale_t scale, struct scale_ctx_s *ctx,
 	}
 }
 
-void scale_rgb_scale(scale_t scale, struct scale_ctx_s *ctx,
+void scale_rgb_scale(scale_t scale, struct scale_video_stream_s *video,
 		     unsigned char *from, unsigned char *to)
 {
 	unsigned int x, y, tp, sp;
 
 	if (scale->flags & SCALE_SIZE)
-		memset(to, 0, ctx->size);
+		memset(to, 0, video->size);
 
-	for (y = 0; y < ctx->sh; y++) {
-		for (x = 0; x < ctx->sw; x++) {
-			sp = (x + y * ctx->sw) * 4;
-			tp = ((x + ctx->rx) + (y + ctx->ry) * ctx->rw) * 3;
+	for (y = 0; y < video->sh; y++) {
+		for (x = 0; x < video->sw; x++) {
+			sp = (x + y * video->sw) * 4;
+			tp = ((x + video->rx) + (y + video->ry) * video->rw) * 3;
 
-			to[tp + 0] = from[ctx->pos[sp + 0] + 0] * ctx->factor[sp + 0] +
-				     from[ctx->pos[sp + 1] + 0] * ctx->factor[sp + 1] +
-				     from[ctx->pos[sp + 2] + 0] * ctx->factor[sp + 2] +
-				     from[ctx->pos[sp + 3] + 0] * ctx->factor[sp + 3];
-			to[tp + 1] = from[ctx->pos[sp + 0] + 1] * ctx->factor[sp + 0] +
-				     from[ctx->pos[sp + 1] + 1] * ctx->factor[sp + 1] +
-				     from[ctx->pos[sp + 2] + 1] * ctx->factor[sp + 2] +
-				     from[ctx->pos[sp + 3] + 1] * ctx->factor[sp + 3];
-			to[tp + 2] = from[ctx->pos[sp + 0] + 2] * ctx->factor[sp + 0] +
-				     from[ctx->pos[sp + 1] + 2] * ctx->factor[sp + 1] +
-				     from[ctx->pos[sp + 2] + 2] * ctx->factor[sp + 2] +
-				     from[ctx->pos[sp + 3] + 2] * ctx->factor[sp + 3];
+			to[tp + 0] = from[video->pos[sp + 0] + 0] * video->factor[sp + 0] +
+				     from[video->pos[sp + 1] + 0] * video->factor[sp + 1] +
+				     from[video->pos[sp + 2] + 0] * video->factor[sp + 2] +
+				     from[video->pos[sp + 3] + 0] * video->factor[sp + 3];
+			to[tp + 1] = from[video->pos[sp + 0] + 1] * video->factor[sp + 0] +
+				     from[video->pos[sp + 1] + 1] * video->factor[sp + 1] +
+				     from[video->pos[sp + 2] + 1] * video->factor[sp + 2] +
+				     from[video->pos[sp + 3] + 1] * video->factor[sp + 3];
+			to[tp + 2] = from[video->pos[sp + 0] + 2] * video->factor[sp + 0] +
+				     from[video->pos[sp + 1] + 2] * video->factor[sp + 1] +
+				     from[video->pos[sp + 2] + 2] * video->factor[sp + 2] +
+				     from[video->pos[sp + 3] + 2] * video->factor[sp + 3];
 		}
 	}
 }
 
-void scale_ycbcr_half(scale_t scale, struct scale_ctx_s *ctx,
+void scale_ycbcr_half(scale_t scale, struct scale_video_stream_s *video,
 		      unsigned char *from, unsigned char *to)
 {
 	unsigned int x, y, ox, oy, cw_from, ch_from, cw_to, ch_to, op1, op2, op3, op4;
 	unsigned char *Cb_to, *Cr_to;
 	unsigned char *Cb_from, *Cr_from;
 
-	cw_from = ctx->w / 2;
-	ch_from = ctx->h / 2;
-	Cb_from = &from[ctx->w * ctx->h];
+	cw_from = video->w / 2;
+	ch_from = video->h / 2;
+	Cb_from = &from[video->w * video->h];
 	Cr_from = &Cb_from[cw_from * ch_from];
 
-	cw_to = ctx->sw / 2;
-	ch_to = ctx->sh / 2;
-	Cb_to = &to[ctx->sw * ctx->sh];
+	cw_to = video->sw / 2;
+	ch_to = video->sh / 2;
+	Cb_to = &to[video->sw * video->sh];
 	Cr_to = &Cb_to[cw_to * ch_to];
 
 	ox = oy = 0;
@@ -369,12 +370,12 @@ void scale_ycbcr_half(scale_t scale, struct scale_ctx_s *ctx,
 	}
 
 	ox = oy = 0;
-	for (y = 0; y < ctx->sh; y++) {
-		for (x = 0; x < ctx->sw; x++) {
-			op1 = oy * ctx->w + ox;
+	for (y = 0; y < video->sh; y++) {
+		for (x = 0; x < video->sw; x++) {
+			op1 = oy * video->w + ox;
 			op2 = op1 + 1;
-			op3 = op1 + ctx->w;
-			op4 = op2 + ctx->w;
+			op3 = op1 + video->w;
+			op4 = op2 + video->w;
 
 			*to++ = (from[op1] +
 				 from[op2] +
@@ -388,7 +389,7 @@ void scale_ycbcr_half(scale_t scale, struct scale_ctx_s *ctx,
 	}
 }
 
-void scale_ycbcr_scale(scale_t scale, struct scale_ctx_s *ctx,
+void scale_ycbcr_scale(scale_t scale, struct scale_video_stream_s *video,
 		       unsigned char *from, unsigned char *to)
 {
 	unsigned int x, y, sp, cw, ch;
@@ -396,223 +397,226 @@ void scale_ycbcr_scale(scale_t scale, struct scale_ctx_s *ctx,
 	unsigned char *Y_from, *Cb_from, *Cr_from;
 
 	Y_from = from;
-	Cb_from = &from[ctx->w * ctx->h];
-	Cr_from = &Cb_from[(ctx->w / 2) * (ctx->h / 2)];
+	Cb_from = &from[video->w * video->h];
+	Cr_from = &Cb_from[(video->w / 2) * (video->h / 2)];
 
-	cw = ctx->sw / 2;
-	ch = ctx->sh / 2;
+	cw = video->sw / 2;
+	ch = video->sh / 2;
 	Y_to = to;
-	Cb_to = &to[ctx->rw * ctx->rh];
-	Cr_to = &Cb_to[(ctx->rw / 2) * (ctx->rh / 2)];
+	Cb_to = &to[video->rw * video->rh];
+	Cr_to = &Cb_to[(video->rw / 2) * (video->rh / 2)];
 
 	if (scale->flags & SCALE_SIZE) {
-		memset(Y_to, 0, ctx->rw * ctx->rh);
-		memset(Cb_to, 128, (ctx->rw / 2) * (ctx->rh / 2));
-		memset(Cr_to, 128, (ctx->rw / 2) * (ctx->rh / 2));
+		memset(Y_to, 0, video->rw * video->rh);
+		memset(Cb_to, 128, (video->rw / 2) * (video->rh / 2));
+		memset(Cr_to, 128, (video->rw / 2) * (video->rh / 2));
 	}
 
-	for (y = 0; y < ctx->sh; y++) {
-		for (x = 0; x < ctx->sw; x++) {
-			sp = (x + y * ctx->sw) * 4;
+	for (y = 0; y < video->sh; y++) {
+		for (x = 0; x < video->sw; x++) {
+			sp = (x + y * video->sw) * 4;
 
-			Y_to[(x + ctx->rx) + (y + ctx->ry) * ctx->rw] =
-				Y_from[ctx->pos[sp + 0]] * ctx->factor[sp + 0] +
-				Y_from[ctx->pos[sp + 1]] * ctx->factor[sp + 1] +
-				Y_from[ctx->pos[sp + 2]] * ctx->factor[sp + 2] +
-				Y_from[ctx->pos[sp + 3]] * ctx->factor[sp + 3];
+			Y_to[(x + video->rx) + (y + video->ry) * video->rw] =
+				Y_from[video->pos[sp + 0]] * video->factor[sp + 0] +
+				Y_from[video->pos[sp + 1]] * video->factor[sp + 1] +
+				Y_from[video->pos[sp + 2]] * video->factor[sp + 2] +
+				Y_from[video->pos[sp + 3]] * video->factor[sp + 3];
 		}
 	}
 
 	for (y = 0; y < ch; y++) {
 		for (x = 0; x < cw; x++) {
-			sp = ctx->sw * ctx->sh * 4 + (x + y * cw) * 4;
+			sp = video->sw * video->sh * 4 + (x + y * cw) * 4;
 
-			Cb_to[(x + ctx->rx / 2) + (y + ctx->ry / 2) * (ctx->rw / 2)] =
-				Cb_from[ctx->pos[sp + 0]] * ctx->factor[sp + 0] +
-				Cb_from[ctx->pos[sp + 1]] * ctx->factor[sp + 1] +
-				Cb_from[ctx->pos[sp + 2]] * ctx->factor[sp + 2] +
-				Cb_from[ctx->pos[sp + 3]] * ctx->factor[sp + 3];
+			Cb_to[(x + video->rx / 2) + (y + video->ry / 2) * (video->rw / 2)] =
+				Cb_from[video->pos[sp + 0]] * video->factor[sp + 0] +
+				Cb_from[video->pos[sp + 1]] * video->factor[sp + 1] +
+				Cb_from[video->pos[sp + 2]] * video->factor[sp + 2] +
+				Cb_from[video->pos[sp + 3]] * video->factor[sp + 3];
 
-			Cr_to[(x + ctx->rx / 2) + (y + ctx->ry / 2) * (ctx->rw / 2)] =
-				Cr_from[ctx->pos[sp + 0]] * ctx->factor[sp + 0] +
-				Cr_from[ctx->pos[sp + 1]] * ctx->factor[sp + 1] +
-				Cr_from[ctx->pos[sp + 2]] * ctx->factor[sp + 2] +
-				Cr_from[ctx->pos[sp + 3]] * ctx->factor[sp + 3];
+			Cr_to[(x + video->rx / 2) + (y + video->ry / 2) * (video->rw / 2)] =
+				Cr_from[video->pos[sp + 0]] * video->factor[sp + 0] +
+				Cr_from[video->pos[sp + 1]] * video->factor[sp + 1] +
+				Cr_from[video->pos[sp + 2]] * video->factor[sp + 2] +
+				Cr_from[video->pos[sp + 3]] * video->factor[sp + 3];
 		}
 	}
 }
 
-int scale_ctx_msg(scale_t scale, glc_ctx_message_t *ctx_msg, glc_thread_state_t *state)
+int scale_video_format_message(scale_t scale,
+			       glc_video_format_message_t *format_message,
+			       glc_thread_state_t *state)
 {
-	struct scale_ctx_s *ctx;
+	struct scale_video_stream_s *video;
 	glc_flags_t old_flags;
 
-	scale_get_ctx(scale, ctx_msg->ctx, &ctx);
-	pthread_rwlock_wrlock(&ctx->update);
+	scale_get_video_stream(scale, format_message->id, &video);
+	pthread_rwlock_wrlock(&video->update);
 
-	old_flags = ctx->flags;
-	ctx->flags = ctx_msg->flags;
-	ctx->w = ctx_msg->w;
-	ctx->h = ctx_msg->h;
+	old_flags = video->flags;
+	video->flags = format_message->flags;
+	video->format = format_message->format;
+	video->w = format_message->width;
+	video->h = format_message->height;
 
 	if (scale->flags & SCALE_SIZE) {
-		ctx->rw = scale->width;
-		ctx->rh = scale->height;
+		video->rw = scale->width;
+		video->rh = scale->height;
 
-		if ((float) ctx->rw / (float) ctx->w < (float) ctx->rh / (float) ctx->h)
-			ctx->scale = (float) ctx->rw / (float) ctx->w;
+		if ((float) video->rw / (float) video->w < (float) video->rh / (float) video->h)
+			video->scale = (float) video->rw / (float) video->w;
 		else
-			ctx->scale = (float) ctx->rh / (float) ctx->h;
+			video->scale = (float) video->rh / (float) video->h;
 
-		ctx->sw = ctx->scale * ctx->w;
-		ctx->sh = ctx->scale * ctx->h;
-		ctx->rx = (ctx->rw - ctx->sw) / 2;
-		ctx->ry = (ctx->rh - ctx->sh) / 2;
+		video->sw = video->scale * video->w;
+		video->sh = video->scale * video->h;
+		video->rx = (video->rw - video->sw) / 2;
+		video->ry = (video->rh - video->sh) / 2;
 		glc_log(scale->glc, GLC_DEBUG, "scale",
 			 "real size is %ux%u, scaled picture starts at %ux%u",
-			 ctx->rw, ctx->rh, ctx->rx, ctx->ry);
+			 video->rw, video->rh, video->rx, video->ry);
 	} else {
-		ctx->scale = scale->scale;
-		ctx->sw = ctx->scale * ctx->w;
-		ctx->sh = ctx->scale * ctx->h;
+		video->scale = scale->scale;
+		video->sw = video->scale * video->w;
+		video->sh = video->scale * video->h;
 
-		ctx->rx = ctx->ry = 0;
-		ctx->rw = ctx->sw;
-		ctx->rh = ctx->sh;
+		video->rx = video->ry = 0;
+		video->rw = video->sw;
+		video->rh = video->sh;
 	}
 
-	if ((ctx_msg->flags & GLC_CTX_BGRA) | (ctx_msg->flags & GLC_CTX_BGR)) {
-		if (ctx_msg->flags & GLC_CTX_BGRA)
-			ctx->bpp = 4;
+	if ((video->format == GLC_VIDEO_BGRA) |
+	    (video->format == GLC_VIDEO_BGR)) {
+		if (video->format == GLC_VIDEO_BGRA)
+			video->bpp = 4;
 		else
-			ctx->bpp = 3;
+			video->bpp = 3;
 
-		ctx->row = ctx->w * ctx->bpp;
+		video->row = video->w * video->bpp;
 
-		if (ctx_msg->flags & GLC_CTX_DWORD_ALIGNED) {
-			if (ctx->row % 8 != 0)
-				ctx->row += 8 - ctx->row % 8;
+		if (format_message->flags & GLC_VIDEO_DWORD_ALIGNED) {
+			if (video->row % 8 != 0)
+				video->row += 8 - video->row % 8;
 		}
 	}
 
-	ctx->proc = NULL; /* do not try anything stupid... */
+	video->proc = NULL; /* do not try anything stupid... */
 
-	if ((ctx_msg->flags & GLC_CTX_BGR) | (ctx_msg->flags & GLC_CTX_BGRA)) {
-		if ((ctx->scale == 0.5) && !(scale->flags & SCALE_SIZE)) {
+	if ((video->format == GLC_VIDEO_BGR) |
+	    (video->format == GLC_VIDEO_BGRA)) {
+		if ((video->scale == 0.5) && !(scale->flags & SCALE_SIZE)) {
 			glc_log(scale->glc, GLC_DEBUG, "scale",
 				 "scaling RGB data to half-size (from %ux%u to %ux%u)",
-				 ctx->w, ctx->h, ctx->sw, ctx->sh);
-			ctx->proc = scale_rgb_half;
-		} else if ((ctx->scale == 1.0) && (ctx_msg->flags & GLC_CTX_BGRA)) {
+				 video->w, video->h, video->sw, video->sh);
+			video->proc = scale_rgb_half;
+		} else if ((video->scale == 1.0) &&
+			   (video->format == GLC_VIDEO_BGRA)) {
 			glc_log(scale->glc, GLC_DEBUG, "scale", "converting BGRA to BGR");
-			ctx->proc = scale_rgb_convert;
-		} else if (ctx->scale != 1.0) {
+			video->proc = scale_rgb_convert;
+		} else if (video->scale != 1.0) {
 			glc_log(scale->glc, GLC_DEBUG, "scale",
 				 "scaling RGB data with factor %f (from %ux%u to %ux%u)",
-				 ctx->scale, ctx->w, ctx->h, ctx->sw, ctx->sh);
-			ctx->proc = scale_rgb_scale;
-			scale_generate_rgb_map(scale, ctx);
+				 video->scale, video->w, video->h, video->sw, video->sh);
+			video->proc = scale_rgb_scale;
+			scale_generate_rgb_map(scale, video);
 		}
 
-		ctx_msg->flags &= ~GLC_CTX_BGRA; /* after scaling data is in BGR */
-		ctx_msg->flags |= GLC_CTX_BGR;
+		format_message->format = GLC_VIDEO_BGR; /* after scaling data is in BGR */
 
-		if (ctx->proc) /* dword alignment is lost if something is done to the data */
-			ctx_msg->flags &= ~GLC_CTX_DWORD_ALIGNED;
+		if (video->proc) /* dword alignment is lost if something is done to the data */
+			format_message->flags &= ~GLC_VIDEO_DWORD_ALIGNED;
 
-		ctx_msg->w = ctx->rw;
-		ctx_msg->h = ctx->rh;
-		ctx->size = ctx->rw * ctx->rh * 3;
+		format_message->width = video->rw;
+		format_message->height = video->rh;
+		video->size = video->rw * video->rh * 3;
 
-		if ((scale->flags & SCALE_SIZE) &&
-		    (ctx_msg->flags & GLC_CTX_UPDATE) &&
-		    ((old_flags & ~(GLC_CTX_CREATE | GLC_CTX_UPDATE)) ==
-		     (ctx_msg->flags & ~(GLC_CTX_CREATE | GLC_CTX_UPDATE))))
+		if ((scale->flags & SCALE_SIZE) && (video->created) &&
+		    (format_message->flags == old_flags))
 			state->flags |= GLC_THREAD_STATE_SKIP_WRITE;
-	} else if (ctx_msg->flags & GLC_CTX_YCBCR_420JPEG) {
-		ctx->sw -= ctx->sw % 2;
-		ctx->sh -= ctx->sh % 2;
-		ctx->rw -= ctx->rw % 2;
-		ctx->rh -= ctx->rh % 2;
-		ctx_msg->w = ctx->rw;
-		ctx_msg->h = ctx->rh;
-		ctx->size = ctx->rw * ctx->rh + 2 * ((ctx->rw / 2) * (ctx->rh / 2));
+		video->created = 1;
+	} else if (video->format == GLC_VIDEO_YCBCR_420JPEG) {
+		video->sw -= video->sw % 2;
+		video->sh -= video->sh % 2;
+		video->rw -= video->rw % 2;
+		video->rh -= video->rh % 2;
+		format_message->width = video->rw;
+		format_message->height = video->rh;
+		video->size = video->rw * video->rh + 2 * ((video->rw / 2) * (video->rh / 2));
 
-		if ((ctx->scale == 0.5) && !(scale->flags & SCALE_SIZE)) {
+		if ((video->scale == 0.5) && !(scale->flags & SCALE_SIZE)) {
 			glc_log(scale->glc, GLC_DEBUG, "scale",
 				 "scaling Y'CbCr data to half-size (from %ux%u to %ux%u)",
-				 ctx->w, ctx->h, ctx->sw, ctx->sh);
-			ctx->proc = scale_ycbcr_half;
-		} else if (ctx->scale != 1.0) {
+				 video->w, video->h, video->sw, video->sh);
+			video->proc = scale_ycbcr_half;
+		} else if (video->scale != 1.0) {
 			glc_log(scale->glc, GLC_DEBUG, "scale",
 				 "scaling Y'CbCr data with factor %f (from %ux%u to %ux%u)",
-				 ctx->scale, ctx->w, ctx->h, ctx->sw, ctx->sh);
-			ctx->proc = scale_ycbcr_scale;
-			scale_generate_ycbcr_map(scale, ctx);
+				 video->scale, video->w, video->h, video->sw, video->sh);
+			video->proc = scale_ycbcr_scale;
+			scale_generate_ycbcr_map(scale, video);
 		}
 
-		if ((scale->flags & SCALE_SIZE) &&
-		    (ctx_msg->flags & GLC_CTX_UPDATE) &&
-		    ((old_flags & ~(GLC_CTX_CREATE | GLC_CTX_UPDATE)) ==
-		     (ctx_msg->flags & ~(GLC_CTX_CREATE | GLC_CTX_UPDATE))))
+		if ((scale->flags & SCALE_SIZE) && (video->created) &&
+		    (format_message->flags == old_flags))
 			state->flags |= GLC_THREAD_STATE_SKIP_WRITE;
+		video->created = 1;
 	}
 
 	state->flags |= GLC_THREAD_COPY;
 
-	pthread_rwlock_unlock(&ctx->update);
+	pthread_rwlock_unlock(&video->update);
 	return 0;
 }
 
-int scale_generate_rgb_map(scale_t scale, struct scale_ctx_s *ctx)
+int scale_generate_rgb_map(scale_t scale, struct scale_video_stream_s *video)
 {
 	float ofx, ofy, fx0, fx1, fy0, fy1;
 	unsigned int tp, x, y, r;
 	float d;
-	size_t smap_size = ctx->sw * ctx->sh * 3 * 4;
+	size_t smap_size = video->sw * video->sh * 3 * 4;
 
-	glc_log(scale->glc, GLC_DEBUG, "scale", "generating %zd + %zd byte scale map for ctx %d",
-		 smap_size * sizeof(unsigned int), smap_size * sizeof(float), ctx->ctx);
+	glc_log(scale->glc, GLC_DEBUG, "scale", "generating %zd + %zd byte scale map for video stream %d",
+		 smap_size * sizeof(unsigned int), smap_size * sizeof(float), video->id);
 
-	if (ctx->pos)
-		ctx->pos = (unsigned int *) realloc(ctx->pos, sizeof(unsigned int) * smap_size);
+	if (video->pos)
+		video->pos = (unsigned int *) realloc(video->pos, sizeof(unsigned int) * smap_size);
 	else
-		ctx->pos = (unsigned int *) malloc(sizeof(unsigned int) * smap_size);
-	if (ctx->factor)
-		ctx->factor = (float *) realloc(ctx->factor, sizeof(float) * smap_size);
+		video->pos = (unsigned int *) malloc(sizeof(unsigned int) * smap_size);
+	if (video->factor)
+		video->factor = (float *) realloc(video->factor, sizeof(float) * smap_size);
 	else
-		ctx->factor = (float *) malloc(sizeof(float) * smap_size);
+		video->factor = (float *) malloc(sizeof(float) * smap_size);
 
 	r = 0;
 	do {
-		d = (float) (ctx->w - r++) / (float) ctx->sw;
+		d = (float) (video->w - r++) / (float) video->sw;
 		glc_log(scale->glc, GLC_DEBUG, "scale", "d = %f", d);
-	} while ((d * (float) (ctx->sh - 1) + 1.0 > ctx->h) |
-		 (d * (float) (ctx->sw - 1) + 1.0 > ctx->w));
+	} while ((d * (float) (video->sh - 1) + 1.0 > video->h) |
+		 (d * (float) (video->sw - 1) + 1.0 > video->w));
 
 	ofx = ofy = 0;
-	for (y = 0; y < ctx->sh; y++) {
-		for (x = 0; x < ctx->sw; x++) {
-			tp = (x + y * ctx->sw) * 4;
+	for (y = 0; y < video->sh; y++) {
+		for (x = 0; x < video->sw; x++) {
+			tp = (x + y * video->sw) * 4;
 
-			ctx->pos[tp + 0] = ((unsigned int) ofx + 0) * ctx->bpp +
-					   ((unsigned int) ofy + 0) * ctx->row;
-			ctx->pos[tp + 1] = ((unsigned int) ofx + 1) * ctx->bpp +
-					   ((unsigned int) ofy + 0) * ctx->row;
-			ctx->pos[tp + 2] = ((unsigned int) ofx + 0) * ctx->bpp +
-					   ((unsigned int) ofy + 1) * ctx->row;
-			ctx->pos[tp + 3] = ((unsigned int) ofx + 1) * ctx->bpp +
-					   ((unsigned int) ofy + 1) * ctx->row;
+			video->pos[tp + 0] = ((unsigned int) ofx + 0) * video->bpp +
+					   ((unsigned int) ofy + 0) * video->row;
+			video->pos[tp + 1] = ((unsigned int) ofx + 1) * video->bpp +
+					   ((unsigned int) ofy + 0) * video->row;
+			video->pos[tp + 2] = ((unsigned int) ofx + 0) * video->bpp +
+					   ((unsigned int) ofy + 1) * video->row;
+			video->pos[tp + 3] = ((unsigned int) ofx + 1) * video->bpp +
+					   ((unsigned int) ofy + 1) * video->row;
 
 			fx1 = (float) x * d - (float) ((unsigned int) ofx);
 			fx0 = 1.0 - fx1;
 			fy1 = (float) y * d - (float) ((unsigned int) ofy);
 			fy0 = 1.0 - fy1;
 
-			ctx->factor[tp + 0] = fx0 * fy0;
-			ctx->factor[tp + 1] = fx1 * fy0;
-			ctx->factor[tp + 2] = fx0 * fy1;
-			ctx->factor[tp + 3] = fx1 * fy1;
+			video->factor[tp + 0] = fx0 * fy0;
+			video->factor[tp + 1] = fx1 * fy0;
+			video->factor[tp + 2] = fx0 * fy1;
+			video->factor[tp + 3] = fx1 * fy1;
 
 			ofx += d;
 		}
@@ -623,55 +627,55 @@ int scale_generate_rgb_map(scale_t scale, struct scale_ctx_s *ctx)
 	return 0;
 }
 
-int scale_generate_ycbcr_map(scale_t scale, struct scale_ctx_s *ctx)
+int scale_generate_ycbcr_map(scale_t scale, struct scale_video_stream_s *video)
 {
 	float ofx, ofy, fx0, fx1, fy0, fy1;
 	unsigned int tp, x, y, r, cw, ch;
 	float d;
-	size_t smap_size = ctx->sw * ctx->sh * 5; /* yw*yh*4 + (ch*cw)*4, ch = yh/2, cw = yw/2 */
+	size_t smap_size = video->sw * video->sh * 5; /* yw*yh*4 + (ch*cw)*4, ch = yh/2, cw = yw/2 */
 
-	glc_log(scale->glc, GLC_DEBUG, "scale", "generating %zd B + %zd B scale map for ctx %d",
-		 smap_size * sizeof(unsigned int), smap_size * sizeof(float), ctx->ctx);
+	glc_log(scale->glc, GLC_DEBUG, "scale", "generating %zd B + %zd B scale map for video stream %d",
+		 smap_size * sizeof(unsigned int), smap_size * sizeof(float), video->id);
 
-	if (ctx->pos)
-		ctx->pos = (unsigned int *) realloc(ctx->pos, sizeof(unsigned int) * smap_size);
+	if (video->pos)
+		video->pos = (unsigned int *) realloc(video->pos, sizeof(unsigned int) * smap_size);
 	else
-		ctx->pos = (unsigned int *) malloc(sizeof(unsigned int) * smap_size);
-	if (ctx->factor)
-		ctx->factor = (float *) realloc(ctx->factor, sizeof(float) * smap_size);
+		video->pos = (unsigned int *) malloc(sizeof(unsigned int) * smap_size);
+	if (video->factor)
+		video->factor = (float *) realloc(video->factor, sizeof(float) * smap_size);
 	else
-		ctx->factor = (float *) malloc(sizeof(float) * smap_size);
+		video->factor = (float *) malloc(sizeof(float) * smap_size);
 
 	r = 0;
 	do {
-		d = (float) (ctx->w - r++) / (float) ctx->sw;
+		d = (float) (video->w - r++) / (float) video->sw;
 		glc_log(scale->glc, GLC_DEBUG, "scale", "Y: d = %f", d);
-	} while ((d * (float) (ctx->sh - 1) + 1.0 > ctx->h) |
-		 (d * (float) (ctx->sw - 1) + 1.0 > ctx->w));
+	} while ((d * (float) (video->sh - 1) + 1.0 > video->h) |
+		 (d * (float) (video->sw - 1) + 1.0 > video->w));
 
 	ofx = ofy = 0;
-	for (y = 0; y < ctx->sh; y++) {
-		for (x = 0; x < ctx->sw; x++) {
-			tp = (x + y * ctx->sw) * 4;
+	for (y = 0; y < video->sh; y++) {
+		for (x = 0; x < video->sw; x++) {
+			tp = (x + y * video->sw) * 4;
 
-			ctx->pos[tp + 0] = ((unsigned int) ofx + 0) +
-					   ((unsigned int) ofy + 0) * ctx->w;
-			ctx->pos[tp + 1] = ((unsigned int) ofx + 1) +
-					   ((unsigned int) ofy + 0) * ctx->w;
-			ctx->pos[tp + 2] = ((unsigned int) ofx + 0) +
-					   ((unsigned int) ofy + 1) * ctx->w;
-			ctx->pos[tp + 3] = ((unsigned int) ofx + 1) +
-					   ((unsigned int) ofy + 1) * ctx->w;
+			video->pos[tp + 0] = ((unsigned int) ofx + 0) +
+					   ((unsigned int) ofy + 0) * video->w;
+			video->pos[tp + 1] = ((unsigned int) ofx + 1) +
+					   ((unsigned int) ofy + 0) * video->w;
+			video->pos[tp + 2] = ((unsigned int) ofx + 0) +
+					   ((unsigned int) ofy + 1) * video->w;
+			video->pos[tp + 3] = ((unsigned int) ofx + 1) +
+					   ((unsigned int) ofy + 1) * video->w;
 
 			fx1 = (float) x * d - (float) ((unsigned int) ofx);
 			fx0 = 1.0 - fx1;
 			fy1 = (float) y * d - (float) ((unsigned int) ofy);
 			fy0 = 1.0 - fy1;
 
-			ctx->factor[tp + 0] = fx0 * fy0;
-			ctx->factor[tp + 1] = fx1 * fy0;
-			ctx->factor[tp + 2] = fx0 * fy1;
-			ctx->factor[tp + 3] = fx1 * fy1;
+			video->factor[tp + 0] = fx0 * fy0;
+			video->factor[tp + 1] = fx1 * fy0;
+			video->factor[tp + 2] = fx0 * fy1;
+			video->factor[tp + 3] = fx1 * fy1;
 
 			ofx += d;
 		}
@@ -679,38 +683,38 @@ int scale_generate_ycbcr_map(scale_t scale, struct scale_ctx_s *ctx)
 		ofx = 0;
 	}
 
-	cw = ctx->sw / 2;
-	ch = ctx->sh / 2;
+	cw = video->sw / 2;
+	ch = video->sh / 2;
 	r = (r < 2) ? (0) : (r - 2);
 	do {
-		d = (float) ((ctx->w / 2) - r++) / (float) cw;
+		d = (float) ((video->w / 2) - r++) / (float) cw;
 		glc_log(scale->glc, GLC_DEBUG, "scale", "C: d = %f", d);
-	} while ((d * (float) (ch - 1) + 1.0 > (ctx->h / 2)) |
-		 (d * (float) (cw - 1) + 1.0 > (ctx->w / 2)));
+	} while ((d * (float) (ch - 1) + 1.0 > (video->h / 2)) |
+		 (d * (float) (cw - 1) + 1.0 > (video->w / 2)));
 
 	ofx = ofy = 0;
 	for (y = 0; y < ch; y++) {
 		for (x = 0; x < cw; x++) {
-			tp = ctx->sw * ctx->sh * 4 + (x + y * cw) * 4;
+			tp = video->sw * video->sh * 4 + (x + y * cw) * 4;
 
-			ctx->pos[tp + 0] = ((unsigned int) ofx + 0) +
-					   ((unsigned int) ofy + 0) * (ctx->w / 2);
-			ctx->pos[tp + 1] = ((unsigned int) ofx + 1) +
-					   ((unsigned int) ofy + 0) * (ctx->w / 2);
-			ctx->pos[tp + 2] = ((unsigned int) ofx + 0) +
-					   ((unsigned int) ofy + 1) * (ctx->w / 2);
-			ctx->pos[tp + 3] = ((unsigned int) ofx + 1) +
-					   ((unsigned int) ofy + 1) * (ctx->w / 2);
+			video->pos[tp + 0] = ((unsigned int) ofx + 0) +
+					   ((unsigned int) ofy + 0) * (video->w / 2);
+			video->pos[tp + 1] = ((unsigned int) ofx + 1) +
+					   ((unsigned int) ofy + 0) * (video->w / 2);
+			video->pos[tp + 2] = ((unsigned int) ofx + 0) +
+					   ((unsigned int) ofy + 1) * (video->w / 2);
+			video->pos[tp + 3] = ((unsigned int) ofx + 1) +
+					   ((unsigned int) ofy + 1) * (video->w / 2);
 
 			fx1 = (float) x * d - (float) ((unsigned int) ofx);
 			fx0 = 1.0 - fx1;
 			fy1 = (float) y * d - (float) ((unsigned int) ofy);
 			fy0 = 1.0 - fy1;
 
-			ctx->factor[tp + 0] = fx0 * fy0;
-			ctx->factor[tp + 1] = fx1 * fy0;
-			ctx->factor[tp + 2] = fx0 * fy1;
-			ctx->factor[tp + 3] = fx1 * fy1;
+			video->factor[tp + 0] = fx0 * fy0;
+			video->factor[tp + 1] = fx1 * fy0;
+			video->factor[tp + 2] = fx0 * fy1;
+			video->factor[tp + 3] = fx1 * fy1;
 
 			ofx += d;
 		}
