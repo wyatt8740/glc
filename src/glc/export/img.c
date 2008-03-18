@@ -40,7 +40,7 @@ struct img_s {
 	glc_thread_t thread;
 	int running;
 
-	glc_ctx_i ctx;
+	glc_stream_id_t id;
 
 	const char *filename_format;
 
@@ -49,7 +49,7 @@ struct img_s {
 
 	unsigned int w, h;
 	unsigned int row;
-	unsigned char *prev_pic;
+	unsigned char *prev_video_data_message;
 	glc_utime_t time;
 	int i;
 
@@ -59,8 +59,8 @@ struct img_s {
 void img_finish_callback(void *ptr, int err);
 int img_read_callback(glc_thread_state_t *state);
 
-int img_ctx_msg(img_t img, glc_ctx_message_t *ctx_msg);
-int img_pic(img_t img, glc_picture_header_t *pic_hdr,
+int img_video_format_message(img_t img, glc_video_format_message_t *video_format);
+int img_video_data_message(img_t img, glc_video_data_header_t *pic_hdr,
 	    const unsigned char *pic, size_t pic_size);
 
 int img_write_bmp(img_t img, const unsigned char *pic,
@@ -80,7 +80,7 @@ int img_init(img_t *img, glc_t *glc)
 	(*img)->fps_usec = 1000000 / (*img)->fps;
 	(*img)->write_proc = &img_write_png;
 	(*img)->filename_format = "frame%08d.png";
-	(*img)->ctx = 1;
+	(*img)->id = 1;
 
 	(*img)->thread.flags = GLC_THREAD_READ;
 	(*img)->thread.ptr = *img;
@@ -149,9 +149,9 @@ int img_set_format(img_t img, int format)
 	return 0;
 }
 
-int img_set_stream_number(img_t img, glc_ctx_i ctx)
+int img_set_stream_id(img_t img, glc_stream_id_t id)
 {
-	img->ctx = ctx;
+	img->id = id;
 	return 0;
 }
 
@@ -164,9 +164,9 @@ void img_finish_callback(void *ptr, int err)
 	if (err)
 		glc_log(img->glc, GLC_ERROR, "img", "%s (%d)", strerror(err), err);
 
-	if (img->prev_pic) {
-		free(img->prev_pic);
-		img->prev_pic = NULL;
+	if (img->prev_video_data_message) {
+		free(img->prev_video_data_message);
+		img->prev_video_data_message = NULL;
 	}
 
 	img->i = 0;
@@ -178,62 +178,62 @@ int img_read_callback(glc_thread_state_t *state)
 	img_t img = state->ptr;
 	int ret = 0;
 
-	if (state->header.type == GLC_MESSAGE_CTX) {
-		ret = img_ctx_msg(img, (glc_ctx_message_t *) state->read_data);
-	} else if (state->header.type == GLC_MESSAGE_PICTURE) {
-		ret = img_pic(img, (glc_picture_header_t *) state->read_data,
-			      (const unsigned char *) &state->read_data[GLC_PICTURE_HEADER_SIZE],
+	if (state->header.type == GLC_MESSAGE_VIDEO_FORMAT) {
+		ret = img_video_format_message(img, (glc_video_format_message_t *) state->read_data);
+	} else if (state->header.type == GLC_MESSAGE_VIDEO_DATA) {
+		ret = img_video_data_message(img, (glc_video_data_header_t *) state->read_data,
+			      (const unsigned char *) &state->read_data[GLC_VIDEO_DATA_HEADER_SIZE],
 			      state->read_size);
 	}
 
 	return ret;
 }
 
-int img_ctx_msg(img_t img, glc_ctx_message_t *ctx_msg)
+int img_video_format_message(img_t img, glc_video_format_message_t *video_format)
 {
-	if (ctx_msg->ctx != img->ctx)
+	if (video_format->id != img->id)
 		return 0;
 
-	if (!(ctx_msg->flags & GLC_CTX_BGR)) {
+	if (video_format->format != GLC_VIDEO_BGR) {
 		glc_log(img->glc, GLC_ERROR, "img",
-				"ctx %d is in unsupported format", ctx_msg->ctx);
+				"video stream %d is in unsupported format", video_format->id);
 		return ENOTSUP;
 	}
 
-	img->w = ctx_msg->w;
-	img->h = ctx_msg->h;
+	img->w = video_format->width;
+	img->h = video_format->height;
 	img->row = img->w * 3;
 
-	if (ctx_msg->flags & GLC_CTX_DWORD_ALIGNED) {
+	if (video_format->flags & GLC_VIDEO_DWORD_ALIGNED) {
 		if (img->row % 8 != 0)
 			img->row += 8 - img->row % 8;
 	}
 
-	if (img->prev_pic)
-		img->prev_pic = (unsigned char *) realloc(img->prev_pic, img->row * img->h);
+	if (img->prev_video_data_message)
+		img->prev_video_data_message = (unsigned char *) realloc(img->prev_video_data_message, img->row * img->h);
 	else
-		img->prev_pic = (unsigned char *) malloc(img->row * img->h);
-	memset(img->prev_pic, 0, img->row * img->h);
+		img->prev_video_data_message = (unsigned char *) malloc(img->row * img->h);
+	memset(img->prev_video_data_message, 0, img->row * img->h);
 
 	return 0;
 }
 
-int img_pic(img_t img, glc_picture_header_t *pic_hdr,
+int img_video_data_message(img_t img, glc_video_data_header_t *pic_hdr,
 	    const unsigned char *pic, size_t pic_size)
 {
 	int ret = 0;
 	char filename[1024];
 
-	if (pic_hdr->ctx != img->ctx)
+	if (pic_hdr->id != img->id)
 		return 0;
 
-	if (img->time < pic_hdr->timestamp) {
+	if (img->time < pic_hdr->time) {
 		/* write previous pic until we are 'fps' away from current time */
-		while (img->time + img->fps_usec < pic_hdr->timestamp) {
+		while (img->time + img->fps_usec < pic_hdr->time) {
 			img->time += img->fps_usec;
 
 			snprintf(filename, sizeof(filename) - 1, img->filename_format, img->i++);
-			img->write_proc(img, img->prev_pic, img->w, img->h, filename);
+			img->write_proc(img, img->prev_video_data_message, img->w, img->h, filename);
 		}
 
 		img->time += img->fps_usec;
@@ -242,7 +242,7 @@ int img_pic(img_t img, glc_picture_header_t *pic_hdr,
 		ret = img->write_proc(img, pic, img->w, img->h, filename);
 	}
 
-	memcpy(img->prev_pic, pic, pic_size);
+	memcpy(img->prev_video_data_message, pic, pic_size);
 
 	return ret;
 }

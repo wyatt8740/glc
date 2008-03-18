@@ -66,10 +66,10 @@ __PUBLIC int img_set_filename(img_t img, const char *filename);
  * Only frames from one video stream will be written. Default
  * stream number is 1.
  * \param img img object
- * \param ctx video stream number
+ * \param id video stream id
  * \return 0 on success otherwise an error code
  */
-__PUBLIC int img_set_stream_number(img_t img, glc_ctx_i ctx);
+__PUBLIC int img_set_stream_id(img_t img, glc_stream_id_t id);
 
 /**
  * \brief set fps
