@@ -59,8 +59,8 @@ struct play_s {
 	double fps;
 
 	const char *export_filename_format;
-	glc_ctx_i export_ctx;
-	glc_audio_i export_audio;
+	glc_stream_id_t export_video_id;
+	glc_stream_id_t export_audio_id;
 	int img_format;
 
 	glc_utime_t silence_threshold;
@@ -145,22 +145,22 @@ int main(int argc, char *argv[])
 			play.action = action_info;
 			break;
 		case 'a':
-			play.export_audio = atoi(optarg);
-			if (play.export_audio < 1)
+			play.export_audio_id = atoi(optarg);
+			if (play.export_audio_id < 1)
 				goto usage;
 			play.action = action_wav;
 			break;
 		case 'p':
 			play.img_format = IMG_PNG;
 		case 'b':
-			play.export_ctx = atoi(optarg);
-			if (play.export_ctx < 1)
+			play.export_video_id = atoi(optarg);
+			if (play.export_video_id < 1)
 				goto usage;
 			play.action = action_img;
 			break;
 		case 'y':
-			play.export_ctx = atoi(optarg);
-			if (play.export_ctx < 1)
+			play.export_video_id = atoi(optarg);
+			if (play.export_video_id < 1)
 				goto usage;
 			play.action = action_yuv4mpeg;
 			break;
@@ -621,7 +621,7 @@ int export_img(struct play_s *play)
 	if ((ret = img_init(&img, &play->glc)))
 		goto err;
 	img_set_filename(img, play->export_filename_format);
-	img_set_stream_number(img, play->export_ctx);
+	img_set_stream_id(img, play->export_video_id);
 	img_set_format(img, play->img_format);
 	img_set_fps(img, play->fps);
 
@@ -736,7 +736,7 @@ int export_yuv4mpeg(struct play_s *play)
 	if ((ret = yuv4mpeg_init(&yuv4mpeg, &play->glc)))
 		goto err;
 	yuv4mpeg_set_fps(yuv4mpeg, play->fps);
-	yuv4mpeg_set_stream_number(yuv4mpeg, play->export_ctx);
+	yuv4mpeg_set_stream_id(yuv4mpeg, play->export_video_id);
 	yuv4mpeg_set_interpolation(yuv4mpeg, play->interpolate);
 	yuv4mpeg_set_filename(yuv4mpeg, play->export_filename_format);
 
@@ -826,7 +826,7 @@ int export_wav(struct play_s *play)
 		goto err;
 	wav_set_interpolation(wav, play->interpolate);
 	wav_set_filename(wav, play->export_filename_format);
-	wav_set_stream_number(wav, play->export_audio);
+	wav_set_stream_id(wav, play->export_audio_id);
 	wav_set_silence_threshold(wav, play->silence_threshold);
 
 	/* start the threads */
