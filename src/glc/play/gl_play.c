@@ -92,7 +92,7 @@ int gl_play_init_texture_information(gl_play_t gl_play);
 int gl_play_create_textures(gl_play_t gl_play);
 int gl_play_destroy_textures(gl_play_t gl_play);
 
-int gl_play_draw_video_data_messageture(gl_play_t gl_play, char *from);
+int gl_play_draw_video_frame_messageture(gl_play_t gl_play, char *from);
 
 int gl_play_handle_xevents(gl_play_t gl_play, glc_thread_state_t *state);
 
@@ -191,7 +191,7 @@ void gl_play_finish_callback(void *ptr, int err)
 	gl_play->dpy = NULL;
 }
 
-int gl_play_draw_video_data_messageture(gl_play_t gl_play, char *from)
+int gl_play_draw_video_frame_messageture(gl_play_t gl_play, char *from)
 {
 	unsigned int x, y, tex_i = 0;
 
@@ -597,7 +597,7 @@ int gl_play_read_callback(glc_thread_state_t *state)
 	gl_play_t gl_play = (gl_play_t) state->ptr;
 
 	glc_video_format_message_t *format_msg;
-	glc_video_data_header_t *pic_hdr;
+	glc_video_frame_header_t *pic_hdr;
 	glc_utime_t time;
 
 	gl_handle_xevents(gl_play, state);
@@ -637,8 +637,8 @@ int gl_play_read_callback(glc_thread_state_t *state)
 				format_msg->id, format_msg->format);
 			return EINVAL;
 		}
-	} else if (state->header.type == GLC_MESSAGE_VIDEO_DATA) {
-		pic_hdr = (glc_video_data_header_t *) state->read_data;
+	} else if (state->header.type == GLC_MESSAGE_VIDEO_FRAME) {
+		pic_hdr = (glc_video_frame_header_t *) state->read_data;
 
 		if (pic_hdr->id != gl_play->id)
 			return 0;
@@ -658,7 +658,7 @@ int gl_play_read_callback(glc_thread_state_t *state)
 		}
 
 		/* draw first, measure and sleep after */
-		gl_play_draw_video_data_messageture(gl_play, &state->read_data[sizeof(glc_video_data_header_t)]);
+		gl_play_draw_video_frame_messageture(gl_play, &state->read_data[sizeof(glc_video_frame_header_t)]);
 
 		/* wait until actual drawing is done */
 		glFinish();

@@ -189,7 +189,7 @@ int color_read_callback(glc_thread_state_t *state)
 {
 	color_t color = (color_t) state->ptr;
 	struct color_video_stream_s *video;
-	glc_video_data_header_t *pic_hdr;
+	glc_video_frame_header_t *pic_hdr;
 
 	if (state->header.type == GLC_MESSAGE_COLOR) {
 		color_color_msg(color, (glc_color_message_t *) state->read_data);
@@ -202,8 +202,8 @@ int color_read_callback(glc_thread_state_t *state)
 	if (state->header.type == GLC_MESSAGE_VIDEO_FORMAT)
 		color_video_format_msg(color, (glc_video_format_message_t *) state->read_data);
 
-	if (state->header.type == GLC_MESSAGE_VIDEO_DATA) {
-		pic_hdr = (glc_video_data_header_t *) state->read_data;
+	if (state->header.type == GLC_MESSAGE_VIDEO_FRAME) {
+		pic_hdr = (glc_video_frame_header_t *) state->read_data;
 		color_get_video_stream(color, pic_hdr->id, &video);
 		state->threadptr = video;
 
@@ -223,10 +223,10 @@ int color_write_callback(glc_thread_state_t *state)
 {
 	struct color_video_stream_s *video = state->threadptr;
 
-	memcpy(state->write_data, state->read_data, sizeof(glc_video_data_header_t));
+	memcpy(state->write_data, state->read_data, sizeof(glc_video_frame_header_t));
 	video->proc(state->ptr, video,
-		  (unsigned char *) &state->read_data[sizeof(glc_video_data_header_t)],
-		  (unsigned char *) &state->write_data[sizeof(glc_video_data_header_t)]);
+		  (unsigned char *) &state->read_data[sizeof(glc_video_frame_header_t)],
+		  (unsigned char *) &state->write_data[sizeof(glc_video_frame_header_t)]);
 
 	pthread_rwlock_unlock(&video->update);
 	return 0;

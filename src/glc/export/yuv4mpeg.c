@@ -42,7 +42,7 @@ struct yuv4mpeg_s {
 	double fps;
 
 	unsigned int size;
-	char *prev_video_data_message;
+	char *prev_video_frame_message;
 	int interpolate;
 
 	const char *filename_format;
@@ -53,8 +53,8 @@ int yuv4mpeg_read_callback(glc_thread_state_t *state);
 void yuv4mpeg_finish_callback(void *priv, int err);
 
 int yuv4mpeg_handle_hdr(yuv4mpeg_t yuv4mpeg, glc_video_format_message_t *video_format);
-int yuv4mpeg_handle_video_data_message(yuv4mpeg_t yuv4mpeg, glc_video_data_header_t *pic_header, char *data);
-int yuv4mpeg_write_video_data_message(yuv4mpeg_t yuv4mpeg, char *pic);
+int yuv4mpeg_handle_video_frame_message(yuv4mpeg_t yuv4mpeg, glc_video_frame_header_t *pic_header, char *data);
+int yuv4mpeg_write_video_frame_message(yuv4mpeg_t yuv4mpeg, char *pic);
 
 int yuv4mpeg_init(yuv4mpeg_t *yuv4mpeg, glc_t *glc)
 {
@@ -144,9 +144,9 @@ void yuv4mpeg_finish_callback(void *priv, int err)
 		yuv4mpeg->to = NULL;
 	}
 
-	if (yuv4mpeg->prev_video_data_message) {
-		free(yuv4mpeg->prev_video_data_message);
-		yuv4mpeg->prev_video_data_message = NULL;
+	if (yuv4mpeg->prev_video_frame_message) {
+		free(yuv4mpeg->prev_video_frame_message);
+		yuv4mpeg->prev_video_frame_message = NULL;
 	}
 
 	yuv4mpeg->file_count = 0;
@@ -159,8 +159,8 @@ int yuv4mpeg_read_callback(glc_thread_state_t *state)
 
 	if (state->header.type == GLC_MESSAGE_VIDEO_FORMAT)
 		return yuv4mpeg_handle_hdr(yuv4mpeg, (glc_video_format_message_t *) state->read_data);
-	else if (state->header.type == GLC_MESSAGE_VIDEO_DATA)
-		return yuv4mpeg_handle_video_data_message(yuv4mpeg, (glc_video_data_header_t *) state->read_data, &state->read_data[sizeof(glc_video_data_header_t)]);
+	else if (state->header.type == GLC_MESSAGE_VIDEO_FRAME)
+		return yuv4mpeg_handle_video_frame_message(yuv4mpeg, (glc_video_frame_header_t *) state->read_data, &state->read_data[sizeof(glc_video_frame_header_t)]);
 
 	return 0;
 }
@@ -197,15 +197,15 @@ int yuv4mpeg_handle_hdr(yuv4mpeg_t yuv4mpeg, glc_video_format_message_t *video_f
 			 (video_format->width * video_format->height) / 2;
 
 	if (yuv4mpeg->interpolate) {
-		if (yuv4mpeg->prev_video_data_message)
-			yuv4mpeg->prev_video_data_message = (char *) realloc(yuv4mpeg->prev_video_data_message, yuv4mpeg->size);
+		if (yuv4mpeg->prev_video_frame_message)
+			yuv4mpeg->prev_video_frame_message = (char *) realloc(yuv4mpeg->prev_video_frame_message, yuv4mpeg->size);
 		else
-			yuv4mpeg->prev_video_data_message = (char *) malloc(yuv4mpeg->size);
+			yuv4mpeg->prev_video_frame_message = (char *) malloc(yuv4mpeg->size);
 
 		/* Set Y' 0 */
-		memset(yuv4mpeg->prev_video_data_message, 0, video_format->width * video_format->height);
+		memset(yuv4mpeg->prev_video_frame_message, 0, video_format->width * video_format->height);
 		/* Set CbCr 128 */
-		memset(&yuv4mpeg->prev_video_data_message[video_format->width * video_format->height],
+		memset(&yuv4mpeg->prev_video_frame_message[video_format->width * video_format->height],
 		       128, (video_format->width * video_format->height) / 2);
 	}
 
@@ -223,7 +223,7 @@ int yuv4mpeg_handle_hdr(yuv4mpeg_t yuv4mpeg, glc_video_format_message_t *video_f
 	return 0;
 }
 
-int yuv4mpeg_handle_video_data_message(yuv4mpeg_t yuv4mpeg, glc_video_data_header_t *pic_hdr, char *data)
+int yuv4mpeg_handle_video_frame_message(yuv4mpeg_t yuv4mpeg, glc_video_frame_header_t *pic_hdr, char *data)
 {
 	if (pic_hdr->id != yuv4mpeg->id)
 		return 0;
@@ -231,20 +231,20 @@ int yuv4mpeg_handle_video_data_message(yuv4mpeg_t yuv4mpeg, glc_video_data_heade
 	if (yuv4mpeg->time < pic_hdr->time) {
 		while (yuv4mpeg->time + yuv4mpeg->fps_usec < pic_hdr->time) {
 			if (yuv4mpeg->interpolate)
-				yuv4mpeg_write_video_data_message(yuv4mpeg, yuv4mpeg->prev_video_data_message);
+				yuv4mpeg_write_video_frame_message(yuv4mpeg, yuv4mpeg->prev_video_frame_message);
 			yuv4mpeg->time += yuv4mpeg->fps_usec;
 		}
-		yuv4mpeg_write_video_data_message(yuv4mpeg, data);
+		yuv4mpeg_write_video_frame_message(yuv4mpeg, data);
 		yuv4mpeg->time += yuv4mpeg->fps_usec;
 	}
 
 	if (yuv4mpeg->interpolate)
-		memcpy(yuv4mpeg->prev_video_data_message, data, yuv4mpeg->size);
+		memcpy(yuv4mpeg->prev_video_frame_message, data, yuv4mpeg->size);
 
 	return 0;
 }
 
-int yuv4mpeg_write_video_data_message(yuv4mpeg_t yuv4mpeg, char *pic)
+int yuv4mpeg_write_video_frame_message(yuv4mpeg_t yuv4mpeg, char *pic)
 {
 	fprintf(yuv4mpeg->to, "FRAME\n");
 	fwrite(pic, 1, yuv4mpeg->size, yuv4mpeg->to);

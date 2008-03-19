@@ -735,7 +735,7 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 {
 	struct gl_capture_video_stream_s *video;
 	glc_message_header_t msg;
-	glc_video_data_header_t pic;
+	glc_video_frame_header_t pic;
 	glc_utime_t now;
 	char *dma;
 	int ret = 0;
@@ -745,7 +745,7 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 
 	gl_capture_get_video_stream(gl_capture, &video, dpy, drawable);
 
-	msg.type = GLC_MESSAGE_VIDEO_DATA;
+	msg.type = GLC_MESSAGE_VIDEO_FRAME;
 	pic.id = video->id;
 
 	/* get current time */
@@ -784,14 +784,14 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 		goto finish;
 	if ((ret = ps_packet_write(&video->packet, &msg, sizeof(glc_message_header_t))))
 		goto cancel;
-	if ((ret = ps_packet_write(&video->packet, &pic, sizeof(glc_video_data_header_t))))
+	if ((ret = ps_packet_write(&video->packet, &pic, sizeof(glc_video_frame_header_t))))
 		goto cancel;
 
 	if (gl_capture->flags & GL_CAPTURE_USE_PBO) {
 		/* is this safe, what happens if this is called simultaneously? */
 		if ((ret = ps_packet_setsize(&video->packet, video->row * video->ch
 								+ sizeof(glc_message_header_t)
-								+ sizeof(glc_video_data_header_t))))
+								+ sizeof(glc_video_frame_header_t))))
 			goto cancel;
 
 		if ((ret = gl_capture_read_pbo(gl_capture, video)))

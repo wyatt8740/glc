@@ -207,7 +207,7 @@ void *demux_thread(void *argptr)
 			goto err;
 
 		if ((msg_hdr.type == GLC_MESSAGE_CLOSE) |
-		    (msg_hdr.type == GLC_MESSAGE_VIDEO_DATA) |
+		    (msg_hdr.type == GLC_MESSAGE_VIDEO_FRAME) |
 		    (msg_hdr.type == GLC_MESSAGE_VIDEO_FORMAT)) {
 			/* handle msg to gl_play */
 			demux_video_stream_message(demux, &msg_hdr, data, data_size);
@@ -263,8 +263,8 @@ int demux_video_stream_message(demux_t demux, glc_message_header_t *header,
 		return 0;
 	} else if (header->type == GLC_MESSAGE_VIDEO_FORMAT)
 		id = ((glc_video_format_message_t *) data)->id;
-	else if (header->type == GLC_MESSAGE_VIDEO_DATA)
-		id = ((glc_video_data_header_t *) data)->id;
+	else if (header->type == GLC_MESSAGE_VIDEO_FRAME)
+		id = ((glc_video_frame_header_t *) data)->id;
 	else
 		return EINVAL;
 

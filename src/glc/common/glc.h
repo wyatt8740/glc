@@ -164,7 +164,7 @@ typedef u_int8_t glc_message_type_t;
 /** end of stream */
 #define GLC_MESSAGE_CLOSE              0x01
 /** video data message */
-#define GLC_MESSAGE_VIDEO_DATA         0x02
+#define GLC_MESSAGE_VIDEO_FRAME        0x02
 /** video format message */
 #define GLC_MESSAGE_VIDEO_FORMAT       0x03
 /** lzo-compressed packet */
@@ -244,7 +244,7 @@ typedef struct {
 	glc_stream_id_t id;
 	/** time */
 	glc_utime_t time;
-} __attribute__((packed)) glc_video_data_header_t;
+} __attribute__((packed)) glc_video_frame_header_t;
 
 /** audio format type */
 typedef u_int8_t glc_audio_format_t;

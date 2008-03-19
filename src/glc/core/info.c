@@ -78,7 +78,7 @@ void info_finish_callback(void *ptr, int err);
 int info_read_callback();
 
 void video_format_info(info_t info, glc_video_format_message_t *video_message);
-void video_data_info(info_t info, glc_video_data_header_t *pic_header);
+void video_frame_info(info_t info, glc_video_frame_header_t *pic_header);
 void audio_format_info(info_t info, glc_audio_format_message_t *fmt_message);
 void audio_data_info(info_t info, glc_audio_data_header_t *audio_header);
 void color_info(info_t info, glc_color_message_t *color_msg);
@@ -201,8 +201,8 @@ int info_read_callback(glc_thread_state_t *state)
 
 	if (state->header.type == GLC_MESSAGE_VIDEO_FORMAT)
 		video_format_info(info, (glc_video_format_message_t *) state->read_data);
-	else if (state->header.type == GLC_MESSAGE_VIDEO_DATA)
-		video_data_info(info, (glc_video_data_header_t *) state->read_data);
+	else if (state->header.type == GLC_MESSAGE_VIDEO_FRAME)
+		video_frame_info(info, (glc_video_frame_header_t *) state->read_data);
 	else if (state->header.type == GLC_MESSAGE_AUDIO_FORMAT)
 		audio_format_info(info, (glc_audio_format_message_t *) state->read_data);
 	else if (state->header.type == GLC_MESSAGE_AUDIO_DATA)
@@ -315,7 +315,7 @@ void video_format_info(info_t info, glc_video_format_message_t *format_message)
 		fprintf(info->stream, "video stream %d\n", format_message->id);
 }
 
-void video_data_info(info_t info, glc_video_data_header_t *pic_header)
+void video_frame_info(info_t info, glc_video_frame_header_t *pic_header)
 {
 	struct info_video_stream_s *video;
 	info->time = pic_header->time;

@@ -186,20 +186,20 @@ int rgb_read_callback(glc_thread_state_t *state)
 {
 	rgb_t rgb = (rgb_t) state->ptr;
 	struct rgb_video_stream_s *ctx;
-	glc_video_data_header_t *pic_hdr;
+	glc_video_frame_header_t *pic_hdr;
 
 	if (state->header.type == GLC_MESSAGE_VIDEO_FORMAT)
 		rgb_video_format_message(rgb, (glc_video_format_message_t *) state->read_data);
 
-	if (state->header.type == GLC_MESSAGE_VIDEO_DATA) {
-		pic_hdr = (glc_video_data_header_t *) state->read_data;
+	if (state->header.type == GLC_MESSAGE_VIDEO_FRAME) {
+		pic_hdr = (glc_video_frame_header_t *) state->read_data;
 		rgbget_video_stream(rgb, pic_hdr->id, &ctx);
 		state->threadptr = ctx;
 
 		pthread_rwlock_rdlock(&ctx->update);
 
 		if (ctx->convert)
-			state->write_size = sizeof(glc_video_data_header_t) + ctx->size;
+			state->write_size = sizeof(glc_video_frame_header_t) + ctx->size;
 		else {
 			state->flags |= GLC_THREAD_COPY;
 			pthread_rwlock_unlock(&ctx->update);
@@ -215,10 +215,10 @@ int rgb_write_callback(glc_thread_state_t *state)
 	rgb_t rgb = (rgb_t) state->ptr;
 	struct rgb_video_stream_s *ctx = state->threadptr;
 
-	memcpy(state->write_data, state->read_data, sizeof(glc_video_data_header_t));
+	memcpy(state->write_data, state->read_data, sizeof(glc_video_frame_header_t));
 	rgb_convert_lookup(rgb, ctx,
-		    (unsigned char *) &state->read_data[sizeof(glc_video_data_header_t)],
-		    (unsigned char *) &state->write_data[sizeof(glc_video_data_header_t)]);
+		    (unsigned char *) &state->read_data[sizeof(glc_video_frame_header_t)],
+		    (unsigned char *) &state->write_data[sizeof(glc_video_frame_header_t)]);
 	pthread_rwlock_unlock(&ctx->update);
 
 	return 0;

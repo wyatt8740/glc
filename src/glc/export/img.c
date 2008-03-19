@@ -49,7 +49,7 @@ struct img_s {
 
 	unsigned int w, h;
 	unsigned int row;
-	unsigned char *prev_video_data_message;
+	unsigned char *prev_video_frame_message;
 	glc_utime_t time;
 	int i;
 
@@ -60,7 +60,7 @@ void img_finish_callback(void *ptr, int err);
 int img_read_callback(glc_thread_state_t *state);
 
 int img_video_format_message(img_t img, glc_video_format_message_t *video_format);
-int img_video_data_message(img_t img, glc_video_data_header_t *pic_hdr,
+int img_video_frame_message(img_t img, glc_video_frame_header_t *pic_hdr,
 	    const unsigned char *pic, size_t pic_size);
 
 int img_write_bmp(img_t img, const unsigned char *pic,
@@ -164,9 +164,9 @@ void img_finish_callback(void *ptr, int err)
 	if (err)
 		glc_log(img->glc, GLC_ERROR, "img", "%s (%d)", strerror(err), err);
 
-	if (img->prev_video_data_message) {
-		free(img->prev_video_data_message);
-		img->prev_video_data_message = NULL;
+	if (img->prev_video_frame_message) {
+		free(img->prev_video_frame_message);
+		img->prev_video_frame_message = NULL;
 	}
 
 	img->i = 0;
@@ -180,9 +180,9 @@ int img_read_callback(glc_thread_state_t *state)
 
 	if (state->header.type == GLC_MESSAGE_VIDEO_FORMAT) {
 		ret = img_video_format_message(img, (glc_video_format_message_t *) state->read_data);
-	} else if (state->header.type == GLC_MESSAGE_VIDEO_DATA) {
-		ret = img_video_data_message(img, (glc_video_data_header_t *) state->read_data,
-			      (const unsigned char *) &state->read_data[sizeof(glc_video_data_header_t)],
+	} else if (state->header.type == GLC_MESSAGE_VIDEO_FRAME) {
+		ret = img_video_frame_message(img, (glc_video_frame_header_t *) state->read_data,
+			      (const unsigned char *) &state->read_data[sizeof(glc_video_frame_header_t)],
 			      state->read_size);
 	}
 
@@ -209,16 +209,16 @@ int img_video_format_message(img_t img, glc_video_format_message_t *video_format
 			img->row += 8 - img->row % 8;
 	}
 
-	if (img->prev_video_data_message)
-		img->prev_video_data_message = (unsigned char *) realloc(img->prev_video_data_message, img->row * img->h);
+	if (img->prev_video_frame_message)
+		img->prev_video_frame_message = (unsigned char *) realloc(img->prev_video_frame_message, img->row * img->h);
 	else
-		img->prev_video_data_message = (unsigned char *) malloc(img->row * img->h);
-	memset(img->prev_video_data_message, 0, img->row * img->h);
+		img->prev_video_frame_message = (unsigned char *) malloc(img->row * img->h);
+	memset(img->prev_video_frame_message, 0, img->row * img->h);
 
 	return 0;
 }
 
-int img_video_data_message(img_t img, glc_video_data_header_t *pic_hdr,
+int img_video_frame_message(img_t img, glc_video_frame_header_t *pic_hdr,
 	    const unsigned char *pic, size_t pic_size)
 {
 	int ret = 0;
@@ -233,7 +233,7 @@ int img_video_data_message(img_t img, glc_video_data_header_t *pic_hdr,
 			img->time += img->fps_usec;
 
 			snprintf(filename, sizeof(filename) - 1, img->filename_format, img->i++);
-			img->write_proc(img, img->prev_video_data_message, img->w, img->h, filename);
+			img->write_proc(img, img->prev_video_frame_message, img->w, img->h, filename);
 		}
 
 		img->time += img->fps_usec;
@@ -242,7 +242,7 @@ int img_video_data_message(img_t img, glc_video_data_header_t *pic_hdr,
 		ret = img->write_proc(img, pic, img->w, img->h, filename);
 	}
 
-	memcpy(img->prev_video_data_message, pic, pic_size);
+	memcpy(img->prev_video_frame_message, pic, pic_size);
 
 	return ret;
 }
