@@ -44,14 +44,14 @@ __PUBLIC int gl_play_init(gl_play_t *gl_play, glc_t *glc);
 __PUBLIC int gl_play_destroy(gl_play_t gl_play);
 
 /**
- * \brief set video stream number
+ * \brief set video stream id
  *
  * Default video stream is 1.
  * \param gl_play gl_play object
- * \param ctx video stream number
+ * \param id video stream id
  * \return 0 on success otherwise an error code
  */
-__PUBLIC int gl_play_set_stream_number(gl_play_t gl_play, glc_ctx_i ctx);
+__PUBLIC int gl_play_set_stream_id(gl_play_t gl_play, glc_stream_id_t id);
 
 /**
  * \brief start gl_play process

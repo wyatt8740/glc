@@ -46,7 +46,7 @@ struct gl_play_s {
 
 	glc_thread_t play_thread;
 
-	glc_ctx_i ctx_i;
+	glc_stream_id_t id;
 	GLenum format;
 	unsigned int w, h;
 	unsigned int pack_alignment;
@@ -92,7 +92,7 @@ int gl_play_init_texture_information(gl_play_t gl_play);
 int gl_play_create_textures(gl_play_t gl_play);
 int gl_play_destroy_textures(gl_play_t gl_play);
 
-int gl_play_draw_picture(gl_play_t gl_play, char *from);
+int gl_play_draw_video_data_messageture(gl_play_t gl_play, char *from);
 
 int gl_play_handle_xevents(gl_play_t gl_play, glc_thread_state_t *state);
 
@@ -102,7 +102,7 @@ int gl_play_init(gl_play_t *gl_play, glc_t *glc)
 	memset(*gl_play, 0, sizeof(struct gl_play_s));
 
 	(*gl_play)->glc = glc;
-	(*gl_play)->ctx_i = 1;
+	(*gl_play)->id = 1;
 	(*gl_play)->sleep_threshold = 100; /* 100us */
 	(*gl_play)->skip_threshold = 25000; /* 25ms */
 
@@ -125,9 +125,9 @@ int gl_play_destroy(gl_play_t gl_play)
 	return 0;
 }
 
-int gl_play_set_stream_number(gl_play_t gl_play, glc_ctx_i ctx)
+int gl_play_set_stream_number(gl_play_t gl_play, glc_stream_id_t ctx)
 {
-	gl_play->ctx_i = ctx;
+	gl_play->id = ctx;
 	return 0;
 }
 
@@ -191,7 +191,7 @@ void gl_play_finish_callback(void *ptr, int err)
 	gl_play->dpy = NULL;
 }
 
-int gl_play_draw_picture(gl_play_t gl_play, char *from)
+int gl_play_draw_video_data_messageture(gl_play_t gl_play, char *from)
 {
 	unsigned int x, y, tex_i = 0;
 
@@ -284,7 +284,7 @@ int gl_play_update_ctx(gl_play_t gl_play)
 	if (!(gl_play->flags & GL_PLAY_INITIALIZED))
 		return EINVAL;
 
-	snprintf(gl_play->name, sizeof(gl_play->name) - 1, "glc-play (ctx %d)", gl_play->ctx_i);
+	snprintf(gl_play->name, sizeof(gl_play->name) - 1, "glc-play (ctx %d)", gl_play->id);
 
 	XUnmapWindow(gl_play->dpy, gl_play->win);
 
@@ -596,8 +596,8 @@ int gl_play_read_callback(glc_thread_state_t *state)
 {
 	gl_play_t gl_play = (gl_play_t) state->ptr;
 
-	glc_ctx_message_t *ctx_msg;
-	glc_picture_header_t *pic_hdr;
+	glc_video_format_message_t *format_msg;
+	glc_video_data_header_t *pic_hdr;
 	glc_utime_t time;
 
 	gl_handle_xevents(gl_play, state);
@@ -605,64 +605,67 @@ int gl_play_read_callback(glc_thread_state_t *state)
 	if (state->flags & GLC_THREAD_STOP)
 		return 0;
 
-	if (state->header.type == GLC_MESSAGE_CTX) {
-		ctx_msg = (glc_ctx_message_t *) state->read_data;
-		if (ctx_msg->ctx != gl_play->ctx_i)
+	if (state->header.type == GLC_MESSAGE_VIDEO_FORMAT) {
+		format_msg = (glc_video_format_message_t *) state->read_data;
+		if (format_msg->id != gl_play->id)
 			return 0; /* just ignore it */
 
-		gl_play->w = ctx_msg->w;
-		gl_play->h = ctx_msg->h;
+		gl_play->w = format_msg->width;
+		gl_play->h = format_msg->height;
 		gl_play->bpp = 3;
 		gl_play->row = gl_play->w * gl_play->bpp;
 
-		if (ctx_msg->flags & GLC_CTX_DWORD_ALIGNED) {
+		if (format_msg->flags & GLC_VIDEO_DWORD_ALIGNED) {
 			gl_play->pack_alignment = 8;
 			if (gl_play->row % 8 != 0)
 				gl_play->row += 8 - gl_play->row % 8;
 		} else
 			gl_play->pack_alignment = 1;
 
-		if ((ctx_msg->flags & GLC_CTX_BGR) && (ctx_msg->flags & GLC_CTX_CREATE))
+		if ((format_msg->format == GLC_VIDEO_BGR) &&
+		    !(gl_play->flags & GL_PLAY_INITIALIZED))
 			gl_play_create_ctx(gl_play);
-		else if ((ctx_msg->flags & GLC_CTX_BGR) && (ctx_msg->flags & GLC_CTX_UPDATE)) {
+		else if (format_msg->format == GLC_VIDEO_BGR) {
 			if (gl_play_update_ctx(gl_play)) {
 				glc_log(gl_play->glc, GLC_ERROR, "gl_play",
-					 "broken ctx %d", ctx_msg->ctx);
+					 "broken video stream %d", format_msg->id);
 				return EINVAL;
 			}
 		} else {
 			glc_log(gl_play->glc, GLC_ERROR, "gl_play",
-				 "ctx %d is in unsupported format", ctx_msg->ctx);
+				"video stream %d is in unsupported format 0x%02x",
+				format_msg->id, format_msg->format);
 			return EINVAL;
 		}
-	} else if (state->header.type == GLC_MESSAGE_PICTURE) {
-		pic_hdr = (glc_picture_header_t *) state->read_data;
+	} else if (state->header.type == GLC_MESSAGE_VIDEO_DATA) {
+		pic_hdr = (glc_video_data_header_t *) state->read_data;
 
-		if (pic_hdr->ctx != gl_play->ctx_i)
+		if (pic_hdr->id != gl_play->id)
 			return 0;
 
 		if (!(gl_play->flags & GL_PLAY_INITIALIZED)) {
 			glc_log(gl_play->glc, GLC_ERROR, "gl_play",
-				 "picture refers to uninitalized ctx %d", pic_hdr->ctx);
+				"picture refers to uninitalized video stream %d",
+				pic_hdr->id);
 			return EINVAL;
 		}
 
 		/* check if we have to draw this frame */
 		time = glc_state_time(gl_play->glc);
-		if (time > pic_hdr->timestamp + gl_play->skip_threshold) {
+		if (time > pic_hdr->time + gl_play->skip_threshold) {
 			glc_log(gl_play->glc, GLC_DEBUG, "gl_play", "dropped frame");
 			return 0;
 		}
 
 		/* draw first, measure and sleep after */
-		gl_play_draw_picture(gl_play, &state->read_data[GLC_PICTURE_HEADER_SIZE]);
+		gl_play_draw_video_data_messageture(gl_play, &state->read_data[GLC_VIDEO_DATA_HEADER_SIZE]);
 
 		/* wait until actual drawing is done */
 		glFinish();
 
 		time = glc_state_time(gl_play->glc);
-		if (pic_hdr->timestamp > time + gl_play->sleep_threshold)
-			usleep(pic_hdr->timestamp - time);
+		if (pic_hdr->time > time + gl_play->sleep_threshold)
+			usleep(pic_hdr->time - time);
 
 		glXSwapBuffers(gl_play->dpy, gl_play->win);
 	}
