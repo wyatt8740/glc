@@ -77,7 +77,7 @@ void color_finish_callback(void *ptr, int err);
 void color_get_video_stream(color_t color, glc_stream_id_t id,
 		   struct color_video_stream_s **video);
 
-int color_video_msg(color_t color, glc_video_format_message_t *msg);
+int color_video_format_msg(color_t color, glc_video_format_message_t *msg);
 int color_color_msg(color_t color, glc_color_message_t *msg);
 
 int color_generate_ycbcr_lookup_table(color_t color,
@@ -200,7 +200,7 @@ int color_read_callback(glc_thread_state_t *state)
 	}
 
 	if (state->header.type == GLC_MESSAGE_VIDEO_FORMAT)
-		color_video_msg(color, (glc_video_format_message_t *) state->read_data);
+		color_video_format_msg(color, (glc_video_format_message_t *) state->read_data);
 
 	if (state->header.type == GLC_MESSAGE_VIDEO_DATA) {
 		pic_hdr = (glc_video_data_header_t *) state->read_data;

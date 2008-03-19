@@ -251,7 +251,7 @@ int rgb_video_format_message(rgb_t rgb, glc_video_format_message_t *video_format
 	struct rgb_video_stream_s *video;
 	rgbget_video_stream(rgb, video_format_message->id, &video);
 
-	if (!(video_format_message->flags & GLC_VIDEO_YCBCR_420JPEG))
+	if (video_format_message->format != GLC_VIDEO_YCBCR_420JPEG)
 		return 0; /* just don't convert */
 	
 	pthread_rwlock_wrlock(&video->update);

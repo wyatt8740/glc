@@ -125,7 +125,7 @@ int gl_play_destroy(gl_play_t gl_play)
 	return 0;
 }
 
-int gl_play_set_stream_number(gl_play_t gl_play, glc_stream_id_t ctx)
+int gl_play_set_stream_id(gl_play_t gl_play, glc_stream_id_t ctx)
 {
 	gl_play->id = ctx;
 	return 0;
