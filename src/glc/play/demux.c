@@ -30,26 +30,26 @@
 #include "gl_play.h"
 #include "alsa_play.h"
 
-struct demux_ctx_s {
-	glc_ctx_i ctx_i;
+struct demux_video_stream_s {
+	glc_stream_id_t id;
 	ps_buffer_t buffer;
 	ps_packet_t packet;
 
 	int running;
 	gl_play_t gl_play;
 
-	struct demux_ctx_s *next;
+	struct demux_video_stream_s *next;
 };
 
-struct demux_stream_s {
-	glc_audio_i audio_i;
+struct demux_audio_stream_s {
+	glc_stream_id_t id;
 	ps_buffer_t buffer;
 	ps_packet_t packet;
 
 	int running;
 	alsa_play_t alsa_play;
 
-	struct demux_stream_s *next;
+	struct demux_audio_stream_s *next;
 };
 
 struct demux_s {
@@ -64,29 +64,30 @@ struct demux_s {
 	ps_bufferattr_t video_bufferattr;
 	ps_bufferattr_t audio_bufferattr;
 
-	struct demux_ctx_s *ctx;
-	struct demux_stream_s *stream;
+	struct demux_video_stream_s *video;
+	struct demux_audio_stream_s *audio;
 };
 
 int demux_close(demux_t demux);
 void *demux_thread(void *argptr);
 
-int demux_video_message(demux_t demux, glc_message_header_t *header,
-			char *data, size_t size);
-int demux_video_close(demux_t demux);
-int demux_video_get_ctx(demux_t demux, glc_ctx_i ctx_i, struct demux_ctx_s **ctx);
-int demux_video_ctx_send(demux_t demux, struct demux_ctx_s *ctx,
-			 glc_message_header_t *header, char *data, size_t size);
-int demux_video_ctx_clean(demux_t demux, struct demux_ctx_s *ctx);
+int demux_video_stream_message(demux_t demux, glc_message_header_t *header,
+			       char *data, size_t size);
+int demux_video_stream_get(demux_t demux, glc_stream_id_t id,
+			   struct demux_video_stream_s **video);
+int demux_video_stream_send(demux_t demux, struct demux_video_stream_s *video,
+			    glc_message_header_t *header, char *data, size_t size);
+int demux_video_stream_close(demux_t demux);
+int demux_video_stream_clean(demux_t demux, struct demux_video_stream_s *video);
 
-int demux_audio_message(demux_t demux, glc_message_header_t *header,
-			char *data, size_t size);
-int demux_audio_close(demux_t demux);
-int demux_audio_get_stream(demux_t demux, glc_audio_i audio_i,
-			   struct demux_stream_s **stream);
-int demux_audio_stream_send(demux_t demux, struct demux_stream_s *stream,
+int demux_audio_stream_message(demux_t demux, glc_message_header_t *header,
+			       char *data, size_t size);
+int demux_audio_stream_get(demux_t demux, glc_stream_id_t id,
+			   struct demux_audio_stream_s **audio);
+int demux_audio_stream_send(demux_t demux, struct demux_audio_stream_s *audio,
 			 glc_message_header_t *header, char *data, size_t size);
-int demux_audio_stream_clean(demux_t demux, struct demux_stream_s *stream);
+int demux_audio_stream_close(demux_t demux);
+int demux_audio_stream_clean(demux_t demux, struct demux_audio_stream_s *audio);
 
 int demux_init(demux_t *demux, glc_t *glc)
 {
@@ -165,14 +166,14 @@ int demux_close(demux_t demux)
 {
 	int ret = 0;
 
-	if (demux->ctx != NULL) {
-		if ((ret = demux_video_close(demux)))
+	if (demux->video != NULL) {
+		if ((ret = demux_video_stream_close(demux)))
 			glc_log(demux->glc, GLC_ERROR, "demux", "can't close video streams: %s (%d)",
 				 strerror(ret), ret);
 	}
 
-	if (demux->stream != NULL) {
-		if ((ret = demux_audio_close(demux)))
+	if (demux->audio != NULL) {
+		if ((ret = demux_audio_stream_close(demux)))
 			glc_log(demux->glc, GLC_ERROR, "demux", "can't close audio streams: %s (%d)",
 				 strerror(ret), ret);
 	}
@@ -206,17 +207,17 @@ void *demux_thread(void *argptr)
 			goto err;
 
 		if ((msg_hdr.type == GLC_MESSAGE_CLOSE) |
-		    (msg_hdr.type == GLC_MESSAGE_PICTURE) |
-		    (msg_hdr.type == GLC_MESSAGE_CTX)) {
+		    (msg_hdr.type == GLC_MESSAGE_VIDEO_DATA) |
+		    (msg_hdr.type == GLC_MESSAGE_VIDEO_FORMAT)) {
 			/* handle msg to gl_play */
-			demux_video_message(demux, &msg_hdr, data, data_size);
+			demux_video_stream_message(demux, &msg_hdr, data, data_size);
 		}
 
 		if ((msg_hdr.type == GLC_MESSAGE_CLOSE) |
 		    (msg_hdr.type == GLC_MESSAGE_AUDIO_FORMAT) |
-		    (msg_hdr.type == GLC_MESSAGE_AUDIO)) {
+		    (msg_hdr.type == GLC_MESSAGE_AUDIO_DATA)) {
 			/* handle msg to alsa_play */
-			demux_audio_message(demux, &msg_hdr, data, data_size);
+			demux_audio_stream_message(demux, &msg_hdr, data, data_size);
 		}
 
 		ps_packet_close(&read);
@@ -229,8 +230,8 @@ finish:
 	if (glc_state_test(demux->glc, GLC_STATE_CANCEL))
 		ps_buffer_cancel(demux->from);
 
-	demux_video_close(demux);
-	demux_audio_close(demux);
+	demux_video_stream_close(demux);
+	demux_audio_stream_close(demux);
 
 	demux_close(demux);
 	return NULL;
@@ -242,74 +243,74 @@ err:
 	goto finish;
 }
 
-int demux_video_message(demux_t demux, glc_message_header_t *header,
+int demux_video_stream_message(demux_t demux, glc_message_header_t *header,
 			char *data, size_t size)
 {
-	struct demux_ctx_s *ctx;
-	glc_ctx_i ctx_i;
+	struct demux_video_stream_s *video;
+	glc_stream_id_t id;
 	int ret;
 
 	if (header->type == GLC_MESSAGE_CLOSE) {
 		/* broadcast to all */
-		ctx = demux->ctx;
-		while (ctx != NULL) {
-			if (ctx->running) {
-				if ((ret = demux_video_ctx_send(demux, ctx, header, data, size)))
+		video = demux->video;
+		while (video != NULL) {
+			if (video->running) {
+				if ((ret = demux_video_stream_send(demux, video, header, data, size)))
 					return ret;
 			}
-			ctx = ctx->next;
+			video = video->next;
 		}
 		return 0;
-	} else if (header->type == GLC_MESSAGE_CTX)
-		ctx_i = ((glc_ctx_message_t *) data)->ctx;
-	else if (header->type == GLC_MESSAGE_PICTURE)
-		ctx_i = ((glc_picture_header_t *) data)->ctx;
+	} else if (header->type == GLC_MESSAGE_VIDEO_FORMAT)
+		id = ((glc_video_format_message_t *) data)->id;
+	else if (header->type == GLC_MESSAGE_VIDEO_DATA)
+		id = ((glc_video_data_header_t *) data)->id;
 	else
 		return EINVAL;
 
 	/* pass to single client */
-	if ((ret = demux_video_get_ctx(demux, ctx_i, &ctx)))
+	if ((ret = demux_video_stream_get(demux, id, &video)))
 		return ret;
 
-	if ((ret = demux_video_ctx_send(demux, ctx, header, data, size)))
+	if ((ret = demux_video_stream_send(demux, video, header, data, size)))
 		return ret;
 
 	return 0;
 }
 
-int demux_video_ctx_send(demux_t demux, struct demux_ctx_s *ctx,
+int demux_video_stream_send(demux_t demux, struct demux_video_stream_s *video,
 			 glc_message_header_t *header, char *data, size_t size)
 {
 	int ret;
-	if ((ret = ps_packet_open(&ctx->packet, PS_PACKET_WRITE)))
+	if ((ret = ps_packet_open(&video->packet, PS_PACKET_WRITE)))
 		goto err;
-	if ((ret = ps_packet_write(&ctx->packet, header, GLC_MESSAGE_HEADER_SIZE)))
+	if ((ret = ps_packet_write(&video->packet, header, GLC_MESSAGE_HEADER_SIZE)))
 		goto err;
-	if ((ret = ps_packet_write(&ctx->packet, data, size)))
+	if ((ret = ps_packet_write(&video->packet, data, size)))
 		goto err;
-	if ((ret = ps_packet_close(&ctx->packet)))
+	if ((ret = ps_packet_close(&video->packet)))
 		goto err;
 err:
 	if (ret != EINTR)
 		return ret;
 
 	/* since it is EINTR, _cancel() is already done */
-	glc_log(demux->glc, GLC_DEBUG, "demux", "video stream %d has quit", ctx->ctx_i);
-	demux_video_ctx_clean(demux, ctx);
+	glc_log(demux->glc, GLC_DEBUG, "demux", "video stream %d has quit", video->id);
+	demux_video_stream_clean(demux, video);
 	return 0;
 }
 
-int demux_video_close(demux_t demux)
+int demux_video_stream_close(demux_t demux)
 {
-	struct demux_ctx_s *del;
+	struct demux_video_stream_s *del;
 
-	while (demux->ctx != NULL) {
-		del = demux->ctx;
-		demux->ctx = demux->ctx->next;
+	while (demux->video != NULL) {
+		del = demux->video;
+		demux->video = demux->video->next;
 
 		if (del->running) {
 			ps_buffer_cancel(&del->buffer);
-			demux_video_ctx_clean(demux, del);
+			demux_video_stream_clean(demux, del);
 		}
 
 		free(del);
@@ -317,98 +318,98 @@ int demux_video_close(demux_t demux)
 	return 0;
 }
 
-int demux_video_get_ctx(demux_t demux, glc_ctx_i ctx_i, struct demux_ctx_s **ctx)
+int demux_video_stream_get(demux_t demux, glc_stream_id_t id, struct demux_video_stream_s **video)
 {
 	int ret;
-	*ctx = demux->ctx;
+	*video = demux->video;
 
-	while (*ctx != NULL) {
-		if ((*ctx)->ctx_i == ctx_i)
+	while (*video != NULL) {
+		if ((*video)->id == id)
 			break;
-		*ctx = (*ctx)->next;
+		*video = (*video)->next;
 	}
 
-	if (*ctx == NULL) {
-		*ctx = malloc(sizeof(struct demux_ctx_s));
-		memset(*ctx, 0, sizeof(struct demux_ctx_s));
-		(*ctx)->ctx_i = ctx_i;
+	if (*video == NULL) {
+		*video = malloc(sizeof(struct demux_video_stream_s));
+		memset(*video, 0, sizeof(struct demux_video_stream_s));
+		(*video)->id = id;
 
-		if ((ret = ps_buffer_init(&(*ctx)->buffer, &demux->video_bufferattr)))
+		if ((ret = ps_buffer_init(&(*video)->buffer, &demux->video_bufferattr)))
 			return ret;
-		if ((ret = ps_packet_init(&(*ctx)->packet, &(*ctx)->buffer)))
+		if ((ret = ps_packet_init(&(*video)->packet, &(*video)->buffer)))
 			return ret;
 
-		if ((ret = gl_play_init(&(*ctx)->gl_play, demux->glc)))
+		if ((ret = gl_play_init(&(*video)->gl_play, demux->glc)))
 			return ret;
-		if ((ret = gl_play_set_stream_number((*ctx)->gl_play, (*ctx)->ctx_i)))
+		if ((ret = gl_play_set_stream_id((*video)->gl_play, (*video)->id)))
 			return ret;
-		if ((ret = gl_play_process_start((*ctx)->gl_play, &(*ctx)->buffer)))
+		if ((ret = gl_play_process_start((*video)->gl_play, &(*video)->buffer)))
 			return ret;
-		(*ctx)->running = 1;
+		(*video)->running = 1;
 
-		(*ctx)->next = demux->ctx;
-		demux->ctx = (*ctx);
+		(*video)->next = demux->video;
+		demux->video = (*video);
 	}
 	return 0;
 }
 
-int demux_video_ctx_clean(demux_t demux, struct demux_ctx_s *ctx)
+int demux_video_stream_clean(demux_t demux, struct demux_video_stream_s *video)
 {
 	int ret;
-	ctx->running = 0;
+	video->running = 0;
 
-	if ((ret = gl_play_process_wait(ctx->gl_play)))
+	if ((ret = gl_play_process_wait(video->gl_play)))
 		return ret;
-	gl_play_destroy(ctx->gl_play);
+	gl_play_destroy(video->gl_play);
 
-	ps_packet_destroy(&ctx->packet);
-	ps_buffer_destroy(&ctx->buffer);
+	ps_packet_destroy(&video->packet);
+	ps_buffer_destroy(&video->buffer);
 
 	return 0;
 }
 
-int demux_audio_message(demux_t demux, glc_message_header_t *header,
+int demux_audio_stream_message(demux_t demux, glc_message_header_t *header,
 			char *data, size_t size)
 {
-	struct demux_stream_s *stream;
-	glc_audio_i audio_i;
+	struct demux_audio_stream_s *audio;
+	glc_stream_id_t id;
 	int ret;
 
 	if (header->type == GLC_MESSAGE_CLOSE) {
 		/* broadcast to all */
-		stream = demux->stream;
-		while (stream != NULL) {
-			if (stream->running) {
-				if ((ret = demux_audio_stream_send(demux, stream, header, data, size)))
+		audio = demux->audio;
+		while (audio != NULL) {
+			if (audio->running) {
+				if ((ret = demux_audio_stream_send(demux, audio, header, data, size)))
 					return ret;
 			}
-			stream = stream->next;
+			audio = audio->next;
 		}
 		return 0;
 	} else if (header->type == GLC_MESSAGE_AUDIO_FORMAT)
-		audio_i = ((glc_audio_format_message_t *) data)->audio;
-	else if (header->type == GLC_MESSAGE_AUDIO)
-		audio_i = ((glc_audio_header_t *) data)->audio;
+		id = ((glc_audio_format_message_t *) data)->id;
+	else if (header->type == GLC_MESSAGE_AUDIO_DATA)
+		id = ((glc_audio_data_header_t *) data)->id;
 	else
 		return EINVAL;
 
 	/* pass to single client */
-	if ((ret = demux_audio_get_stream(demux, audio_i, &stream)))
+	if ((ret = demux_audio_stream_get(demux, id, &audio)))
 		return ret;
 
-	if ((ret = demux_audio_stream_send(demux, stream, header, data, size)))
+	if ((ret = demux_audio_stream_send(demux, audio, header, data, size)))
 		return ret;
 
 	return 0;
 }
 
-int demux_audio_close(demux_t demux)
+int demux_audio_stream_close(demux_t demux)
 {
-	struct demux_stream_s *del;
+	struct demux_audio_stream_s *del;
 
-	while (demux->stream != NULL) {
-		del = demux->stream;
-		demux->stream = demux->stream->next;
+	while (demux->audio != NULL) {
+		del = demux->audio;
+		demux->audio = demux->audio->next;
 
 		if (del->running) {
 			ps_buffer_cancel(&del->buffer);
@@ -420,79 +421,79 @@ int demux_audio_close(demux_t demux)
 	return 0;
 }
 
-int demux_audio_get_stream(demux_t demux, glc_audio_i audio_i,
-			   struct demux_stream_s **stream)
+int demux_audio_stream_get(demux_t demux, glc_stream_id_t id,
+			   struct demux_audio_stream_s **audio)
 {
 	int ret;
-	*stream = demux->stream;
+	*audio = demux->audio;
 
-	while (*stream != NULL) {
-		if ((*stream)->audio_i == audio_i)
+	while (*audio != NULL) {
+		if ((*audio)->id == id)
 			break;
-		*stream = (*stream)->next;
+		*audio = (*audio)->next;
 	}
 
-	if (*stream == NULL) {
-		*stream = malloc(sizeof(struct demux_stream_s));
-		memset(*stream, 0, sizeof(struct demux_stream_s));
-		(*stream)->audio_i = audio_i;
+	if (*audio == NULL) {
+		*audio = malloc(sizeof(struct demux_audio_stream_s));
+		memset(*audio, 0, sizeof(struct demux_audio_stream_s));
+		(*audio)->id = id;
 
-		if ((ret = ps_buffer_init(&(*stream)->buffer, &demux->audio_bufferattr)))
+		if ((ret = ps_buffer_init(&(*audio)->buffer, &demux->audio_bufferattr)))
 			return ret;
-		if ((ret = ps_packet_init(&(*stream)->packet, &(*stream)->buffer)))
+		if ((ret = ps_packet_init(&(*audio)->packet, &(*audio)->buffer)))
 			return ret;
 
-		if ((ret = alsa_play_init(&(*stream)->alsa_play, demux->glc)))
+		if ((ret = alsa_play_init(&(*audio)->alsa_play, demux->glc)))
 			return ret;
-		if ((ret = alsa_play_set_stream_number((*stream)->alsa_play,
-							(*stream)->audio_i)))
+		if ((ret = alsa_play_set_stream_id((*audio)->alsa_play,
+							(*audio)->id)))
 			return ret;
-		if ((ret = alsa_play_set_alsa_playback_device((*stream)->alsa_play,
+		if ((ret = alsa_play_set_alsa_playback_device((*audio)->alsa_play,
 							       demux->alsa_playback_device)))
 			return ret;
-		if ((ret = alsa_play_process_start((*stream)->alsa_play,
-						    &(*stream)->buffer)))
+		if ((ret = alsa_play_process_start((*audio)->alsa_play,
+						    &(*audio)->buffer)))
 			return ret;
-		(*stream)->running = 1;
+		(*audio)->running = 1;
 
-		(*stream)->next = demux->stream;
-		demux->stream = (*stream);
+		(*audio)->next = demux->audio;
+		demux->audio = (*audio);
 	}
 	return 0;
 }
 
-int demux_audio_stream_send(demux_t demux, struct demux_stream_s *stream,
+int demux_audio_stream_send(demux_t demux, struct demux_audio_stream_s *audio,
 			 glc_message_header_t *header, char *data, size_t size)
 {
 	int ret;
-	if ((ret = ps_packet_open(&stream->packet, PS_PACKET_WRITE)))
+	if ((ret = ps_packet_open(&audio->packet, PS_PACKET_WRITE)))
 		goto err;
-	if ((ret = ps_packet_write(&stream->packet, header, GLC_MESSAGE_HEADER_SIZE)))
+	if ((ret = ps_packet_write(&audio->packet, header, GLC_MESSAGE_HEADER_SIZE)))
 		goto err;
-	if ((ret = ps_packet_write(&stream->packet, data, size)))
+	if ((ret = ps_packet_write(&audio->packet, data, size)))
 		goto err;
-	if ((ret = ps_packet_close(&stream->packet)))
+	if ((ret = ps_packet_close(&audio->packet)))
 		goto err;
 err:
 	if (ret != EINTR)
 		return ret;
 
-	glc_log(demux->glc, GLC_DEBUG, "demux", "audio stream %d has quit", stream->audio_i);
-	demux_audio_stream_clean(demux, stream);
+	glc_log(demux->glc, GLC_DEBUG, "demux", "audio stream %d has quit", audio->id);
+	demux_audio_stream_clean(demux, audio);
 	return 0;
 }
 
-int demux_audio_stream_clean(demux_t demux, struct demux_stream_s *stream)
+int demux_audio_stream_clean(demux_t demux, struct demux_audio_stream_s *audio)
 {
 	int ret;
-	stream->running = 0;
+	audio->running = 0;
 
-	if ((ret = alsa_play_process_wait(stream->alsa_play)))
+	if ((ret = alsa_play_process_wait(audio->alsa_play)))
 		return ret;
-	alsa_play_destroy(stream->alsa_play);
+	alsa_play_destroy(audio->alsa_play);
 
-	ps_packet_destroy(&stream->packet);
-	ps_buffer_destroy(&stream->buffer);
+	ps_packet_destroy(&audio->packet);
+	ps_buffer_destroy(&audio->buffer);
 
 	return 0;
 }
