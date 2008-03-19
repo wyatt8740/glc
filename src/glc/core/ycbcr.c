@@ -198,7 +198,6 @@ int ycbcr_read_callback(glc_thread_state_t *state)
 
 	if (state->header.type == GLC_MESSAGE_VIDEO_DATA) {
 		pic_hdr = (glc_video_data_header_t *) state->read_data;
-		printf("%lu\n", pic_hdr->time);
 		ycbcr_get_video_stream(ycbcr, pic_hdr->id, &video);
 		state->threadptr = video;
 
