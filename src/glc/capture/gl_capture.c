@@ -58,16 +58,17 @@ typedef GLvoid *(*glMapBufferProc)(GLenum target,
                                    GLenum access);
 typedef GLboolean (*glUnmapBufferProc)(GLenum target);
 
-struct gl_capture_ctx_s {
-	glc_state_ctx_t state_ctx;
-	glc_ctx_i ctx_i;
+struct gl_capture_video_stream_s {
+	glc_state_video_t state_video;
+	glc_stream_id_t id;
 
 	glc_flags_t flags;
+	glc_video_format_t format;
 	Display *dpy;
 	int screen;
 	GLXDrawable drawable;
 	ps_packet_t packet;
-	glc_utime_t last, pbo_timestamp;
+	glc_utime_t last, pbo_time;
 
 	unsigned int w, h;
 	unsigned int cw, ch, row, cx, cy;
@@ -77,7 +78,7 @@ struct gl_capture_ctx_s {
 
 	int indicator_list;
 
-	struct gl_capture_ctx_s *next;
+	struct gl_capture_video_stream_s *next;
 
 	GLuint pbo;
 	int pbo_active;
@@ -90,8 +91,8 @@ struct gl_capture_s {
 	GLenum capture_buffer;
 	glc_utime_t fps;
 
-	pthread_rwlock_t ctxlist_lock;
-	struct gl_capture_ctx_s *ctx;
+	pthread_rwlock_t videolist_lock;
+	struct gl_capture_video_stream_s *video;
 
 	ps_buffer_t *to;
 
@@ -114,26 +115,27 @@ struct gl_capture_s {
 	glUnmapBufferProc glUnmapBuffer;
 };
 
-int gl_capture_get_ctx(gl_capture_t gl_capture,
-		       struct gl_capture_ctx_s **ctx, Display *dpy, GLXDrawable drawable);
-int gl_capture_update_ctx(gl_capture_t gl_capture,
-			  struct gl_capture_ctx_s *ctx);
+int gl_capture_get_video_stream(gl_capture_t gl_capture,
+				struct gl_capture_video_stream_s **video,
+				Display *dpy, GLXDrawable drawable);
+int gl_capture_update_video_stream(gl_capture_t gl_capture,
+				   struct gl_capture_video_stream_s *video);
 
 int gl_capture_get_geometry(gl_capture_t gl_capture,
 			    Display *dpy, GLXDrawable drawable, unsigned int *w, unsigned int *h);
-int gl_capture_calc_geometry(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx,
+int gl_capture_calc_geometry(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video,
 			     unsigned int w, unsigned int h);
-int gl_capture_update_screen(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx);
-int gl_capture_update_color(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx);
+int gl_capture_update_screen(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video);
+int gl_capture_update_color(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video);
 
-int gl_capture_get_pixels(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx, char *to);
-int gl_capture_gen_indicator_list(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx);
+int gl_capture_get_pixels(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video, char *to);
+int gl_capture_gen_indicator_list(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video);
 
 int gl_capture_init_pbo(gl_capture_t gl);
-int gl_capture_create_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx);
-int gl_capture_destroy_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx);
-int gl_capture_start_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx);
-int gl_capture_read_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx);
+int gl_capture_create_pbo(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video);
+int gl_capture_destroy_pbo(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video);
+int gl_capture_start_pbo(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video);
+int gl_capture_read_pbo(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video);
 
 int gl_capture_init(gl_capture_t *gl_capture, glc_t *glc)
 {
@@ -149,7 +151,7 @@ int gl_capture_init(gl_capture_t *gl_capture, glc_t *glc)
 	(*gl_capture)->capture_buffer = GL_FRONT;	/* front buffer is default */
 
 	pthread_mutex_init(&(*gl_capture)->init_pbo_mutex, NULL);
-	pthread_rwlock_init(&(*gl_capture)->ctxlist_lock, NULL);
+	pthread_rwlock_init(&(*gl_capture)->videolist_lock, NULL);
 
 	return 0;
 }
@@ -335,11 +337,11 @@ int gl_capture_stop(gl_capture_t gl_capture)
 
 int gl_capture_destroy(gl_capture_t gl_capture)
 {
-	struct gl_capture_ctx_s *del;
+	struct gl_capture_video_stream_s *del;
 
-	while (gl_capture->ctx != NULL) {
-		del = gl_capture->ctx;
-		gl_capture->ctx = gl_capture->ctx->next;
+	while (gl_capture->video != NULL) {
+		del = gl_capture->video;
+		gl_capture->video = gl_capture->video->next;
 		
 		/* we might be in wrong thread */
 		if (del->indicator_list)
@@ -352,7 +354,7 @@ int gl_capture_destroy(gl_capture_t gl_capture)
 		free(del);
 	}
 
-	pthread_rwlock_destroy(&gl_capture->ctxlist_lock);
+	pthread_rwlock_destroy(&gl_capture->videolist_lock);
 	pthread_mutex_destroy(&gl_capture->init_pbo_mutex);
 
 	if (gl_capture->libGL_handle)
@@ -374,68 +376,68 @@ int gl_capture_get_geometry(gl_capture_t gl_capture, Display *dpy, GLXDrawable d
 	return 0;
 }
 
-int gl_capture_update_screen(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
+int gl_capture_update_screen(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video)
 {
 	/** \todo figure out real screen */
-	ctx->screen = DefaultScreen(ctx->dpy);
+	video->screen = DefaultScreen(video->dpy);
 	return 0;
 }
 
-int gl_capture_calc_geometry(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx,
+int gl_capture_calc_geometry(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video,
 			     unsigned int w, unsigned int h)
 {
-	ctx->w = w;
-	ctx->h = h;
+	video->w = w;
+	video->h = h;
 
 	/* calculate image area when cropping */
 	if (gl_capture->flags & GL_CAPTURE_CROP) {
-		if (gl_capture->crop_x > ctx->w)
-			ctx->cx = 0;
+		if (gl_capture->crop_x > video->w)
+			video->cx = 0;
 		else
-			ctx->cx = gl_capture->crop_x;
+			video->cx = gl_capture->crop_x;
 
-		if (gl_capture->crop_y > ctx->h)
-			ctx->cy = 0;
+		if (gl_capture->crop_y > video->h)
+			video->cy = 0;
 		else
-			ctx->cy = gl_capture->crop_y;
+			video->cy = gl_capture->crop_y;
 
-		if (gl_capture->crop_w + ctx->cx > ctx->w)
-			ctx->cw = ctx->w - ctx->cx;
+		if (gl_capture->crop_w + video->cx > video->w)
+			video->cw = video->w - video->cx;
 		else
-			ctx->cw = gl_capture->crop_w;
+			video->cw = gl_capture->crop_w;
 
-		if (gl_capture->crop_h + ctx->cy > ctx->h)
-			ctx->ch = ctx->h - ctx->cy;
+		if (gl_capture->crop_h + video->cy > video->h)
+			video->ch = video->h - video->cy;
 		else
-			ctx->ch = gl_capture->crop_h;
+			video->ch = gl_capture->crop_h;
 
 		/* we need to recalc y coord for OpenGL */
-		ctx->cy = ctx->h - ctx->ch - ctx->cy;
+		video->cy = video->h - video->ch - video->cy;
 	} else {
-		ctx->cw = ctx->w;
-		ctx->ch = ctx->h;
-		ctx->cx = ctx->cy = 0;
+		video->cw = video->w;
+		video->ch = video->h;
+		video->cx = video->cy = 0;
 	}
 
 	glc_log(gl_capture->glc, GLC_DEBUG, "gl_capture",
-		 "calculated capture area for ctx %d is %ux%u+%u+%u",
-		 ctx->ctx_i, ctx->cw, ctx->ch, ctx->cx, ctx->cy);
+		 "calculated capture area for video %d is %ux%u+%u+%u",
+		 video->id, video->cw, video->ch, video->cx, video->cy);
 
-	ctx->row = ctx->cw * gl_capture->bpp;
-	if (ctx->row % gl_capture->pack_alignment != 0)
-		ctx->row += gl_capture->pack_alignment - ctx->row % gl_capture->pack_alignment;
+	video->row = video->cw * gl_capture->bpp;
+	if (video->row % gl_capture->pack_alignment != 0)
+		video->row += gl_capture->pack_alignment - video->row % gl_capture->pack_alignment;
 
 	return 0;
 }
 
-int gl_capture_get_pixels(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx, char *to)
+int gl_capture_get_pixels(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video, char *to)
 {
 	glPushAttrib(GL_PIXEL_MODE_BIT);
 	glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);
 
 	glReadBuffer(gl_capture->capture_buffer);
 	glPixelStorei(GL_PACK_ALIGNMENT, gl_capture->pack_alignment);
-	glReadPixels(ctx->cx, ctx->cy, ctx->cw, ctx->ch, gl_capture->format, GL_UNSIGNED_BYTE, to);
+	glReadPixels(video->cx, video->cy, video->cw, video->ch, gl_capture->format, GL_UNSIGNED_BYTE, to);
 
 	glPopClientAttrib();
 	glPopAttrib();
@@ -443,26 +445,26 @@ int gl_capture_get_pixels(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx,
 	return 0;
 }
 
-int gl_capture_gen_indicator_list(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
+int gl_capture_gen_indicator_list(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video)
 {
 	int size;
-	if (!ctx->indicator_list)
-		ctx->indicator_list = glGenLists(1);
+	if (!video->indicator_list)
+		video->indicator_list = glGenLists(1);
 	
-	glNewList(ctx->indicator_list, GL_COMPILE);
+	glNewList(video->indicator_list, GL_COMPILE);
 	
-	size = ctx->h / 75;
+	size = video->h / 75;
 	if (size < 10)
 		size = 10;
 
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 
-	glViewport(0, 0, ctx->w, ctx->h);
+	glViewport(0, 0, video->w, video->h);
 	glEnable(GL_SCISSOR_TEST);
-	glScissor(size / 2 - 1, ctx->h - size - size / 2 - 1, size + 2, size + 2);
+	glScissor(size / 2 - 1, video->h - size - size / 2 - 1, size + 2, size + 2);
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
-	glScissor(size / 2, ctx->h - size - size / 2, size, size);
+	glScissor(size / 2, video->h - size - size / 2, size, size);
 	glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 	glDisable(GL_SCISSOR_TEST);
@@ -529,7 +531,7 @@ int gl_capture_init_pbo(gl_capture_t gl_capture)
 	return 0;
 }
 
-int gl_capture_create_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
+int gl_capture_create_pbo(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video)
 {
 	GLint binding;
 
@@ -538,9 +540,9 @@ int gl_capture_create_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
 	glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING_ARB, &binding);
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 
-	gl_capture->glGenBuffers(1, &ctx->pbo);
-	gl_capture->glBindBuffer(GL_PIXEL_PACK_BUFFER_ARB, ctx->pbo);
-	gl_capture->glBufferData(GL_PIXEL_PACK_BUFFER_ARB, ctx->row * ctx->ch,
+	gl_capture->glGenBuffers(1, &video->pbo);
+	gl_capture->glBindBuffer(GL_PIXEL_PACK_BUFFER_ARB, video->pbo);
+	gl_capture->glBufferData(GL_PIXEL_PACK_BUFFER_ARB, video->row * video->ch,
 		         NULL, GL_STREAM_READ);
 
 	glPopAttrib();
@@ -548,33 +550,33 @@ int gl_capture_create_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
 	return 0;
 }
 
-int gl_capture_destroy_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
+int gl_capture_destroy_pbo(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video)
 {
 	glc_log(gl_capture->glc, GLC_DEBUG, "gl_capture", "destroying PBO");
 
-	gl_capture->glDeleteBuffers(1, &ctx->pbo);
+	gl_capture->glDeleteBuffers(1, &video->pbo);
 	return 0;
 }
 
-int gl_capture_start_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
+int gl_capture_start_pbo(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video)
 {
 	GLint binding;
 
-	if (ctx->pbo_active)
+	if (video->pbo_active)
 		return EAGAIN;
 
 	glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING_ARB, &binding);
 	glPushAttrib(GL_PIXEL_MODE_BIT);
 	glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);
 
-	gl_capture->glBindBuffer(GL_PIXEL_PACK_BUFFER_ARB, ctx->pbo);
+	gl_capture->glBindBuffer(GL_PIXEL_PACK_BUFFER_ARB, video->pbo);
 
 	glReadBuffer(gl_capture->capture_buffer);
 	glPixelStorei(GL_PACK_ALIGNMENT, gl_capture->pack_alignment);
 	/* to = ((char *)NULL + (offset)) */
-	glReadPixels(ctx->cx, ctx->cy, ctx->cw, ctx->ch, gl_capture->format, GL_UNSIGNED_BYTE, NULL);
+	glReadPixels(video->cx, video->cy, video->cw, video->ch, gl_capture->format, GL_UNSIGNED_BYTE, NULL);
 
-	ctx->pbo_active = 1;
+	video->pbo_active = 1;
 
 	glPopClientAttrib();
 	glPopAttrib();
@@ -582,73 +584,73 @@ int gl_capture_start_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
 	return 0;
 }
 
-int gl_capture_read_pbo(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
+int gl_capture_read_pbo(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video)
 {
 	GLvoid *buf;
 	GLint binding;
 	
-	if (!ctx->pbo_active)
+	if (!video->pbo_active)
 		return EAGAIN;
 
 	glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING_ARB, &binding);
 
-	gl_capture->glBindBuffer(GL_PIXEL_PACK_BUFFER_ARB, ctx->pbo);
+	gl_capture->glBindBuffer(GL_PIXEL_PACK_BUFFER_ARB, video->pbo);
 	buf = gl_capture->glMapBuffer(GL_PIXEL_PACK_BUFFER_ARB, GL_READ_ONLY);
 	if (!buf)
 		return EINVAL;
 
-	ps_packet_write(&ctx->packet, buf, ctx->row * ctx->ch);
+	ps_packet_write(&video->packet, buf, video->row * video->ch);
 
 	gl_capture->glUnmapBuffer(GL_PIXEL_PACK_BUFFER_ARB);
 
-	ctx->pbo_active = 0;
+	video->pbo_active = 0;
 	
 	gl_capture->glBindBuffer(GL_PIXEL_PACK_BUFFER_ARB, binding);
 	return 0;
 }
 
-int gl_capture_get_ctx(gl_capture_t gl_capture, struct gl_capture_ctx_s **ctx, Display *dpy, GLXDrawable drawable)
+int gl_capture_get_video_stream(gl_capture_t gl_capture, struct gl_capture_video_stream_s **video, Display *dpy, GLXDrawable drawable)
 {
-	struct gl_capture_ctx_s *fctx;
+	struct gl_capture_video_stream_s *fvideo;
 
-	pthread_rwlock_rdlock(&gl_capture->ctxlist_lock);
-	fctx = gl_capture->ctx;
-	while (fctx != NULL) {
-		if ((fctx->drawable == drawable) && (fctx->dpy == dpy))
+	pthread_rwlock_rdlock(&gl_capture->videolist_lock);
+	fvideo = gl_capture->video;
+	while (fvideo != NULL) {
+		if ((fvideo->drawable == drawable) && (fvideo->dpy == dpy))
 			break;
 		
-		fctx = fctx->next;
+		fvideo = fvideo->next;
 	}
-	pthread_rwlock_unlock(&gl_capture->ctxlist_lock);
+	pthread_rwlock_unlock(&gl_capture->videolist_lock);
 	
-	if (fctx == NULL) {
-		fctx = (struct gl_capture_ctx_s *) malloc(sizeof(struct gl_capture_ctx_s));
-		memset(fctx, 0, sizeof(struct gl_capture_ctx_s));
+	if (fvideo == NULL) {
+		fvideo = (struct gl_capture_video_stream_s *) malloc(sizeof(struct gl_capture_video_stream_s));
+		memset(fvideo, 0, sizeof(struct gl_capture_video_stream_s));
 
-		fctx->dpy = dpy;
-		fctx->drawable = drawable;
-		ps_packet_init(&fctx->packet, gl_capture->to);
+		fvideo->dpy = dpy;
+		fvideo->drawable = drawable;
+		ps_packet_init(&fvideo->packet, gl_capture->to);
 
-		glc_state_ctx_new(gl_capture->glc, &fctx->ctx_i, &fctx->state_ctx);
+		glc_state_video_new(gl_capture->glc, &fvideo->id, &fvideo->state_video);
 
 		/* these functions need to be thread-safe */
-		pthread_rwlock_wrlock(&gl_capture->ctxlist_lock);
+		pthread_rwlock_wrlock(&gl_capture->videolist_lock);
 
-		fctx->next = gl_capture->ctx;
-		gl_capture->ctx = fctx;
+		fvideo->next = gl_capture->video;
+		gl_capture->video = fvideo;
 
-		pthread_rwlock_unlock(&gl_capture->ctxlist_lock);
+		pthread_rwlock_unlock(&gl_capture->videolist_lock);
 	}
 	
-	*ctx = fctx;
+	*video = fvideo;
 	return 0;
 }
 
-int gl_capture_update_ctx(gl_capture_t gl_capture,
-			  struct gl_capture_ctx_s *ctx)
+int gl_capture_update_video_stream(gl_capture_t gl_capture,
+			  struct gl_capture_video_stream_s *video)
 {
 	glc_message_header_t msg;
-	glc_ctx_message_t ctx_msg;
+	glc_video_format_message_t format_msg;
 	unsigned int w, h;
 
 	/* initialize PBO if not already done */
@@ -664,60 +666,56 @@ int gl_capture_update_ctx(gl_capture_t gl_capture,
 		pthread_mutex_unlock(&gl_capture->init_pbo_mutex);
 	}
 
-	gl_capture_get_geometry(gl_capture, ctx->dpy, ctx->drawable, &w, &h);
+	gl_capture_get_geometry(gl_capture, video->dpy, video->drawable, &w, &h);
 
-	if (ctx->flags == 0) {
+	if (!video->format) {
 		/* initialize screen information */
-		gl_capture_update_screen(gl_capture, ctx);
+		gl_capture_update_screen(gl_capture, video);
 
 		/* reset gamma values */
-		ctx->gamma_red = ctx->gamma_green = ctx->gamma_blue = 1.0;
-
-		ctx->flags |= GLC_CTX_CREATE;
+		video->gamma_red = video->gamma_green = video->gamma_blue = 1.0;
 
 		if (gl_capture->format == GL_BGRA)
-			ctx->flags |= GLC_CTX_BGRA;
+			video->format = GLC_VIDEO_BGRA;
 		else if (gl_capture->format == GL_BGR)
-			ctx->flags |= GLC_CTX_BGR;
+			video->format = GLC_VIDEO_BGR;
 		else
 			return EINVAL;
 
 		if (gl_capture->pack_alignment == 8)
-			ctx->flags |= GLC_CTX_DWORD_ALIGNED;
-	} else if (ctx->flags & GLC_CTX_CREATE) {
-		ctx->flags &= ~GLC_CTX_CREATE;
-		ctx->flags |= GLC_CTX_UPDATE;
+			video->flags |= GLC_VIDEO_DWORD_ALIGNED;
 	}
 
-	if ((w != ctx->w) | (h != ctx->h) | (ctx->flags & GLC_CTX_CREATE)) {
-		gl_capture_calc_geometry(gl_capture, ctx, w, h);
+	if ((w != video->w) | (h != video->h)) {
+		gl_capture_calc_geometry(gl_capture, video, w, h);
 
 		glc_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
-			 "creating/updating configuration for ctx %d", ctx->ctx_i);
+			 "creating/updating configuration for video %d", video->id);
 
-		msg.type = GLC_MESSAGE_CTX;
-		ctx_msg.flags = ctx->flags;
-		ctx_msg.ctx = ctx->ctx_i;
-		ctx_msg.w = ctx->cw;
-		ctx_msg.h = ctx->ch;
+		msg.type = GLC_MESSAGE_VIDEO_FORMAT;
+		format_msg.flags = video->flags;
+		format_msg.format = video->format;
+		format_msg.id = video->id;
+		format_msg.width = video->cw;
+		format_msg.height = video->ch;
 
-		ps_packet_open(&ctx->packet, PS_PACKET_WRITE);
-		ps_packet_write(&ctx->packet, &msg, GLC_MESSAGE_HEADER_SIZE);
-		ps_packet_write(&ctx->packet, &ctx_msg, GLC_CTX_MESSAGE_SIZE);
-		ps_packet_close(&ctx->packet);
+		ps_packet_open(&video->packet, PS_PACKET_WRITE);
+		ps_packet_write(&video->packet, &msg, GLC_MESSAGE_HEADER_SIZE);
+		ps_packet_write(&video->packet, &format_msg, GLC_VIDEO_FORMAT_MESSAGE_SIZE);
+		ps_packet_close(&video->packet);
 
 		glc_log(gl_capture->glc, GLC_DEBUG, "gl_capture",
-			 "ctx %d: %ux%u (%ux%u), 0x%02x flags", ctx->ctx_i,
-			 ctx->cw, ctx->ch, ctx->w, ctx->h, ctx->flags);
+			 "video %d: %ux%u (%ux%u), 0x%02x flags", video->id,
+			 video->cw, video->ch, video->w, video->h, video->flags);
 
 		/* how about color correction? */
-		gl_capture_update_color(gl_capture, ctx);
+		gl_capture_update_color(gl_capture, video);
 
 		if (gl_capture->flags & GL_CAPTURE_USE_PBO) {
-			if (ctx->pbo)
-				gl_capture_destroy_pbo(gl_capture, ctx);
+			if (video->pbo)
+				gl_capture_destroy_pbo(gl_capture, video);
 
-			if (gl_capture_create_pbo(gl_capture, ctx)) {
+			if (gl_capture_create_pbo(gl_capture, video)) {
 				gl_capture->flags &= ~(GL_CAPTURE_TRY_PBO | GL_CAPTURE_USE_PBO);
 				/** \todo destroy pbo stuff? */
 				/** \todo race condition? */
@@ -727,17 +725,17 @@ int gl_capture_update_ctx(gl_capture_t gl_capture,
 
 
 	if ((gl_capture->flags & GL_CAPTURE_DRAW_INDICATOR) &&
-	    (!ctx->indicator_list))
-		gl_capture_gen_indicator_list(gl_capture, ctx);
+	    (!video->indicator_list))
+		gl_capture_gen_indicator_list(gl_capture, video);
 
 	return 0;
 }
 
 int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable)
 {
-	struct gl_capture_ctx_s *ctx;
+	struct gl_capture_video_stream_s *video;
 	glc_message_header_t msg;
-	glc_picture_header_t pic;
+	glc_video_data_header_t pic;
 	glc_utime_t now;
 	char *dma;
 	int ret = 0;
@@ -745,73 +743,73 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 	if (!(gl_capture->flags & GL_CAPTURE_CAPTURING))
 		return 0; /* capturing not active */
 
-	gl_capture_get_ctx(gl_capture, &ctx, dpy, drawable);
+	gl_capture_get_video_stream(gl_capture, &video, dpy, drawable);
 
-	msg.type = GLC_MESSAGE_PICTURE;
-	pic.ctx = ctx->ctx_i;
+	msg.type = GLC_MESSAGE_VIDEO_DATA;
+	pic.id = video->id;
 
 	/* get current time */
 	if (gl_capture->flags & GL_CAPTURE_IGNORE_TIME)
-		now = ctx->last + gl_capture->fps;
+		now = video->last + gl_capture->fps;
 	else
 		now = glc_state_time(gl_capture->glc);
 
 	/* if we are using PBO we will actually write previous picture to buffer */
 	if (gl_capture->flags & GL_CAPTURE_USE_PBO)
-		pic.timestamp = ctx->pbo_timestamp;
+		pic.time = video->pbo_time;
 	else
-		pic.timestamp = now;
+		pic.time = now;
 
 	/* has gl_capture->fps microseconds elapsed since last capture */
-	if ((now - ctx->last < gl_capture->fps) &&
+	if ((now - video->last < gl_capture->fps) &&
 	    !(gl_capture->flags & GL_CAPTURE_LOCK_FPS) &&
 	    !(gl_capture->flags & GL_CAPTURE_IGNORE_TIME))
 		goto finish;
 
 	/* not really needed until now */
-	gl_capture_update_ctx(gl_capture, ctx);
+	gl_capture_update_video_stream(gl_capture, video);
 
-	if (ps_packet_open(&ctx->packet, gl_capture->flags & GL_CAPTURE_LOCK_FPS ?
+	if (ps_packet_open(&video->packet, gl_capture->flags & GL_CAPTURE_LOCK_FPS ?
 					 PS_PACKET_WRITE :
 					 PS_PACKET_WRITE | PS_PACKET_TRY))
 		goto finish;
-	if ((ret = ps_packet_write(&ctx->packet, &msg, GLC_MESSAGE_HEADER_SIZE)))
+	if ((ret = ps_packet_write(&video->packet, &msg, GLC_MESSAGE_HEADER_SIZE)))
 		goto cancel;
-	if ((ret = ps_packet_write(&ctx->packet, &pic, GLC_PICTURE_HEADER_SIZE)))
+	if ((ret = ps_packet_write(&video->packet, &pic, GLC_VIDEO_DATA_HEADER_SIZE)))
 		goto cancel;
 
 	if (gl_capture->flags & GL_CAPTURE_USE_PBO) {
-		if (ctx->pbo_active) {
+		if (video->pbo_active) {
 			/* is this safe, what happens if this is called simultaneously? */
-			if ((ret = ps_packet_setsize(&ctx->packet, ctx->row * ctx->ch
+			if ((ret = ps_packet_setsize(&video->packet, video->row * video->ch
 									+ GLC_MESSAGE_HEADER_SIZE
-									+ GLC_PICTURE_HEADER_SIZE)))
+									+ GLC_VIDEO_DATA_HEADER_SIZE)))
 				goto cancel;
 
-			if ((ret = gl_capture_read_pbo(gl_capture, ctx)))
+			if ((ret = gl_capture_read_pbo(gl_capture, video)))
 				goto cancel;
 		}
 
-		ret = gl_capture_start_pbo(gl_capture, ctx);
-		ctx->pbo_timestamp = now;
+		ret = gl_capture_start_pbo(gl_capture, video);
+		video->pbo_time = now;
 	} else {
-		if ((ret = ps_packet_dma(&ctx->packet, (void *) &dma,
-					ctx->row * ctx->ch, PS_ACCEPT_FAKE_DMA)))
+		if ((ret = ps_packet_dma(&video->packet, (void *) &dma,
+					video->row * video->ch, PS_ACCEPT_FAKE_DMA)))
 		goto cancel;
 
-		ret = gl_capture_get_pixels(gl_capture, ctx, dma);
+		ret = gl_capture_get_pixels(gl_capture, video, dma);
 	}
 
 	if ((gl_capture->flags & GL_CAPTURE_LOCK_FPS) &&
 	    !(gl_capture->flags & GL_CAPTURE_IGNORE_TIME)) {
 		now = glc_state_time(gl_capture->glc);
 
-		if (now - ctx->last < gl_capture->fps)
-			usleep(gl_capture->fps + ctx->last - now);
+		if (now - video->last < gl_capture->fps)
+			usleep(gl_capture->fps + video->last - now);
 	}
 
 	/* increment by 1/fps seconds */
-	ctx->last += gl_capture->fps;
+	video->last += gl_capture->fps;
 
 	/*
 	 We should accept framedrops (eg. not allow this difference
@@ -820,11 +818,11 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 	if (!(gl_capture->flags & GL_CAPTURE_IGNORE_TIME)) {
 		now = glc_state_time(gl_capture->glc);
 
-		if (now - ctx->last > gl_capture->fps) /* reasonable choice? */
-			ctx->last = now - 0.5 * gl_capture->fps;
+		if (now - video->last > gl_capture->fps) /* reasonable choice? */
+			video->last = now - 0.5 * gl_capture->fps;
 	}
 
-	ps_packet_close(&ctx->packet);
+	ps_packet_close(&video->packet);
 
 finish:
 	if (ret != 0)
@@ -832,7 +830,7 @@ finish:
 			 "%s (%d)", strerror(ret), ret);
 
 	if (gl_capture->flags & GL_CAPTURE_DRAW_INDICATOR)
-		glCallList(ctx->indicator_list);
+		glCallList(video->indicator_list);
 
 	return ret;
 cancel:
@@ -841,13 +839,13 @@ cancel:
 		glc_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 			 "dropped frame, buffer not ready");
 	}
-	ps_packet_cancel(&ctx->packet);
+	ps_packet_cancel(&video->packet);
 	goto finish;
 }
 
 int gl_capture_refresh_color_correction(gl_capture_t gl_capture)
 {
-	struct gl_capture_ctx_s *ctx;
+	struct gl_capture_video_stream_s *video;
 
 	if (!(gl_capture->flags & GL_CAPTURE_CAPTURING))
 		return 0; /* capturing not active */
@@ -855,35 +853,35 @@ int gl_capture_refresh_color_correction(gl_capture_t gl_capture)
 	glc_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
 		 "refreshing color correction");
 
-	pthread_rwlock_rdlock(&gl_capture->ctxlist_lock);
-	ctx = gl_capture->ctx;
-	while (ctx != NULL) {
-		gl_capture_update_color(gl_capture, ctx);
+	pthread_rwlock_rdlock(&gl_capture->videolist_lock);
+	video = gl_capture->video;
+	while (video != NULL) {
+		gl_capture_update_color(gl_capture, video);
 		
-		ctx = ctx->next;
+		video = video->next;
 	}
-	pthread_rwlock_unlock(&gl_capture->ctxlist_lock);
+	pthread_rwlock_unlock(&gl_capture->videolist_lock);
 
 	return 0;
 }
 
 /** \todo support GammaRamp */
-int gl_capture_update_color(gl_capture_t gl_capture, struct gl_capture_ctx_s *ctx)
+int gl_capture_update_color(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video)
 {
 	glc_message_header_t msg_hdr;
 	glc_color_message_t msg;
 	XF86VidModeGamma gamma;
 	int ret = 0;
 
-	XF86VidModeGetGamma(ctx->dpy, ctx->screen, &gamma);
+	XF86VidModeGetGamma(video->dpy, video->screen, &gamma);
 
-	if ((gamma.red == ctx->gamma_red) &&
-	    (gamma.green == ctx->gamma_green) &&
-	    (gamma.blue == ctx->gamma_blue))
+	if ((gamma.red == video->gamma_red) &&
+	    (gamma.green == video->gamma_green) &&
+	    (gamma.blue == video->gamma_blue))
 		return 0; /* nothing to update */
 
 	msg_hdr.type = GLC_MESSAGE_COLOR;
-	msg.ctx = ctx->ctx_i;
+	msg.id = video->id;
 	msg.red = gamma.red;
 	msg.green = gamma.green;
 	msg.blue = gamma.blue;
@@ -895,19 +893,19 @@ int gl_capture_update_color(gl_capture_t gl_capture, struct gl_capture_ctx_s *ct
 		 "color correction: brightness=%f, contrast=%f, red=%f, green=%f, blue=%f",
 		 msg.brightness, msg.contrast, msg.red, msg.green, msg.blue);
 
-	if ((ret = ps_packet_open(&ctx->packet, PS_PACKET_WRITE)))
+	if ((ret = ps_packet_open(&video->packet, PS_PACKET_WRITE)))
 		goto err;
-	if ((ret = ps_packet_write(&ctx->packet, &msg_hdr, GLC_MESSAGE_HEADER_SIZE)))
+	if ((ret = ps_packet_write(&video->packet, &msg_hdr, GLC_MESSAGE_HEADER_SIZE)))
 		goto err;
-	if ((ret = ps_packet_write(&ctx->packet, &msg, GLC_COLOR_MESSAGE_SIZE)))
+	if ((ret = ps_packet_write(&video->packet, &msg, GLC_COLOR_MESSAGE_SIZE)))
 		goto err;
-	if ((ret = ps_packet_close(&ctx->packet)))
+	if ((ret = ps_packet_close(&video->packet)))
 		goto err;
 
 	return 0;
 
 err:
-	ps_packet_cancel(&ctx->packet);
+	ps_packet_cancel(&video->packet);
 
 	glc_log(gl_capture->glc, GLC_ERROR, "gl_capture",
 		 "can't write gamma correction information to buffer: %s (%d)",
