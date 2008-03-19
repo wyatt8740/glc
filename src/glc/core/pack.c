@@ -225,16 +225,16 @@ int pack_read_callback(glc_thread_state_t *state)
 	     (state->header.type == GLC_MESSAGE_AUDIO_DATA))) {
 		if (pack->compression == PACK_QUICKLZ) {
 #ifdef __QUICKLZ
-			state->write_size = GLC_CONTAINER_MESSAGE_SIZE
-					    + GLC_QUICKLZ_HEADER_SIZE
+			state->write_size = sizeof(glc_container_message_header_t)
+					    + sizeof(glc_quicklz_header_t)
 					    + __quicklz_worstcase(state->read_size);
 #else
 			goto copy;
 #endif
 		} else if (pack->compression == PACK_LZO) {
 #ifdef __LZO
-			state->write_size = GLC_CONTAINER_MESSAGE_SIZE
-					    + GLC_LZO_HEADER_SIZE
+			state->write_size = sizeof(glc_container_message_header_t)
+					    + sizeof(glc_lzo_header_t)
 			                    + __lzo_worstcase(state->read_size);
 #else
 			goto copy;
@@ -252,20 +252,20 @@ copy:
 int pack_lzo_write_callback(glc_thread_state_t *state)
 {
 #ifdef __LZO
-	glc_container_message_t *container = (glc_container_message_t *) state->write_data;
+	glc_container_message_header_t *container = (glc_container_message_header_t *) state->write_data;
 	glc_lzo_header_t *lzo_header =
-		(glc_lzo_header_t *) &state->write_data[GLC_CONTAINER_MESSAGE_SIZE];
+		(glc_lzo_header_t *) &state->write_data[sizeof(glc_container_message_header_t)];
 	lzo_uint compressed_size;
 
 	__lzo_compress((unsigned char *) state->read_data, state->read_size,
-		       (unsigned char *) &state->write_data[GLC_LZO_HEADER_SIZE +
-		       					    GLC_CONTAINER_MESSAGE_SIZE],
+		       (unsigned char *) &state->write_data[sizeof(glc_lzo_header_t) +
+		       					    sizeof(glc_container_message_header_t)],
 		       &compressed_size, (lzo_voidp) state->threadptr);
 
 	lzo_header->size = (glc_size_t) state->read_size;
-	memcpy(&lzo_header->header, &state->header, GLC_MESSAGE_HEADER_SIZE);
+	memcpy(&lzo_header->header, &state->header, sizeof(glc_message_header_t));
 
-	container->size = compressed_size + GLC_LZO_HEADER_SIZE;
+	container->size = compressed_size + sizeof(glc_lzo_header_t);
 	container->header.type = GLC_MESSAGE_LZO;
 
 	state->header.type = GLC_MESSAGE_CONTAINER;
@@ -279,21 +279,21 @@ int pack_lzo_write_callback(glc_thread_state_t *state)
 int pack_quicklz_write_callback(glc_thread_state_t *state)
 {
 #ifdef __QUICKLZ
-	glc_container_message_t *container = (glc_container_message_t *) state->write_data;
+	glc_container_message_header_t *container = (glc_container_message_header_t *) state->write_data;
 	glc_quicklz_header_t *quicklz_header =
-		(glc_quicklz_header_t *) &state->write_data[GLC_CONTAINER_MESSAGE_SIZE];
+		(glc_quicklz_header_t *) &state->write_data[sizeof(glc_container_message_header_t)];
 	size_t compressed_size;
 
 	quicklz_compress((const unsigned char *) state->read_data,
-			 (unsigned char *) &state->write_data[GLC_QUICKLZ_HEADER_SIZE +
-			 				      GLC_CONTAINER_MESSAGE_SIZE],
+			 (unsigned char *) &state->write_data[sizeof(glc_quicklz_header_t) +
+			 				      sizeof(glc_container_message_header_t)],
 			 state->read_size, &compressed_size,
 			 (uintptr_t *) state->threadptr);
 
 	quicklz_header->size = (glc_size_t) state->read_size;
-	memcpy(&quicklz_header->header, &state->header, GLC_MESSAGE_HEADER_SIZE);
+	memcpy(&quicklz_header->header, &state->header, sizeof(glc_message_header_t));
 
-	container->size = compressed_size + GLC_QUICKLZ_HEADER_SIZE;
+	container->size = compressed_size + sizeof(glc_quicklz_header_t);
 	container->header.type = GLC_MESSAGE_QUICKLZ;
 
 	state->header.type = GLC_MESSAGE_CONTAINER;
@@ -394,9 +394,9 @@ int unpack_write_callback(glc_thread_state_t *state)
 	if (state->header.type == GLC_MESSAGE_LZO) {
 #ifdef __LZO
 		memcpy(&state->header, &((glc_lzo_header_t *) state->read_data)->header,
-		       GLC_MESSAGE_HEADER_SIZE);
-		__lzo_decompress((unsigned char *) &state->read_data[GLC_LZO_HEADER_SIZE],
-				state->read_size - GLC_LZO_HEADER_SIZE,
+		       sizeof(glc_message_header_t));
+		__lzo_decompress((unsigned char *) &state->read_data[sizeof(glc_lzo_header_t)],
+				state->read_size - sizeof(glc_lzo_header_t),
 				(unsigned char *) state->write_data,
 				(lzo_uintp) &state->write_size,
 				NULL);
@@ -406,8 +406,8 @@ int unpack_write_callback(glc_thread_state_t *state)
 	} else if (state->header.type == GLC_MESSAGE_QUICKLZ) {
 #ifdef __QUICKLZ
 		memcpy(&state->header, &((glc_quicklz_header_t *) state->read_data)->header,
-		       GLC_MESSAGE_HEADER_SIZE);
-		quicklz_decompress((const unsigned char *) &state->read_data[GLC_QUICKLZ_HEADER_SIZE],
+		       sizeof(glc_message_header_t));
+		quicklz_decompress((const unsigned char *) &state->read_data[sizeof(glc_quicklz_header_t)],
 				   (unsigned char *) state->write_data,
 				   state->write_size);
 #else

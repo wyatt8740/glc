@@ -182,7 +182,7 @@ int wav_read_callback(glc_thread_state_t *state)
 	if (state->header.type == GLC_MESSAGE_AUDIO_FORMAT)
 		return wav_write_hdr(wav, (glc_audio_format_message_t *) state->read_data);
 	else if (state->header.type == GLC_MESSAGE_AUDIO_DATA)
-		return wav_write_audio(wav, (glc_audio_data_header_t *) state->read_data, &state->read_data[GLC_AUDIO_DATA_HEADER_SIZE]);
+		return wav_write_audio(wav, (glc_audio_data_header_t *) state->read_data, &state->read_data[sizeof(glc_audio_data_header_t)]);
 	
 	return 0;
 }

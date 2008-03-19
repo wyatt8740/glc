@@ -223,10 +223,10 @@ int color_write_callback(glc_thread_state_t *state)
 {
 	struct color_video_stream_s *video = state->threadptr;
 
-	memcpy(state->write_data, state->read_data, GLC_VIDEO_DATA_HEADER_SIZE);
+	memcpy(state->write_data, state->read_data, sizeof(glc_video_data_header_t));
 	video->proc(state->ptr, video,
-		  (unsigned char *) &state->read_data[GLC_VIDEO_DATA_HEADER_SIZE],
-		  (unsigned char *) &state->write_data[GLC_VIDEO_DATA_HEADER_SIZE]);
+		  (unsigned char *) &state->read_data[sizeof(glc_video_data_header_t)],
+		  (unsigned char *) &state->write_data[sizeof(glc_video_data_header_t)]);
 
 	pthread_rwlock_unlock(&video->update);
 	return 0;

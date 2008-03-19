@@ -164,11 +164,11 @@ void *glc_thread(void *argptr)
 		if ((thread->flags & GLC_THREAD_READ) && (!(state.flags & GLC_THREAD_STATE_SKIP_READ))) {
 			if ((ret = ps_packet_open(&read, PS_PACKET_READ)))
 				goto err;
-			if ((ret = ps_packet_read(&read, &state.header, GLC_MESSAGE_HEADER_SIZE)))
+			if ((ret = ps_packet_read(&read, &state.header, sizeof(glc_message_header_t))))
 				goto err;
 			if ((ret = ps_packet_getsize(&read, &state.read_size)))
 				goto err;
-			state.read_size -= GLC_MESSAGE_HEADER_SIZE;
+			state.read_size -= sizeof(glc_message_header_t);
 			state.write_size = state.read_size;
 
 			/* header callback */
@@ -198,13 +198,13 @@ void *glc_thread(void *argptr)
 			}
 
 			/* reserve space for header */
-			if ((ret = ps_packet_seek(&write, GLC_MESSAGE_HEADER_SIZE)))
+			if ((ret = ps_packet_seek(&write, sizeof(glc_message_header_t))))
 				goto err;
 
 			if (!(state.flags & GLC_THREAD_STATE_UNKNOWN_FINAL_SIZE)) {
 				/* 'unlock' write */
 				if ((ret = ps_packet_setsize(&write,
-					                     GLC_MESSAGE_HEADER_SIZE + state.write_size)))
+					                     sizeof(glc_message_header_t) + state.write_size)))
 					goto err;
 				write_size_set = 1;
 			}
@@ -228,7 +228,7 @@ void *glc_thread(void *argptr)
 			/* write header */
 			if ((ret = ps_packet_seek(&write, 0)))
 				goto err;
-			if ((ret = ps_packet_write(&write, &state.header, GLC_MESSAGE_HEADER_SIZE)))
+			if ((ret = ps_packet_write(&write, &state.header, sizeof(glc_message_header_t))))
 				goto err;
 		}
 
@@ -247,7 +247,7 @@ void *glc_thread(void *argptr)
 		if ((thread->flags & GLC_THREAD_WRITE) && (!(state.flags & GLC_THREAD_STATE_SKIP_WRITE))) {
 			if (!write_size_set) {
 				if ((ret = ps_packet_setsize(&write,
-							     GLC_MESSAGE_HEADER_SIZE + state.write_size)))
+							     sizeof(glc_message_header_t) + state.write_size)))
 					goto err;
 			}
 			ps_packet_close(&write);

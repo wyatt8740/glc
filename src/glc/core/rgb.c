@@ -199,7 +199,7 @@ int rgb_read_callback(glc_thread_state_t *state)
 		pthread_rwlock_rdlock(&ctx->update);
 
 		if (ctx->convert)
-			state->write_size = GLC_VIDEO_DATA_HEADER_SIZE + ctx->size;
+			state->write_size = sizeof(glc_video_data_header_t) + ctx->size;
 		else {
 			state->flags |= GLC_THREAD_COPY;
 			pthread_rwlock_unlock(&ctx->update);
@@ -215,10 +215,10 @@ int rgb_write_callback(glc_thread_state_t *state)
 	rgb_t rgb = (rgb_t) state->ptr;
 	struct rgb_video_stream_s *ctx = state->threadptr;
 
-	memcpy(state->write_data, state->read_data, GLC_VIDEO_DATA_HEADER_SIZE);
+	memcpy(state->write_data, state->read_data, sizeof(glc_video_data_header_t));
 	rgb_convert_lookup(rgb, ctx,
-		    (unsigned char *) &state->read_data[GLC_VIDEO_DATA_HEADER_SIZE],
-		    (unsigned char *) &state->write_data[GLC_VIDEO_DATA_HEADER_SIZE]);
+		    (unsigned char *) &state->read_data[sizeof(glc_video_data_header_t)],
+		    (unsigned char *) &state->write_data[sizeof(glc_video_data_header_t)]);
 	pthread_rwlock_unlock(&ctx->update);
 
 	return 0;

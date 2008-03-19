@@ -198,11 +198,11 @@ void *demux_thread(void *argptr)
 		if ((ret = ps_packet_open(&read, PS_PACKET_READ)))
 			goto err;
 
-		if ((ret = ps_packet_read(&read, &msg_hdr, GLC_MESSAGE_HEADER_SIZE)))
+		if ((ret = ps_packet_read(&read, &msg_hdr, sizeof(glc_message_header_t))))
 			goto err;
 		if ((ret = ps_packet_getsize(&read, &data_size)))
 			goto err;
-		data_size -= GLC_MESSAGE_HEADER_SIZE;
+		data_size -= sizeof(glc_message_header_t);
 		if ((ret = ps_packet_dma(&read, (void *) &data, data_size, PS_ACCEPT_FAKE_DMA)))
 			goto err;
 
@@ -284,7 +284,7 @@ int demux_video_stream_send(demux_t demux, struct demux_video_stream_s *video,
 	int ret;
 	if ((ret = ps_packet_open(&video->packet, PS_PACKET_WRITE)))
 		goto err;
-	if ((ret = ps_packet_write(&video->packet, header, GLC_MESSAGE_HEADER_SIZE)))
+	if ((ret = ps_packet_write(&video->packet, header, sizeof(glc_message_header_t))))
 		goto err;
 	if ((ret = ps_packet_write(&video->packet, data, size)))
 		goto err;
@@ -468,7 +468,7 @@ int demux_audio_stream_send(demux_t demux, struct demux_audio_stream_s *audio,
 	int ret;
 	if ((ret = ps_packet_open(&audio->packet, PS_PACKET_WRITE)))
 		goto err;
-	if ((ret = ps_packet_write(&audio->packet, header, GLC_MESSAGE_HEADER_SIZE)))
+	if ((ret = ps_packet_write(&audio->packet, header, sizeof(glc_message_header_t))))
 		goto err;
 	if ((ret = ps_packet_write(&audio->packet, data, size)))
 		goto err;

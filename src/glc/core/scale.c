@@ -198,7 +198,7 @@ int scale_read_callback(glc_thread_state_t *state) {
 		pthread_rwlock_rdlock(&video->update);
 
 		if (video->proc)
-			state->write_size = video->size + GLC_VIDEO_DATA_HEADER_SIZE;
+			state->write_size = video->size + sizeof(glc_video_data_header_t);
 		else {
 			state->flags |= GLC_THREAD_COPY;
 			pthread_rwlock_unlock(&video->update);
@@ -213,10 +213,10 @@ int scale_write_callback(glc_thread_state_t *state) {
 	scale_t scale = (scale_t) state->ptr;
 	struct scale_video_stream_s *video = state->threadptr;
 
-	memcpy(state->write_data, state->read_data, GLC_VIDEO_DATA_HEADER_SIZE);
+	memcpy(state->write_data, state->read_data, sizeof(glc_video_data_header_t));
 	video->proc(scale, video,
-		  (unsigned char *) &state->read_data[GLC_VIDEO_DATA_HEADER_SIZE],
-		  (unsigned char *) &state->write_data[GLC_VIDEO_DATA_HEADER_SIZE]);
+		  (unsigned char *) &state->read_data[sizeof(glc_video_data_header_t)],
+		  (unsigned char *) &state->write_data[sizeof(glc_video_data_header_t)]);
 	pthread_rwlock_unlock(&video->update);
 
 	return 0;

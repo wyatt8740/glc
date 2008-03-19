@@ -700,8 +700,8 @@ int gl_capture_update_video_stream(gl_capture_t gl_capture,
 		format_msg.height = video->ch;
 
 		ps_packet_open(&video->packet, PS_PACKET_WRITE);
-		ps_packet_write(&video->packet, &msg, GLC_MESSAGE_HEADER_SIZE);
-		ps_packet_write(&video->packet, &format_msg, GLC_VIDEO_FORMAT_MESSAGE_SIZE);
+		ps_packet_write(&video->packet, &msg, sizeof(glc_message_header_t));
+		ps_packet_write(&video->packet, &format_msg, sizeof(glc_video_format_message_t));
 		ps_packet_close(&video->packet);
 
 		glc_log(gl_capture->glc, GLC_DEBUG, "gl_capture",
@@ -777,20 +777,21 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 		goto finish;
 	}
 
-	if (ps_packet_open(&video->packet, gl_capture->flags & GL_CAPTURE_LOCK_FPS ?
-					 PS_PACKET_WRITE :
-					 PS_PACKET_WRITE | PS_PACKET_TRY))
+	if (ps_packet_open(&video->packet, ((gl_capture->flags & GL_CAPTURE_LOCK_FPS) |
+					    (gl_capture->flags & GL_CAPTURE_IGNORE_TIME)) ?
+					   PS_PACKET_WRITE :
+					   PS_PACKET_WRITE | PS_PACKET_TRY))
 		goto finish;
-	if ((ret = ps_packet_write(&video->packet, &msg, GLC_MESSAGE_HEADER_SIZE)))
+	if ((ret = ps_packet_write(&video->packet, &msg, sizeof(glc_message_header_t))))
 		goto cancel;
-	if ((ret = ps_packet_write(&video->packet, &pic, GLC_VIDEO_DATA_HEADER_SIZE)))
+	if ((ret = ps_packet_write(&video->packet, &pic, sizeof(glc_video_data_header_t))))
 		goto cancel;
 
 	if (gl_capture->flags & GL_CAPTURE_USE_PBO) {
 		/* is this safe, what happens if this is called simultaneously? */
 		if ((ret = ps_packet_setsize(&video->packet, video->row * video->ch
-								+ GLC_MESSAGE_HEADER_SIZE
-								+ GLC_VIDEO_DATA_HEADER_SIZE)))
+								+ sizeof(glc_message_header_t)
+								+ sizeof(glc_video_data_header_t))))
 			goto cancel;
 
 		if ((ret = gl_capture_read_pbo(gl_capture, video)))
@@ -901,9 +902,9 @@ int gl_capture_update_color(gl_capture_t gl_capture, struct gl_capture_video_str
 
 	if ((ret = ps_packet_open(&video->packet, PS_PACKET_WRITE)))
 		goto err;
-	if ((ret = ps_packet_write(&video->packet, &msg_hdr, GLC_MESSAGE_HEADER_SIZE)))
+	if ((ret = ps_packet_write(&video->packet, &msg_hdr, sizeof(glc_message_header_t))))
 		goto err;
-	if ((ret = ps_packet_write(&video->packet, &msg, GLC_COLOR_MESSAGE_SIZE)))
+	if ((ret = ps_packet_write(&video->packet, &msg, sizeof(glc_color_message_t))))
 		goto err;
 	if ((ret = ps_packet_close(&video->packet)))
 		goto err;

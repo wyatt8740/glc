@@ -161,7 +161,7 @@ int alsa_play_read_callback(glc_thread_state_t *state)
 		return alsa_play_hw(alsa_play, (glc_audio_format_message_t *) state->read_data);
 	else if (state->header.type == GLC_MESSAGE_AUDIO_DATA)
 		return alsa_play_play(alsa_play, (glc_audio_data_header_t *) state->read_data,
-				       &state->read_data[GLC_AUDIO_DATA_HEADER_SIZE]);
+				       &state->read_data[sizeof(glc_audio_data_header_t)]);
 
 	return 0;
 }

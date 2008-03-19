@@ -293,8 +293,8 @@ void *alsa_hook_thread(void *argptr)
 		hdr.size = stream->capture_size;
 
 		ps_packet_open(&stream->packet, PS_PACKET_WRITE);
-		ps_packet_write(&stream->packet, &msg_hdr, GLC_MESSAGE_HEADER_SIZE);
-		ps_packet_write(&stream->packet, &hdr, GLC_AUDIO_DATA_HEADER_SIZE);
+		ps_packet_write(&stream->packet, &msg_hdr, sizeof(glc_message_header_t));
+		ps_packet_write(&stream->packet, &hdr, sizeof(glc_audio_data_header_t));
 		ps_packet_write(&stream->packet, stream->capture_data, hdr.size);
 		ps_packet_close(&stream->packet);
 
@@ -688,8 +688,8 @@ int alsa_hook_stream_init(alsa_hook_t alsa_hook, struct alsa_hook_stream_s *stre
 	fmt_msg.channels = stream->channels;
 	fmt_msg.format = stream->format;
 	ps_packet_open(&stream->packet, PS_PACKET_WRITE);
-	ps_packet_write(&stream->packet, &msg_hdr, GLC_MESSAGE_HEADER_SIZE);
-	ps_packet_write(&stream->packet, &fmt_msg, GLC_AUDIO_FORMAT_MESSAGE_SIZE);
+	ps_packet_write(&stream->packet, &msg_hdr, sizeof(glc_message_header_t));
+	ps_packet_write(&stream->packet, &fmt_msg, sizeof(glc_audio_format_message_t));
 	ps_packet_close(&stream->packet);
 
 	if (stream->capture_running) {

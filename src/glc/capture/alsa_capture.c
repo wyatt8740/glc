@@ -238,8 +238,8 @@ int alsa_capture_open(alsa_capture_t alsa_capture)
 	msg_hdr.type = GLC_MESSAGE_AUDIO_FORMAT;
 	ps_packet_init(&packet, alsa_capture->to);
 	ps_packet_open(&packet, PS_PACKET_WRITE);
-	ps_packet_write(&packet, &msg_hdr, GLC_MESSAGE_HEADER_SIZE);
-	ps_packet_write(&packet, &fmt_msg, GLC_AUDIO_FORMAT_MESSAGE_SIZE);
+	ps_packet_write(&packet, &msg_hdr, sizeof(glc_message_header_t));
+	ps_packet_write(&packet, &fmt_msg, sizeof(glc_audio_format_message_t));
 	ps_packet_close(&packet);
 	ps_packet_destroy(&packet);
 
@@ -405,9 +405,9 @@ void *alsa_capture_thread(void *argptr)
 
 			if ((ret = ps_packet_open(&packet, PS_PACKET_WRITE)))
 				goto cancel;
-			if ((ret = ps_packet_write(&packet, &msg_hdr, GLC_MESSAGE_HEADER_SIZE)))
+			if ((ret = ps_packet_write(&packet, &msg_hdr, sizeof(glc_message_header_t))))
 				goto cancel;
-			if ((ret = ps_packet_write(&packet, &hdr, GLC_AUDIO_DATA_HEADER_SIZE)))
+			if ((ret = ps_packet_write(&packet, &hdr, sizeof(glc_audio_data_header_t))))
 				goto cancel;
 			if ((ret = ps_packet_dma(&packet, (void *) &dma, hdr.size, PS_ACCEPT_FAKE_DMA)))
 				goto cancel;
@@ -424,8 +424,8 @@ void *alsa_capture_thread(void *argptr)
 					 "xrun recovery failed: %s", snd_strerror(read));
 
 			hdr.size = read * alsa_capture->bytes_per_frame;
-			if ((ret = ps_packet_setsize(&packet, GLC_MESSAGE_HEADER_SIZE +
-							     GLC_AUDIO_DATA_HEADER_SIZE +
+			if ((ret = ps_packet_setsize(&packet, sizeof(glc_message_header_t) +
+							     sizeof(glc_audio_data_header_t) +
 							     hdr.size)))
 				goto cancel;
 			if ((ret = ps_packet_close(&packet)))

@@ -198,13 +198,14 @@ int ycbcr_read_callback(glc_thread_state_t *state)
 
 	if (state->header.type == GLC_MESSAGE_VIDEO_DATA) {
 		pic_hdr = (glc_video_data_header_t *) state->read_data;
+		printf("%lu\n", pic_hdr->time);
 		ycbcr_get_video_stream(ycbcr, pic_hdr->id, &video);
 		state->threadptr = video;
 
 		pthread_rwlock_rdlock(&video->update);
 
 		if (video->convert != NULL)
-			state->write_size = GLC_VIDEO_DATA_HEADER_SIZE + video->size;
+			state->write_size = sizeof(glc_video_data_header_t) + video->size;
 		else {
 			state->flags |= GLC_THREAD_COPY;
 			pthread_rwlock_unlock(&video->update);
@@ -220,10 +221,10 @@ int ycbcr_write_callback(glc_thread_state_t *state)
 	ycbcr_t ycbcr = state->ptr;
 	struct ycbcr_video_stream_s *video = state->threadptr;
 
-	memcpy(state->write_data, state->read_data, GLC_VIDEO_DATA_HEADER_SIZE);
+	memcpy(state->write_data, state->read_data, sizeof(glc_video_data_header_t));
 	video->convert(ycbcr, video,
-		     (unsigned char *) &state->read_data[GLC_VIDEO_DATA_HEADER_SIZE],
-		     (unsigned char *) &state->write_data[GLC_VIDEO_DATA_HEADER_SIZE]);
+		     (unsigned char *) &state->read_data[sizeof(glc_video_data_header_t)],
+		     (unsigned char *) &state->write_data[sizeof(glc_video_data_header_t)]);
 	pthread_rwlock_unlock(&video->update);
 
 	return 0;

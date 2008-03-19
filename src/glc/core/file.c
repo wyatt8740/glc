@@ -147,7 +147,7 @@ int file_write_info(file_t file, glc_stream_info_t *info,
 	    (!(file->flags & FILE_WRITING)))
 		return EAGAIN;
 
-	if (write(file->fd, info, GLC_STREAM_INFO_SIZE) != GLC_STREAM_INFO_SIZE)
+	if (write(file->fd, info, sizeof(glc_stream_info_t)) != sizeof(glc_stream_info_t))
 		goto err;
 	if (write(file->fd, info_name, info->name_size) != info->name_size)
 		goto err;
@@ -203,26 +203,26 @@ void file_finish_callback(void *ptr, int err)
 int file_read_callback(glc_thread_state_t *state)
 {
 	file_t file = (file_t) state->ptr;
-	glc_container_message_t *container;
+	glc_container_message_header_t *container;
 	glc_size_t glc_size;
 
 	if (state->header.type == GLC_MESSAGE_CONTAINER) {
-		container = (glc_container_message_t *) state->read_data;
+		container = (glc_container_message_header_t *) state->read_data;
 
-		if (write(file->fd, &container->header, GLC_MESSAGE_HEADER_SIZE)
-		    != GLC_MESSAGE_HEADER_SIZE)
+		if (write(file->fd, &container->header, sizeof(glc_message_header_t))
+		    != sizeof(glc_message_header_t))
 			goto err;
-		if (write(file->fd, &container->size, GLC_SIZE_SIZE) != GLC_SIZE_SIZE)
+		if (write(file->fd, &container->size, sizeof(glc_size_t)) != sizeof(glc_size_t))
 			goto err;
-		if (write(file->fd, &state->read_data[GLC_CONTAINER_MESSAGE_SIZE], container->size)
+		if (write(file->fd, &state->read_data[sizeof(glc_container_message_header_t)], container->size)
 		    != container->size)
 			goto err;
 	} else {
-		if (write(file->fd, &state->header, GLC_MESSAGE_HEADER_SIZE)
-		    != GLC_MESSAGE_HEADER_SIZE)
+		if (write(file->fd, &state->header, sizeof(glc_message_header_t))
+		    != sizeof(glc_message_header_t))
 			goto err;
 		glc_size = state->read_size;
-		if (write(file->fd, &glc_size, GLC_SIZE_SIZE) != GLC_SIZE_SIZE)
+		if (write(file->fd, &glc_size, sizeof(glc_size_t)) != sizeof(glc_size_t))
 			goto err;
 		if (write(file->fd, state->read_data, state->read_size) != state->read_size)
 			goto err;
@@ -293,7 +293,7 @@ int file_read_info(file_t file, glc_stream_info_t *info,
 	if ((file->fd < 0) | (!(file->flags & FILE_READING)))
 		return EAGAIN;
 
-	if (read(file->fd, info, GLC_STREAM_INFO_SIZE) != GLC_STREAM_INFO_SIZE) {
+	if (read(file->fd, info, sizeof(glc_stream_info_t)) != sizeof(glc_stream_info_t)) {
 		glc_log(file->glc, GLC_ERROR, "file",
 			 "can't read stream info header");
 		return errno;
@@ -358,16 +358,16 @@ int file_read(file_t file, ps_buffer_t *to)
 	ps_packet_init(&packet, to);
 
 	do {
-		if (read(file->fd, &header, GLC_MESSAGE_HEADER_SIZE) != GLC_MESSAGE_HEADER_SIZE)
+		if (read(file->fd, &header, sizeof(glc_message_header_t)) != sizeof(glc_message_header_t))
 			goto send_eof;
-		if (read(file->fd, &glc_ps, GLC_SIZE_SIZE) != GLC_SIZE_SIZE)
+		if (read(file->fd, &glc_ps, sizeof(glc_size_t)) != sizeof(glc_size_t))
 			goto send_eof;
 
 		packet_size = glc_ps;
 
 		if ((ret = ps_packet_open(&packet, PS_PACKET_WRITE)))
 			goto err;
-		if ((ret = ps_packet_write(&packet, &header, GLC_MESSAGE_HEADER_SIZE)))
+		if ((ret = ps_packet_write(&packet, &header, sizeof(glc_message_header_t))))
 			goto err;
 		if ((ret = ps_packet_dma(&packet, (void *) &dma, packet_size, PS_ACCEPT_FAKE_DMA)))
 			goto err;
@@ -389,7 +389,7 @@ finish:
 send_eof:
 	header.type = GLC_MESSAGE_CLOSE;
 	ps_packet_open(&packet, PS_PACKET_WRITE);
-	ps_packet_write(&packet, &header, GLC_MESSAGE_HEADER_SIZE);
+	ps_packet_write(&packet, &header, sizeof(glc_message_header_t));
 	ps_packet_close(&packet);
 
 	glc_log(file->glc, GLC_ERROR, "file", "unexpected EOF");

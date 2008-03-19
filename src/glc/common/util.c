@@ -135,7 +135,7 @@ int glc_util_write_end_of_stream(glc_t *glc, ps_buffer_t *to)
 		goto finish;
 	if ((ret = ps_packet_open(&packet, PS_PACKET_WRITE)))
 		goto finish;
-	if ((ret = ps_packet_write(&packet, &header, GLC_MESSAGE_HEADER_SIZE)))
+	if ((ret = ps_packet_write(&packet, &header, sizeof(glc_message_header_t))))
 		goto finish;
 	if ((ret = ps_packet_close(&packet)))
 		goto finish;

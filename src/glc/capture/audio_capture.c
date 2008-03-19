@@ -211,10 +211,10 @@ int audio_capture_write_cfg(audio_capture_t audio_capture)
 	if ((ret = ps_packet_open(&audio_capture->packet, PS_PACKET_WRITE)))
 		goto err;
 	if ((ret = ps_packet_write(&audio_capture->packet,
-				   &hdr, GLC_MESSAGE_HEADER_SIZE)))
+				   &hdr, sizeof(glc_message_header_t))))
 		goto err;
 	if ((ret = ps_packet_write(&audio_capture->packet,
-				   &fmt_msg, GLC_AUDIO_FORMAT_MESSAGE_SIZE)))
+				   &fmt_msg, sizeof(glc_audio_format_message_t))))
 		goto err;
 	if ((ret = ps_packet_close(&audio_capture->packet)))
 		goto err;
@@ -261,10 +261,10 @@ int audio_capture_data(audio_capture_t audio_capture,
 	if ((ret = ps_packet_open(&audio_capture->packet, PS_PACKET_WRITE)))
 		goto err;
 	if ((ret = ps_packet_write(&audio_capture->packet,
-				   &msg_hdr, GLC_MESSAGE_HEADER_SIZE)))
+				   &msg_hdr, sizeof(glc_message_header_t))))
 		goto err;
 	if ((ret = ps_packet_write(&audio_capture->packet,
-				   &audio_hdr, GLC_AUDIO_DATA_HEADER_SIZE)))
+				   &audio_hdr, sizeof(glc_audio_data_header_t))))
 		goto err;
 	if ((ret = ps_packet_write(&audio_capture->packet,
 				   data, size)))

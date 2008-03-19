@@ -658,7 +658,7 @@ int gl_play_read_callback(glc_thread_state_t *state)
 		}
 
 		/* draw first, measure and sleep after */
-		gl_play_draw_video_data_messageture(gl_play, &state->read_data[GLC_VIDEO_DATA_HEADER_SIZE]);
+		gl_play_draw_video_data_messageture(gl_play, &state->read_data[sizeof(glc_video_data_header_t)]);
 
 		/* wait until actual drawing is done */
 		glFinish();

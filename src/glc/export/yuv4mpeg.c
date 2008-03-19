@@ -160,7 +160,7 @@ int yuv4mpeg_read_callback(glc_thread_state_t *state)
 	if (state->header.type == GLC_MESSAGE_VIDEO_FORMAT)
 		return yuv4mpeg_handle_hdr(yuv4mpeg, (glc_video_format_message_t *) state->read_data);
 	else if (state->header.type == GLC_MESSAGE_VIDEO_DATA)
-		return yuv4mpeg_handle_video_data_message(yuv4mpeg, (glc_video_data_header_t *) state->read_data, &state->read_data[GLC_VIDEO_DATA_HEADER_SIZE]);
+		return yuv4mpeg_handle_video_data_message(yuv4mpeg, (glc_video_data_header_t *) state->read_data, &state->read_data[sizeof(glc_video_data_header_t)]);
 
 	return 0;
 }
