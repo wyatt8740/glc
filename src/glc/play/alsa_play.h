@@ -44,14 +44,14 @@ __PUBLIC int alsa_play_init(alsa_play_t *alsa_play, glc_t *glc);
 __PUBLIC int alsa_play_destroy(alsa_play_t alsa_play);
 
 /**
- * \brief set audio stream number
+ * \brief set audio stream id
  *
  * Default audio stream is 1.
  * \param alsa_play alsa_play object
- * \param audio audio stream number
+ * \param id audio stream id
  * \return 0 on success otherwise an error code
  */
-__PUBLIC int alsa_play_set_stream_number(alsa_play_t alsa_play, glc_audio_i audio);
+__PUBLIC int alsa_play_set_stream_id(alsa_play_t alsa_play, glc_stream_id_t id);
 
 /**
  * \brief set ALSA playback device

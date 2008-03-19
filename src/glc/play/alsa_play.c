@@ -36,13 +36,14 @@ struct alsa_play_s {
 
 	glc_utime_t silence_threshold;
 
-	glc_audio_i audio_i;
+	glc_stream_id_t id;
 	snd_pcm_t *pcm;
 	const char *device;
 
 	unsigned int channels;
 	unsigned int rate;
 	glc_flags_t flags;
+	glc_audio_format_t format;
 
 	int fmt;
 
@@ -53,20 +54,22 @@ int alsa_play_read_callback(glc_thread_state_t *state);
 void alsa_play_finish_callback(void *priv, int err);
 
 int alsa_play_hw(alsa_play_t alsa_play, glc_audio_format_message_t *fmt_msg);
-int alsa_play_play(alsa_play_t alsa_play, glc_audio_header_t *audio_msg, char *data);
+int alsa_play_play(alsa_play_t alsa_play, glc_audio_data_header_t *audio_msg, char *data);
 
-snd_pcm_format_t glc_fmt_to_pcm_fmt(glc_flags_t flags);
+snd_pcm_format_t glc_fmt_to_pcm_fmt(glc_audio_format_t format);
 
 int alsa_play_xrun(alsa_play_t alsa_play, int err);
 
-snd_pcm_format_t glc_fmt_to_pcm_fmt(glc_flags_t flags)
+snd_pcm_format_t glc_fmt_to_pcm_fmt(glc_audio_format_t format)
 {
-	if (flags & GLC_AUDIO_S16_LE)
-		return SND_PCM_FORMAT_S16_LE;
-	else if (flags & GLC_AUDIO_S24_LE)
-		return SND_PCM_FORMAT_S24_LE;
-	else if (flags & GLC_AUDIO_S32_LE)
-		return SND_PCM_FORMAT_S32_LE;
+	switch (format) {
+		case GLC_AUDIO_S16_LE:
+			return SND_PCM_FORMAT_S16_LE;
+		case GLC_AUDIO_S24_LE:
+			return SND_PCM_FORMAT_S24_LE;
+		case GLC_AUDIO_S32_LE:
+			return SND_PCM_FORMAT_S32_LE;
+	}
 	return 0;
 }
 
@@ -77,7 +80,7 @@ int alsa_play_init(alsa_play_t *alsa_play, glc_t *glc)
 
 	(*alsa_play)->glc = glc;
 	(*alsa_play)->device = "default";
-	(*alsa_play)->audio_i = 1;
+	(*alsa_play)->id = 1;
 	(*alsa_play)->silence_threshold = 200000; /** \todo make configurable? */
 
 	(*alsa_play)->thread.flags = GLC_THREAD_READ;
@@ -101,9 +104,9 @@ int alsa_play_set_alsa_playback_device(alsa_play_t alsa_play, const char *device
 	return 0;
 }
 
-int alsa_play_set_stream_number(alsa_play_t alsa_play, glc_audio_i audio)
+int alsa_play_set_stream_id(alsa_play_t alsa_play, glc_stream_id_t id)
 {
-	alsa_play->audio_i = audio;
+	alsa_play->id = id;
 	return 0;
 }
 
@@ -156,9 +159,9 @@ int alsa_play_read_callback(glc_thread_state_t *state)
 
 	if (state->header.type == GLC_MESSAGE_AUDIO_FORMAT)
 		return alsa_play_hw(alsa_play, (glc_audio_format_message_t *) state->read_data);
-	else if (state->header.type == GLC_MESSAGE_AUDIO)
-		return alsa_play_play(alsa_play, (glc_audio_header_t *) state->read_data,
-				       &state->read_data[GLC_AUDIO_HEADER_SIZE]);
+	else if (state->header.type == GLC_MESSAGE_AUDIO_DATA)
+		return alsa_play_play(alsa_play, (glc_audio_data_header_t *) state->read_data,
+				       &state->read_data[GLC_AUDIO_DATA_HEADER_SIZE]);
 
 	return 0;
 }
@@ -171,10 +174,11 @@ int alsa_play_hw(alsa_play_t alsa_play, glc_audio_format_message_t *fmt_msg)
 	unsigned int min_periods;
 	int dir, ret = 0;
 
-	if (fmt_msg->audio != alsa_play->audio_i)
+	if (fmt_msg->id != alsa_play->id)
 		return 0;
 
 	alsa_play->flags = fmt_msg->flags;
+	alsa_play->format = fmt_msg->format;
 	alsa_play->rate = fmt_msg->rate;
 	alsa_play->channels = fmt_msg->channels;
 
@@ -206,7 +210,7 @@ int alsa_play_hw(alsa_play_t alsa_play, glc_audio_format_message_t *fmt_msg)
 						hw_params, access)) < 0)
 		goto err;
 	if ((ret = snd_pcm_hw_params_set_format(alsa_play->pcm, hw_params,
-						glc_fmt_to_pcm_fmt(alsa_play->flags))) < 0)
+						glc_fmt_to_pcm_fmt(alsa_play->format))) < 0)
 		goto err;
 	if ((ret = snd_pcm_hw_params_set_channels(alsa_play->pcm, hw_params,
 						  alsa_play->channels)) < 0)
@@ -244,18 +248,18 @@ err:
 	return -ret;
 }
 
-int alsa_play_play(alsa_play_t alsa_play, glc_audio_header_t *audio_hdr, char *data)
+int alsa_play_play(alsa_play_t alsa_play, glc_audio_data_header_t *audio_hdr, char *data)
 {
 	snd_pcm_uframes_t frames, rem;
 	snd_pcm_sframes_t ret = 0;
 	unsigned int c;
 
-	if (audio_hdr->audio != alsa_play->audio_i)
+	if (audio_hdr->id != alsa_play->id)
 		return 0;
 
 	if (!alsa_play->pcm) {
 		glc_log(alsa_play->glc, GLC_ERROR, "alsa_play", "broken stream %d",
-			 alsa_play->audio_i);
+			 alsa_play->id);
 		return EINVAL;
 	}
 
@@ -263,9 +267,9 @@ int alsa_play_play(alsa_play_t alsa_play, glc_audio_header_t *audio_hdr, char *d
 	glc_utime_t time = glc_state_time(alsa_play->glc);
 	glc_utime_t duration = (1000000 * frames) / alsa_play->rate;
 
-	if (time + alsa_play->silence_threshold + duration < audio_hdr->timestamp)
-		usleep(audio_hdr->timestamp - time - duration);
-	else if (time > audio_hdr->timestamp) {
+	if (time + alsa_play->silence_threshold + duration < audio_hdr->time)
+		usleep(audio_hdr->time - time - duration);
+	else if (time > audio_hdr->time) {
 		glc_log(alsa_play->glc, GLC_DEBUG, "alsa_play", "dropped packet");
 		return 0;
 	}
