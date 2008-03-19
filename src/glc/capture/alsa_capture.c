@@ -34,7 +34,7 @@ struct alsa_capture_s {
 	ps_buffer_t *to;
 
 	glc_state_audio_t state_audio;
-	glc_audio_i id;
+	glc_stream_id_t id;
 
 	snd_pcm_t *pcm;
 	snd_pcm_uframes_t period_size;
@@ -64,7 +64,7 @@ int alsa_capture_init_sw(alsa_capture_t alsa_capture, snd_pcm_sw_params_t *sw_pa
 void alsa_capture_async_callback(snd_async_handler_t *async_handler);
 void *alsa_capture_thread(void *argptr);
 
-glc_flags_t alsa_capture_fmt_flags(snd_pcm_format_t pcm_fmt);
+glc_audio_format_t alsa_capture_glc_format(snd_pcm_format_t pcm_fmt);
 
 int alsa_capture_xrun(alsa_capture_t alsa_capture, int err);
 int alsa_capture_stop(alsa_capture_t alsa_capture);
@@ -221,18 +221,19 @@ int alsa_capture_open(alsa_capture_t alsa_capture)
 	alsa_capture->rate_usec = 1000000 / alsa_capture->rate;
 
 	alsa_capture->flags = GLC_AUDIO_INTERLEAVED;
-	alsa_capture->flags |= alsa_capture_fmt_flags(alsa_capture->format);
-	if (alsa_capture->flags & GLC_AUDIO_FORMAT_UNKNOWN) {
-		glc_log(alsa_capture->glc, GLC_ERROR, "alsa_capture",
-			 "unsupported audio format 0x%02x", alsa_capture->format);
-		return ENOTSUP;
-	}
 
 	/* prepare packet */
-	fmt_msg.audio = alsa_capture->id;
+	fmt_msg.id = alsa_capture->id;
 	fmt_msg.rate = alsa_capture->rate;
 	fmt_msg.channels = alsa_capture->channels;
 	fmt_msg.flags = alsa_capture->flags;
+	fmt_msg.format = alsa_capture_glc_format(alsa_capture->format);
+
+	if (!fmt_msg.format) {
+		glc_log(alsa_capture->glc, GLC_ERROR, "alsa_capture",
+			"unsupported audio format 0x%02x", alsa_capture->format);
+		return ENOTSUP;
+	}
 
 	msg_hdr.type = GLC_MESSAGE_AUDIO_FORMAT;
 	ps_packet_init(&packet, alsa_capture->to);
@@ -268,7 +269,7 @@ err:
 	return -ret;
 }
 
-glc_flags_t alsa_capture_fmt_flags(snd_pcm_format_t pcm_fmt)
+glc_audio_format_t alsa_capture_glc_format(snd_pcm_format_t pcm_fmt)
 {
 	switch (pcm_fmt) {
 	case SND_PCM_FORMAT_S16_LE:
@@ -278,7 +279,7 @@ glc_flags_t alsa_capture_fmt_flags(snd_pcm_format_t pcm_fmt)
 	case SND_PCM_FORMAT_S32_LE:
 		return GLC_AUDIO_S32_LE;
 	default:
-		return GLC_AUDIO_FORMAT_UNKNOWN;
+		return 0;
 	}
 }
 
@@ -363,14 +364,14 @@ void *alsa_capture_thread(void *argptr)
 	alsa_capture_t alsa_capture = argptr;
 	snd_pcm_sframes_t avail, read;
 	glc_utime_t time, delay_usec = 0;
-	glc_audio_header_t hdr;
+	glc_audio_data_header_t hdr;
 	glc_message_header_t msg_hdr;
 	ps_packet_t packet;
 	int ret;
 	char *dma;
 
 	ps_packet_init(&packet, alsa_capture->to);
-	msg_hdr.type = GLC_MESSAGE_AUDIO;
+	msg_hdr.type = GLC_MESSAGE_AUDIO_DATA;
 
 	while (!sem_wait(&alsa_capture->capture)) {
 		if (alsa_capture->stop_capture)
@@ -398,15 +399,15 @@ void *alsa_capture_thread(void *argptr)
 
 			if (delay_usec < time)
 				time -= delay_usec;
-			hdr.timestamp = time;
+			hdr.time = time;
 			hdr.size = alsa_capture->period_size_in_bytes;
-			hdr.audio = alsa_capture->id;
+			hdr.id = alsa_capture->id;
 
 			if ((ret = ps_packet_open(&packet, PS_PACKET_WRITE)))
 				goto cancel;
 			if ((ret = ps_packet_write(&packet, &msg_hdr, GLC_MESSAGE_HEADER_SIZE)))
 				goto cancel;
-			if ((ret = ps_packet_write(&packet, &hdr, GLC_AUDIO_HEADER_SIZE)))
+			if ((ret = ps_packet_write(&packet, &hdr, GLC_AUDIO_DATA_HEADER_SIZE)))
 				goto cancel;
 			if ((ret = ps_packet_dma(&packet, (void *) &dma, hdr.size, PS_ACCEPT_FAKE_DMA)))
 				goto cancel;
@@ -424,7 +425,7 @@ void *alsa_capture_thread(void *argptr)
 
 			hdr.size = read * alsa_capture->bytes_per_frame;
 			if ((ret = ps_packet_setsize(&packet, GLC_MESSAGE_HEADER_SIZE +
-							     GLC_AUDIO_HEADER_SIZE +
+							     GLC_AUDIO_DATA_HEADER_SIZE +
 							     hdr.size)))
 				goto cancel;
 			if ((ret = ps_packet_close(&packet)))
