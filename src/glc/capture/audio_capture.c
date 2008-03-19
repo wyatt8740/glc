@@ -36,9 +36,10 @@ struct audio_capture_s {
 	ps_packet_t packet;
 
 	glc_flags_t format_flags;
+	glc_audio_format_t format;
 	u_int32_t rate, channels;
 
-	glc_audio_i audio_i;
+	glc_stream_id_t id;
 	glc_state_audio_t state_audio;
 
 	glc_utime_t time;
@@ -76,22 +77,32 @@ int audio_capture_set_buffer(audio_capture_t audio_capture, ps_buffer_t *buffer)
 	return 0;
 }
 
-int audio_capture_set_format(audio_capture_t audio_capture,
-			     glc_flags_t format_flags)
+int audio_capture_set_flags(audio_capture_t audio_capture,
+			    glc_flags_t format_flags)
 {
 	/* check for unsupported flags */
-	if (format_flags & (~(GLC_AUDIO_INTERLEAVED |
-			      GLC_AUDIO_S16_LE |
-			      GLC_AUDIO_S24_LE |
-			      GLC_AUDIO_S32_LE)))
+	if (format_flags & (~(GLC_AUDIO_INTERLEAVED)))
 		return EINVAL;
 
-	/* FIXME check for invalid combinations */
 	if (audio_capture->format_flags != format_flags) {
 		audio_capture->format_flags = format_flags;
 		audio_capture->flags |= AUDIO_CAPTURE_CFG_CHANGED;
 	}
 	return 0;
+}
+
+int audio_capture_set_format(audio_capture_t audio_capture,
+			     glc_audio_format_t format)
+{
+	if ((format != GLC_AUDIO_S16_LE) |
+	    (format != GLC_AUDIO_S24_LE) |
+	    (format != GLC_AUDIO_S32_LE))
+		return EINVAL;
+
+	if (audio_capture->format != format) {
+		audio_capture->format = format;
+		audio_capture->flags |= AUDIO_CAPTURE_CFG_CHANGED;
+	}
 }
 
 int audio_capture_set_rate(audio_capture_t audio_capture,
@@ -133,12 +144,14 @@ int audio_capture_ignore_time(audio_capture_t audio_capture, int ignore_time)
 size_t audio_capture_samples_to_bytes(audio_capture_t audio_capture,
 				      unsigned int samples)
 {
-	if (audio_capture->flags & GLC_AUDIO_S16_LE)
-		return 2 * samples;
-	else if (audio_capture->flags & GLC_AUDIO_S24_LE)
-		return 3 * samples;
-	else if (audio_capture->flags & GLC_AUDIO_S32_LE)
-		return 4 * samples;
+	switch (audio_capture->format) {
+		case GLC_AUDIO_S16_LE:
+			return 2 * samples;
+		case GLC_AUDIO_S24_LE:
+			return 3 * samples;
+		case GLC_AUDIO_S32_LE:
+			return 4 * samples;
+	}
 
 	return 0; /* unknown */
 }
@@ -184,15 +197,16 @@ int audio_capture_write_cfg(audio_capture_t audio_capture)
 	glc_audio_format_message_t fmt_msg;
 	int ret = 0;
 
-	if (!audio_capture->audio_i)
-		glc_state_audio_new(audio_capture->glc, &audio_capture->audio_i,
+	if (!audio_capture->id)
+		glc_state_audio_new(audio_capture->glc, &audio_capture->id,
 				    &audio_capture->state_audio);
 
 	hdr.type = GLC_MESSAGE_AUDIO_FORMAT;
+	fmt_msg.id = audio_capture->id;
 	fmt_msg.flags = audio_capture->format_flags;
-	fmt_msg.audio = audio_capture->audio_i;
 	fmt_msg.rate = audio_capture->rate;
 	fmt_msg.channels = audio_capture->channels;
+	fmt_msg.format = audio_capture->format;
 
 	if ((ret = ps_packet_open(&audio_capture->packet, PS_PACKET_WRITE)))
 		goto err;
@@ -219,7 +233,7 @@ int audio_capture_data(audio_capture_t audio_capture,
 		       void *data, size_t size)
 {
 	glc_message_header_t msg_hdr;
-	glc_audio_header_t audio_hdr;
+	glc_audio_data_header_t audio_hdr;
 
 	int ret;
 	if (!(audio_capture->flags & AUDIO_CAPTURE_CAPTURING))
@@ -234,10 +248,10 @@ int audio_capture_data(audio_capture_t audio_capture,
 	if (!(audio_capture->flags & AUDIO_CAPTURE_IGNORE_TIME))
 		audio_capture->time = glc_state_time(audio_capture->glc);
 
-	msg_hdr.type = GLC_MESSAGE_AUDIO;
-	audio_hdr.audio = audio_capture->audio_i; /* should be set to valid one */
+	msg_hdr.type = GLC_MESSAGE_AUDIO_DATA;
+	audio_hdr.id = audio_capture->id; /* should be set to valid one */
 	audio_hdr.size = size;
-	audio_hdr.timestamp = audio_capture->time;
+	audio_hdr.time = audio_capture->time;
 
 	if (audio_capture->flags & AUDIO_CAPTURE_IGNORE_TIME)
 		audio_capture->time += (size * 1000000) /
@@ -250,7 +264,7 @@ int audio_capture_data(audio_capture_t audio_capture,
 				   &msg_hdr, GLC_MESSAGE_HEADER_SIZE)))
 		goto err;
 	if ((ret = ps_packet_write(&audio_capture->packet,
-				   &audio_hdr, GLC_AUDIO_HEADER_SIZE)))
+				   &audio_hdr, GLC_AUDIO_DATA_HEADER_SIZE)))
 		goto err;
 	if ((ret = ps_packet_write(&audio_capture->packet,
 				   data, size)))

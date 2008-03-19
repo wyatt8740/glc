@@ -49,19 +49,28 @@ __PUBLIC int audio_capture_set_buffer(audio_capture_t audio_capture, ps_buffer_t
 /**
  * \brief set data format
  *
+ * Currently supported formats are
+ *  * GLC_AUDIO_S16_LE
+ *  * GLC_AUDIO_S24_LE
+ *  * GLC_AUDIO_S32_LE
+ * \param audio_capture audio_capture object
+ * \param format format
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int audio_capture_set_format(audio_capture_t audio_capture,
+				      glc_audio_format_t format);
+
+/**
+ * \brief set data format flags
+ *
  * Currently supported flags are
  *  * GLC_AUDIO_INTERLEAVED	audio data is interleaved
- * 
- * and one of the following
- *  * GLC_AUDIO_S16_LE		16b little-endian samples
- *  * GLC_AUDIO_S24_LE		24b little-endian samples
- *  * GLC_AUDIO_S32_LE		32b little-endian samples
  * \param audio_capture audio_capture object
  * \param format_flags format flags
  * \return 0 on success otherwise an error code
  */
-__PUBLIC int audio_capture_set_format(audio_capture_t audio_capture,
-				      glc_flags_t format_flags);
+__PUBLIC int audio_capture_set_flags(audio_capture_t audio_capture,
+				     glc_flags_t format_flags);
 
 /**
  * \brief set rate
