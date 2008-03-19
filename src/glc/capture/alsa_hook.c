@@ -39,7 +39,8 @@
 
 struct alsa_hook_stream_s {
 	glc_state_audio_t state_audio;
-	glc_audio_i audio_i;
+	glc_stream_id_t id;
+	glc_audio_format_t format;
 
 	snd_pcm_t *pcm;
 	int mode;
@@ -99,7 +100,7 @@ int alsa_hook_unlock_write(alsa_hook_t alsa_hook, struct alsa_hook_stream_s *str
 int alsa_hook_set_data_size(struct alsa_hook_stream_s *stream, size_t size);
 void *alsa_hook_thread(void *argptr);
 
-glc_flags_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt);
+glc_audio_format_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt);
 
 int alsa_hook_init(alsa_hook_t *alsa_hook, glc_t *glc)
 {
@@ -225,7 +226,7 @@ int alsa_hook_destroy(alsa_hook_t alsa_hook)
 	return 0;
 }
 
-glc_flags_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt)
+glc_audio_format_t snd_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt)
 {
 	switch (pcm_fmt) {
 	case SND_PCM_FORMAT_S16_LE:
@@ -235,7 +236,7 @@ glc_flags_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt)
 	case SND_PCM_FORMAT_S32_LE:
 		return GLC_AUDIO_S32_LE;
 	default:
-		return GLC_AUDIO_FORMAT_UNKNOWN;
+		return 0;
 	}
 }
 
@@ -254,7 +255,7 @@ int alsa_hook_get_stream_alsa(alsa_hook_t alsa_hook, snd_pcm_t *pcm, struct alsa
 		memset(find, 0, sizeof(struct alsa_hook_stream_s));
 		find->pcm = pcm;
 
-		find->audio_i = 0; /* zero until it is initialized */
+		find->id = 0; /* zero until it is initialized */
 		sem_init(&find->capture_finished, 0, 0);
 
 		sem_init(&find->capture_full, 0, 0);
@@ -274,11 +275,11 @@ int alsa_hook_get_stream_alsa(alsa_hook_t alsa_hook, snd_pcm_t *pcm, struct alsa
 void *alsa_hook_thread(void *argptr)
 {
 	struct alsa_hook_stream_s *stream = (struct alsa_hook_stream_s *) argptr;
-	glc_audio_header_t hdr;
+	glc_audio_data_header_t hdr;
 	glc_message_header_t msg_hdr;
 
-	msg_hdr.type = GLC_MESSAGE_AUDIO;
-	hdr.audio = stream->audio_i;
+	msg_hdr.type = GLC_MESSAGE_AUDIO_DATA;
+	hdr.id = stream->id;
 
 	stream->capture_ready = 1;
 	while (1) {
@@ -288,12 +289,12 @@ void *alsa_hook_thread(void *argptr)
 		if (!stream->capture_running)
 			break;
 
-		hdr.timestamp = stream->capture_time;
+		hdr.time = stream->capture_time;
 		hdr.size = stream->capture_size;
 
 		ps_packet_open(&stream->packet, PS_PACKET_WRITE);
 		ps_packet_write(&stream->packet, &msg_hdr, GLC_MESSAGE_HEADER_SIZE);
-		ps_packet_write(&stream->packet, &hdr, GLC_AUDIO_HEADER_SIZE);
+		ps_packet_write(&stream->packet, &hdr, GLC_AUDIO_DATA_HEADER_SIZE);
 		ps_packet_write(&stream->packet, stream->capture_data, hdr.size);
 		ps_packet_close(&stream->packet);
 
@@ -392,7 +393,7 @@ int alsa_hook_alsa_close(alsa_hook_t alsa_hook, snd_pcm_t *pcm)
 
 	alsa_hook_get_stream_alsa(alsa_hook, pcm, &stream);
 	glc_log(alsa_hook->glc, GLC_INFORMATION, "alsa_hook", "%p: closing stream %d",
-		 pcm, stream->audio_i);
+		 pcm, stream->id);
 	stream->fmt = 0; /* no format -> do not initialize */
 
 	return 0;
@@ -604,16 +605,16 @@ int alsa_hook_alsa_hw_params(alsa_hook_t alsa_hook, snd_pcm_t *pcm, snd_pcm_hw_p
 
 	glc_log(alsa_hook->glc, GLC_DEBUG, "alsa_hook",
 		 "%p: creating/updating configuration for stream %d",
-		 stream->pcm, stream->audio_i);
+		 stream->pcm, stream->id);
 
 	/* extract information */
 	if ((ret = snd_pcm_hw_params_get_format(params, &format)) < 0)
 		goto err;
 	stream->flags = 0; /* zero flags */
-	stream->flags |= pcm_fmt_to_glc_fmt(format);
-	if (stream->flags & GLC_AUDIO_FORMAT_UNKNOWN) {
+	stream->format = pcm_fmt_to_glc_fmt(format);
+	if (!stream->format) {
 		glc_log(alsa_hook->glc, GLC_ERROR, "alsa_hook",
-			 "%p: unsupported audio format 0x%02x", stream->pcm, format);
+			"%p: unsupported audio format 0x%02x", stream->pcm, format);
 		ret = ENOTSUP;
 		goto err;
 	}
@@ -668,11 +669,11 @@ int alsa_hook_stream_init(alsa_hook_t alsa_hook, struct alsa_hook_stream_s *stre
 		return EINVAL;
 
 	/* we need proper id for the stream */
-	if (stream->audio_i < 1)
-		glc_state_audio_new(alsa_hook->glc, &stream->audio_i, &stream->state_audio);
+	if (stream->id < 1)
+		glc_state_audio_new(alsa_hook->glc, &stream->id, &stream->state_audio);
 
 	glc_log(alsa_hook->glc, GLC_INFORMATION, "alsa_hook",
-		 "%p: initializing stream %d", stream->pcm, stream->audio_i);
+		 "%p: initializing stream %d", stream->pcm, stream->id);
 
 	/* init packet */
 	if (stream->initialized)
@@ -681,10 +682,11 @@ int alsa_hook_stream_init(alsa_hook_t alsa_hook, struct alsa_hook_stream_s *stre
 
 	/* prepare audio format message */
 	msg_hdr.type = GLC_MESSAGE_AUDIO_FORMAT;
-	fmt_msg.audio = stream->audio_i;
+	fmt_msg.id = stream->id;
 	fmt_msg.flags = stream->flags;
 	fmt_msg.rate = stream->rate;
 	fmt_msg.channels = stream->channels;
+	fmt_msg.format = stream->format;
 	ps_packet_open(&stream->packet, PS_PACKET_WRITE);
 	ps_packet_write(&stream->packet, &msg_hdr, GLC_MESSAGE_HEADER_SIZE);
 	ps_packet_write(&stream->packet, &fmt_msg, GLC_AUDIO_FORMAT_MESSAGE_SIZE);
