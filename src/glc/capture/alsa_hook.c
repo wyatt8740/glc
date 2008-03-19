@@ -226,7 +226,7 @@ int alsa_hook_destroy(alsa_hook_t alsa_hook)
 	return 0;
 }
 
-glc_audio_format_t snd_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt)
+glc_audio_format_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt)
 {
 	switch (pcm_fmt) {
 	case SND_PCM_FORMAT_S16_LE:

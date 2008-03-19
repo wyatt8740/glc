@@ -769,6 +769,14 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 	/* not really needed until now */
 	gl_capture_update_video_stream(gl_capture, video);
 
+	/* if PBO is not active, just start transfer and finish */
+	if ((gl_capture->flags & GL_CAPTURE_USE_PBO) && (!video->pbo_active)) {
+		ret = gl_capture_start_pbo(gl_capture, video);
+		video->pbo_time = now;
+
+		goto finish;
+	}
+
 	if (ps_packet_open(&video->packet, gl_capture->flags & GL_CAPTURE_LOCK_FPS ?
 					 PS_PACKET_WRITE :
 					 PS_PACKET_WRITE | PS_PACKET_TRY))
@@ -779,16 +787,14 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 		goto cancel;
 
 	if (gl_capture->flags & GL_CAPTURE_USE_PBO) {
-		if (video->pbo_active) {
-			/* is this safe, what happens if this is called simultaneously? */
-			if ((ret = ps_packet_setsize(&video->packet, video->row * video->ch
-									+ GLC_MESSAGE_HEADER_SIZE
-									+ GLC_VIDEO_DATA_HEADER_SIZE)))
-				goto cancel;
+		/* is this safe, what happens if this is called simultaneously? */
+		if ((ret = ps_packet_setsize(&video->packet, video->row * video->ch
+								+ GLC_MESSAGE_HEADER_SIZE
+								+ GLC_VIDEO_DATA_HEADER_SIZE)))
+			goto cancel;
 
-			if ((ret = gl_capture_read_pbo(gl_capture, video)))
-				goto cancel;
-		}
+		if ((ret = gl_capture_read_pbo(gl_capture, video)))
+			goto cancel;
 
 		ret = gl_capture_start_pbo(gl_capture, video);
 		video->pbo_time = now;
