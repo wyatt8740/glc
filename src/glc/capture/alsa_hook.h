@@ -85,7 +85,7 @@ __PUBLIC int alsa_hook_destroy(alsa_hook_t alsa_hook);
  * Call after calling real snd_pcm_open().
  * \code
  * if (snd_pcm_open(pcmp, name, stream, mode) == 0)
- * 	alsa_hook_alsa_open(alsa_hook, *pcmp, nome, stream, mode);
+ * 	alsa_hook_open(alsa_hook, *pcmp, nome, stream, mode);
  * \endcode
  * \param alsa_hook alsa_hook object
  * \param pcm pcm pointer given by snd_pcm_open()
@@ -101,7 +101,7 @@ __PUBLIC int alsa_hook_open(alsa_hook_t alsa_hook, snd_pcm_t *pcm, const char *n
  * \brief hook function for snd_pcm_close()
  * \code
  * snd_pcm_close(pcm);
- * alsa_hook_alsa_close(alsa_hook, pcm);
+ * alsa_hook_close(alsa_hook, pcm);
  * \endcode
  * \param alsa_hook alsa_hook object
  * \param pcm closed pcm
@@ -113,7 +113,7 @@ __PUBLIC int alsa_hook_close(alsa_hook_t alsa_hook, snd_pcm_t *pcm);
  * \brief hook function for snd_pcm_hw_params()
  * \code
  * if (snd_pcm_hw_params(pcm, params))
- * 	alsa_hook_alsa_hw_params(alsa_hook, pcm, params);
+ * 	alsa_hook_hw_params(alsa_hook, pcm, params);
  * \endcode
  * \param alsa_hook alsa_hook object
  * \param pcm pcm
@@ -128,7 +128,7 @@ __PUBLIC int alsa_hook_hw_params(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
  * \code
  * snd_pcm_sframes_t ret = snd_pcm_writei(pcm, buffer, size);
  * if (ret > 0)
- * 	alsa_hook_alsa_i(alsa_hook, pcm, buffer, ret);
+ * 	alsa_hook_writei(alsa_hook, pcm, buffer, ret);
  * \endcode
  * \param alsa_hook alsa_hook object
  * \param pcm pcm
@@ -144,7 +144,7 @@ __PUBLIC int alsa_hook_writei(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
  * \code
  * snd_pcm_sframes_t ret = snd_pcm_writen(pcm, bufs, size);
  * if (ret > 0)
- * 	alsa_hook_alsa_n(alsa_hook, pcm, bufs, size);
+ * 	alsa_hook_writen(alsa_hook, pcm, bufs, size);
  * \endcode
  * \param alsa_hook alsa_hook object
  * \param pcm pcm
@@ -159,7 +159,7 @@ __PUBLIC int alsa_hook_writen(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
  * \brief hook function for snd_pcm_mmap_begin()
  * \code
  * if (snd_pcm_mmap_begin(pcm, areas, offset, frames) >= 0)
- * 	alsa_hook_alsa_mmap_begin(alsa_hook, pcm, *areas, *offset, *frames);
+ * 	alsa_hook_mmap_begin(alsa_hook, pcm, *areas, *offset, *frames);
  * \endcode
  * \param alsa_hook alsa_hook object
  * \param pcm pcm
@@ -177,7 +177,7 @@ __PUBLIC int alsa_hook_mmap_begin(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
  *
  * Must be called before calling real snd_pcm_mmap_commit().
  * \code
- * alsa_hook_alsa_mmap_commit(alsa_hook, pcm, offset, frames);
+ * alsa_hook_mmap_commit(alsa_hook, pcm, offset, frames);
  * snd_pcm_mmap_commit(pcm, offset, frames);
  * \endcode
  * \param alsa_hook alsa_hook object
