@@ -364,7 +364,7 @@ int __alsa_snd_pcm_open(snd_pcm_t **pcmp, const char *name, snd_pcm_stream_t str
 	INIT_GLC
 	int ret = alsa.snd_pcm_open(pcmp, name, stream, mode);
 	if ((alsa.capture) && (ret == 0))
-		alsa_hook_alsa_open(alsa.alsa_hook, *pcmp, name, stream, mode);
+		alsa_hook_open(alsa.alsa_hook, *pcmp, name, stream, mode);
 	return ret;
 }
 
@@ -380,7 +380,7 @@ int __alsa_snd_pcm_open_lconf(snd_pcm_t **pcmp, const char *name, snd_pcm_stream
 	INIT_GLC
 	int ret = alsa.snd_pcm_open_lconf(pcmp, name, stream, mode, lconf);
 	if ((alsa.capture) && (ret == 0))
-		alsa_hook_alsa_open(alsa.alsa_hook, *pcmp, name, stream, mode);
+		alsa_hook_open(alsa.alsa_hook, *pcmp, name, stream, mode);
 	return ret;
 }
 
@@ -394,7 +394,7 @@ int __alsa_snd_pcm_close(snd_pcm_t *pcm)
 	INIT_GLC
 	int ret = alsa.snd_pcm_close(pcm);
 	if ((alsa.capture) && (ret == 0))
-		alsa_hook_alsa_close(alsa.alsa_hook, pcm);
+		alsa_hook_close(alsa.alsa_hook, pcm);
 	return ret;
 }
 
@@ -408,7 +408,7 @@ int __alsa_snd_pcm_hw_params(snd_pcm_t *pcm, snd_pcm_hw_params_t *params)
 	INIT_GLC
 	int ret = alsa.snd_pcm_hw_params(pcm, params);
 	if ((alsa.capture) && (ret == 0))
-		alsa_hook_alsa_hw_params(alsa.alsa_hook, pcm, params);
+		alsa_hook_hw_params(alsa.alsa_hook, pcm, params);
 	return ret;
 }
 
@@ -422,7 +422,7 @@ snd_pcm_sframes_t __alsa_snd_pcm_writei(snd_pcm_t *pcm, const void *buffer, snd_
 	INIT_GLC
 	snd_pcm_sframes_t ret = alsa.snd_pcm_writei(pcm, buffer, size);
 	if ((alsa.capture) && (ret > 0) && alsa.capturing)
-		alsa_hook_alsa_i(alsa.alsa_hook, pcm, buffer, ret);
+		alsa_hook_writei(alsa.alsa_hook, pcm, buffer, ret);
 	return ret;
 }
 
@@ -436,7 +436,7 @@ snd_pcm_sframes_t __alsa_snd_pcm_writen(snd_pcm_t *pcm, void **bufs, snd_pcm_ufr
 	INIT_GLC
 	snd_pcm_sframes_t ret = alsa.snd_pcm_writen(pcm, bufs, size);
 	if (alsa.capture && (ret > 0))
-		alsa_hook_alsa_n(alsa.alsa_hook, pcm, bufs, ret);
+		alsa_hook_writen(alsa.alsa_hook, pcm, bufs, ret);
 	return ret;
 }
 
@@ -450,7 +450,7 @@ snd_pcm_sframes_t __alsa_snd_pcm_mmap_writei(snd_pcm_t *pcm, const void *buffer,
 	INIT_GLC
 	snd_pcm_sframes_t ret = alsa.snd_pcm_mmap_writei(pcm, buffer, size);
 	if (alsa.capture && (ret > 0))
-		alsa_hook_alsa_i(alsa.alsa_hook, pcm, buffer, ret);
+		alsa_hook_writei(alsa.alsa_hook, pcm, buffer, ret);
 	return ret;
 }
 
@@ -464,7 +464,7 @@ snd_pcm_sframes_t __alsa_snd_pcm_mmap_writen(snd_pcm_t *pcm, void **bufs, snd_pc
 	INIT_GLC
 	snd_pcm_sframes_t ret = alsa.snd_pcm_mmap_writen(pcm, bufs, size);
 	if ((alsa.capture) && (ret > 0))
-		alsa_hook_alsa_n(alsa.alsa_hook, pcm, bufs, ret);
+		alsa_hook_writen(alsa.alsa_hook, pcm, bufs, ret);
 	return ret;
 }
 
@@ -478,7 +478,7 @@ int __alsa_snd_pcm_mmap_begin(snd_pcm_t *pcm, const snd_pcm_channel_area_t **are
 	INIT_GLC
 	int ret = alsa.snd_pcm_mmap_begin(pcm, areas, offset, frames);
 	if (alsa.capture && (ret >= 0))
-		alsa_hook_alsa_mmap_begin(alsa.alsa_hook, pcm, *areas, *offset, *frames);
+		alsa_hook_mmap_begin(alsa.alsa_hook, pcm, *areas, *offset, *frames);
 	return ret;
 }
 
@@ -492,7 +492,7 @@ snd_pcm_sframes_t __alsa_snd_pcm_mmap_commit(snd_pcm_t *pcm, snd_pcm_uframes_t o
 	INIT_GLC
 	snd_pcm_uframes_t ret;
 	if (alsa.capture)
-		alsa_hook_alsa_mmap_commit(alsa.alsa_hook, pcm, offset,  frames);
+		alsa_hook_mmap_commit(alsa.alsa_hook, pcm, offset,  frames);
 
 	ret = alsa.snd_pcm_mmap_commit(pcm, offset, frames);
 	if (ret != frames)
