@@ -34,10 +34,11 @@
 
 #include "alsa_hook.h"
 
-#define AUDIO_HOOK_CAPTURING    0x1
-#define AUDIO_HOOK_ALLOW_SKIP   0x2
+#define ALSA_HOOK_CAPTURING    0x1
+#define ALSA_HOOK_ALLOW_SKIP   0x2
 
 struct alsa_hook_stream_s {
+	alsa_hook_t alsa_hook;
 	glc_state_audio_t state_audio;
 	glc_stream_id_t id;
 	glc_audio_format_t format;
@@ -89,9 +90,9 @@ struct alsa_hook_s {
 };
 
 int alsa_hook_init_streams(alsa_hook_t alsa_hook);
-int alsa_hook_get_stream_alsa(alsa_hook_t alsa_hook, snd_pcm_t *pcm, struct alsa_hook_stream_s **stream);
+int alsa_hook_get_stream(alsa_hook_t alsa_hook, snd_pcm_t *pcm, struct alsa_hook_stream_s **stream);
 int alsa_hook_stream_init(alsa_hook_t alsa_hook, struct alsa_hook_stream_s *stream);
-void *alsa_hook_alsa_mmap_pos(const snd_pcm_channel_area_t *area, snd_pcm_uframes_t offset);
+void *alsa_hook_mmap_pos(const snd_pcm_channel_area_t *area, snd_pcm_uframes_t offset);
 int alsa_hook_complex_to_interleaved(struct alsa_hook_stream_s *stream, const snd_pcm_channel_area_t *areas, snd_pcm_uframes_t offset, snd_pcm_uframes_t frames, char *to);
 
 int alsa_hook_wait_for_thread(alsa_hook_t alsa_hook, struct alsa_hook_stream_s *stream);
@@ -124,9 +125,9 @@ int alsa_hook_set_buffer(alsa_hook_t alsa_hook, ps_buffer_t *buffer)
 int alsa_hook_allow_skip(alsa_hook_t alsa_hook, int allow_skip)
 {
 	if (allow_skip)
-		alsa_hook->flags |= AUDIO_HOOK_ALLOW_SKIP;
+		alsa_hook->flags |= ALSA_HOOK_ALLOW_SKIP;
 	else
-		alsa_hook->flags &= ~AUDIO_HOOK_ALLOW_SKIP;
+		alsa_hook->flags &= ~ALSA_HOOK_ALLOW_SKIP;
 
 	return 0;
 }
@@ -142,27 +143,27 @@ int alsa_hook_start(alsa_hook_t alsa_hook)
 	if (!alsa_hook->started)
 		alsa_hook_init_streams(alsa_hook);
 
-	if (alsa_hook->flags & AUDIO_HOOK_CAPTURING)
+	if (alsa_hook->flags & ALSA_HOOK_CAPTURING)
 		glc_log(alsa_hook->glc, GLC_WARNING, "alsa_hook",
 			 "capturing is already active");
 	else
 		glc_log(alsa_hook->glc, GLC_INFORMATION, "alsa_hook",
 			 "starting capturing");
 
-	alsa_hook->flags |= AUDIO_HOOK_CAPTURING;
+	alsa_hook->flags |= ALSA_HOOK_CAPTURING;
 	return 0;
 }
 
 int alsa_hook_stop(alsa_hook_t alsa_hook)
 {
-	if (alsa_hook->flags & AUDIO_HOOK_CAPTURING)
+	if (alsa_hook->flags & ALSA_HOOK_CAPTURING)
 		glc_log(alsa_hook->glc, GLC_INFORMATION, "alsa_hook",
 			 "stopping capturing");
 	else
 		glc_log(alsa_hook->glc, GLC_WARNING, "alsa_hook",
 			 "capturing is already stopped");
 
-	alsa_hook->flags &= ~AUDIO_HOOK_CAPTURING;
+	alsa_hook->flags &= ~ALSA_HOOK_CAPTURING;
 	return 0;
 }
 
@@ -240,7 +241,7 @@ glc_audio_format_t pcm_fmt_to_glc_fmt(snd_pcm_format_t pcm_fmt)
 	}
 }
 
-int alsa_hook_get_stream_alsa(alsa_hook_t alsa_hook, snd_pcm_t *pcm, struct alsa_hook_stream_s **stream)
+int alsa_hook_get_stream(alsa_hook_t alsa_hook, snd_pcm_t *pcm, struct alsa_hook_stream_s **stream)
 {
 	struct alsa_hook_stream_s *find = alsa_hook->stream;
 
@@ -264,6 +265,8 @@ int alsa_hook_get_stream_alsa(alsa_hook_t alsa_hook, snd_pcm_t *pcm, struct alsa
 		pthread_mutex_init(&find->write_mutex, NULL);
 		pthread_spin_init(&find->write_spinlock, 0);
 
+		find->alsa_hook = alsa_hook;
+
 		find->next = alsa_hook->stream;
 		alsa_hook->stream = find;
 	}
@@ -277,6 +280,7 @@ void *alsa_hook_thread(void *argptr)
 	struct alsa_hook_stream_s *stream = (struct alsa_hook_stream_s *) argptr;
 	glc_audio_data_header_t hdr;
 	glc_message_header_t msg_hdr;
+	int ret = 0;
 
 	msg_hdr.type = GLC_MESSAGE_AUDIO_DATA;
 	hdr.id = stream->id;
@@ -292,16 +296,25 @@ void *alsa_hook_thread(void *argptr)
 		hdr.time = stream->capture_time;
 		hdr.size = stream->capture_size;
 
-		ps_packet_open(&stream->packet, PS_PACKET_WRITE);
-		ps_packet_write(&stream->packet, &msg_hdr, sizeof(glc_message_header_t));
-		ps_packet_write(&stream->packet, &hdr, sizeof(glc_audio_data_header_t));
-		ps_packet_write(&stream->packet, stream->capture_data, hdr.size);
-		ps_packet_close(&stream->packet);
+		if ((ret = ps_packet_open(&stream->packet, PS_PACKET_WRITE)))
+			break;
+		if ((ret = ps_packet_write(&stream->packet, &msg_hdr, sizeof(glc_message_header_t))))
+			break;
+		if ((ret = ps_packet_write(&stream->packet, &hdr, sizeof(glc_audio_data_header_t))))
+			break;
+		if ((ret = ps_packet_write(&stream->packet, stream->capture_data, hdr.size)))
+			break;
+		if ((ret = ps_packet_close(&stream->packet)))
+			break;
 
 		if (!(stream->mode & SND_PCM_ASYNC))
 			sem_post(&stream->capture_empty);
 		stream->capture_ready = 1;
 	}
+
+	if (ret != 0)
+		glc_log(stream->alsa_hook->glc, GLC_ERROR, "alsa_hook",
+			"thread failed: %s (%d)", strerror(ret), ret);
 
 	sem_post(&stream->capture_finished);
 	return NULL;
@@ -315,7 +328,7 @@ int alsa_hook_wait_for_thread(alsa_hook_t alsa_hook, struct alsa_hook_stream_s *
 		*       signal handler (f.ex. async mode)
 		*/
 		while (!stream->capture_ready) {
-			if (alsa_hook->flags & AUDIO_HOOK_ALLOW_SKIP)
+			if (alsa_hook->flags & ALSA_HOOK_ALLOW_SKIP)
 				goto busy;
 			sched_yield();
 		}
@@ -368,13 +381,12 @@ int alsa_hook_set_data_size(struct alsa_hook_stream_s *stream, size_t size)
 	return 0;
 }
 
-
-int alsa_hook_alsa_open(alsa_hook_t alsa_hook, snd_pcm_t *pcm, const char *name,
+int alsa_hook_open(alsa_hook_t alsa_hook, snd_pcm_t *pcm, const char *name,
 			 snd_pcm_stream_t pcm_stream, int mode)
 {
 	struct alsa_hook_stream_s *stream;
 
-	alsa_hook_get_stream_alsa(alsa_hook, pcm, &stream);
+	alsa_hook_get_stream(alsa_hook, pcm, &stream);
 
 	stream->mode = mode;
 
@@ -387,11 +399,11 @@ int alsa_hook_alsa_open(alsa_hook_t alsa_hook, snd_pcm_t *pcm, const char *name,
 	return 0;
 }
 
-int alsa_hook_alsa_close(alsa_hook_t alsa_hook, snd_pcm_t *pcm)
+int alsa_hook_close(alsa_hook_t alsa_hook, snd_pcm_t *pcm)
 {
 	struct alsa_hook_stream_s *stream;
 
-	alsa_hook_get_stream_alsa(alsa_hook, pcm, &stream);
+	alsa_hook_get_stream(alsa_hook, pcm, &stream);
 	glc_log(alsa_hook->glc, GLC_INFORMATION, "alsa_hook", "%p: closing stream %d",
 		 pcm, stream->id);
 	stream->fmt = 0; /* no format -> do not initialize */
@@ -399,15 +411,16 @@ int alsa_hook_alsa_close(alsa_hook_t alsa_hook, snd_pcm_t *pcm)
 	return 0;
 }
 
-int alsa_hook_alsa_i(alsa_hook_t alsa_hook, snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size)
+int alsa_hook_writei(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
+		     const void *buffer, snd_pcm_uframes_t size)
 {
 	struct alsa_hook_stream_s *stream;
 	int ret = 0;
 
-	if (!(alsa_hook->flags & AUDIO_HOOK_CAPTURING))
+	if (!(alsa_hook->flags & ALSA_HOOK_CAPTURING))
 		return 0;
 
-	alsa_hook_get_stream_alsa(alsa_hook, pcm, &stream);
+	alsa_hook_get_stream(alsa_hook, pcm, &stream);
 
 	if (!stream->initialized) {
 		ret = EINVAL;
@@ -432,15 +445,16 @@ unlock:
 	return ret;
 }
 
-int alsa_hook_alsa_n(alsa_hook_t alsa_hook, snd_pcm_t *pcm, void **bufs, snd_pcm_uframes_t size)
+int alsa_hook_writen(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
+		     void **bufs, snd_pcm_uframes_t size)
 {
 	struct alsa_hook_stream_s *stream;
 	int c, ret = 0;
 
-	if (!(alsa_hook->flags & AUDIO_HOOK_CAPTURING))
+	if (!(alsa_hook->flags & ALSA_HOOK_CAPTURING))
 		return 0;
 
-	alsa_hook_get_stream_alsa(alsa_hook, pcm, &stream);
+	alsa_hook_get_stream(alsa_hook, pcm, &stream);
 
 	if (!stream->initialized) {
 		ret = EINVAL;
@@ -475,17 +489,17 @@ unlock:
 	return ret;
 }
 
-int alsa_hook_alsa_mmap_begin(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
+int alsa_hook_mmap_begin(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
 			       const snd_pcm_channel_area_t *areas,
 			       snd_pcm_uframes_t offset, snd_pcm_uframes_t frames)
 {
 	struct alsa_hook_stream_s *stream;
 	int ret;
 
-	if (!(alsa_hook->flags & AUDIO_HOOK_CAPTURING))
+	if (!(alsa_hook->flags & ALSA_HOOK_CAPTURING))
 		return 0;
 
-	alsa_hook_get_stream_alsa(alsa_hook, pcm, &stream);
+	alsa_hook_get_stream(alsa_hook, pcm, &stream);
 
 	if (!stream->initialized) {
 		alsa_hook_unlock_write(alsa_hook, stream);
@@ -503,17 +517,17 @@ int alsa_hook_alsa_mmap_begin(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
 	return 0;
 }
 
-int alsa_hook_alsa_mmap_commit(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
+int alsa_hook_mmap_commit(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
 				snd_pcm_uframes_t offset, snd_pcm_uframes_t frames)
 {
 	struct alsa_hook_stream_s *stream;
 	unsigned int c;
 	int ret = 0;
 
-	if (!(alsa_hook->flags & AUDIO_HOOK_CAPTURING))
+	if (!(alsa_hook->flags & ALSA_HOOK_CAPTURING))
 		return 0;
 
-	alsa_hook_get_stream_alsa(alsa_hook, pcm, &stream);
+	alsa_hook_get_stream(alsa_hook, pcm, &stream);
 
 	if ((ret = alsa_hook_lock_write(alsa_hook, stream)))
 		return ret;
@@ -542,7 +556,7 @@ int alsa_hook_alsa_mmap_commit(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
 
 	if (stream->flags & GLC_AUDIO_INTERLEAVED) {
 		memcpy(stream->capture_data,
-		       alsa_hook_alsa_mmap_pos(stream->mmap_areas, offset),
+		       alsa_hook_mmap_pos(stream->mmap_areas, offset),
 		       stream->capture_size);
 	} else if (stream->complex) {
 		alsa_hook_complex_to_interleaved(stream, stream->mmap_areas, offset,
@@ -550,7 +564,7 @@ int alsa_hook_alsa_mmap_commit(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
 	} else {
 		for (c = 0; c < stream->channels; c++)
 			memcpy(&stream->capture_data[c * snd_pcm_samples_to_bytes(stream->pcm, frames)],
-			       alsa_hook_alsa_mmap_pos(&stream->mmap_areas[c], offset),
+			       alsa_hook_mmap_pos(&stream->mmap_areas[c], offset),
 			       snd_pcm_samples_to_bytes(stream->pcm, frames));
 	}
 
@@ -561,7 +575,7 @@ unlock:
 	return ret;
 }
 
-void *alsa_hook_alsa_mmap_pos(const snd_pcm_channel_area_t *area, snd_pcm_uframes_t offset)
+void *alsa_hook_mmap_pos(const snd_pcm_channel_area_t *area, snd_pcm_uframes_t offset)
 {
 	/** \todo FIX: first or step not divisible by 8 */
 	void *addr = &((unsigned char *) area->addr)[area->first / 8];
@@ -582,7 +596,7 @@ int alsa_hook_complex_to_interleaved(struct alsa_hook_stream_s *stream, const sn
 	for (c = 0; c < stream->channels; c++) {
 		off = add * c;
 		for (s = 0; s < frames; s++) {
-			memcpy(&to[off], alsa_hook_alsa_mmap_pos(&areas[c], offset + s), ssize);
+			memcpy(&to[off], alsa_hook_mmap_pos(&areas[c], offset + s), ssize);
 			off += add;
 		}
 	}
@@ -590,7 +604,7 @@ int alsa_hook_complex_to_interleaved(struct alsa_hook_stream_s *stream, const sn
 	return 0;
 }
 
-int alsa_hook_alsa_hw_params(alsa_hook_t alsa_hook, snd_pcm_t *pcm, snd_pcm_hw_params_t *params)
+int alsa_hook_hw_params(alsa_hook_t alsa_hook, snd_pcm_t *pcm, snd_pcm_hw_params_t *params)
 {
 	struct alsa_hook_stream_s *stream;
 
@@ -599,7 +613,7 @@ int alsa_hook_alsa_hw_params(alsa_hook_t alsa_hook, snd_pcm_t *pcm, snd_pcm_hw_p
 	snd_pcm_access_t access;
 	int dir, ret;
 
-	alsa_hook_get_stream_alsa(alsa_hook, pcm, &stream);
+	alsa_hook_get_stream(alsa_hook, pcm, &stream);
 	if ((ret = alsa_hook_lock_write(alsa_hook, stream)))
 		return ret;
 

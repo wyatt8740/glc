@@ -94,8 +94,8 @@ __PUBLIC int alsa_hook_destroy(alsa_hook_t alsa_hook);
  * \param mode open mode
  * \return 0 on success otherwise an error code
  */
-__PUBLIC int alsa_hook_alsa_open(alsa_hook_t alsa_hook, snd_pcm_t *pcm, const char *name,
-				  snd_pcm_stream_t pcm_stream, int mode);
+__PUBLIC int alsa_hook_open(alsa_hook_t alsa_hook, snd_pcm_t *pcm, const char *name,
+			    snd_pcm_stream_t pcm_stream, int mode);
 
 /**
  * \brief hook function for snd_pcm_close()
@@ -107,7 +107,7 @@ __PUBLIC int alsa_hook_alsa_open(alsa_hook_t alsa_hook, snd_pcm_t *pcm, const ch
  * \param pcm closed pcm
  * \return 0 on success otherwise an error code
  */
-__PUBLIC int alsa_hook_alsa_close(alsa_hook_t alsa_hook, snd_pcm_t *pcm);
+__PUBLIC int alsa_hook_close(alsa_hook_t alsa_hook, snd_pcm_t *pcm);
 
 /**
  * \brief hook function for snd_pcm_hw_params()
@@ -120,7 +120,8 @@ __PUBLIC int alsa_hook_alsa_close(alsa_hook_t alsa_hook, snd_pcm_t *pcm);
  * \param params active hardware parameters
  * \return 0 on success otherwise an error code
  */
-__PUBLIC int alsa_hook_alsa_hw_params(alsa_hook_t alsa_hook, snd_pcm_t *pcm, snd_pcm_hw_params_t *params);
+__PUBLIC int alsa_hook_hw_params(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
+				 snd_pcm_hw_params_t *params);
 
 /**
  * \brief hook function for snd_pcm_writei()
@@ -135,7 +136,8 @@ __PUBLIC int alsa_hook_alsa_hw_params(alsa_hook_t alsa_hook, snd_pcm_t *pcm, snd
  * \param size actually written frames
  * \return 0 on success otherwise an error code
  */
-__PUBLIC int alsa_hook_alsa_i(alsa_hook_t alsa_hook, snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size);
+__PUBLIC int alsa_hook_writei(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
+			      const void *buffer, snd_pcm_uframes_t size);
 
 /**
  * \brief hook function for snd_pcm_writen()
@@ -150,7 +152,8 @@ __PUBLIC int alsa_hook_alsa_i(alsa_hook_t alsa_hook, snd_pcm_t *pcm, const void 
  * \param size actually written frames
  * \return 0 on success otherwise an error code
  */
-__PUBLIC int alsa_hook_alsa_n(alsa_hook_t alsa_hook, snd_pcm_t *pcm, void **bufs, snd_pcm_uframes_t size);
+__PUBLIC int alsa_hook_writen(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
+			      void **bufs, snd_pcm_uframes_t size);
 
 /**
  * \brief hook function for snd_pcm_mmap_begin()
@@ -165,9 +168,9 @@ __PUBLIC int alsa_hook_alsa_n(alsa_hook_t alsa_hook, snd_pcm_t *pcm, void **bufs
  * \param frames frames given by snd_pcm_mmap_begin()
  * \return 0 on success otherwise an error code
  */
-__PUBLIC int alsa_hook_alsa_mmap_begin(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
-					const snd_pcm_channel_area_t *areas,
-					snd_pcm_uframes_t offset, snd_pcm_uframes_t frames);
+__PUBLIC int alsa_hook_mmap_begin(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
+				  const snd_pcm_channel_area_t *areas,
+				  snd_pcm_uframes_t offset, snd_pcm_uframes_t frames);
 
 /**
  * \brief hook function for snd_pcm_mmap_commit()
@@ -183,8 +186,8 @@ __PUBLIC int alsa_hook_alsa_mmap_begin(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
  * \param frames number of frames written
  * \return 0 on success otherwise an error code
  */
-__PUBLIC int alsa_hook_alsa_mmap_commit(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
-					 snd_pcm_uframes_t offset, snd_pcm_uframes_t frames);
+__PUBLIC int alsa_hook_mmap_commit(alsa_hook_t alsa_hook, snd_pcm_t *pcm,
+				   snd_pcm_uframes_t offset, snd_pcm_uframes_t frames);
 
 #ifdef __cplusplus
 }
