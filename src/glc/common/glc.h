@@ -157,6 +157,10 @@ typedef struct {
 	u_int32_t name_size;
 	/** size of date */
 	u_int32_t date_size;
+	/** reserved */
+	u_int64_t reserved1;
+	/** reserved */
+	u_int64_t reserved2;
 } __attribute__((packed)) glc_stream_info_t;
 
 /** stream message type */
