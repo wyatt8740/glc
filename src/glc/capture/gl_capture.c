@@ -121,6 +121,8 @@ int gl_capture_get_video_stream(gl_capture_t gl_capture,
 int gl_capture_update_video_stream(gl_capture_t gl_capture,
 				   struct gl_capture_video_stream_s *video);
 
+void gl_capture_error(gl_capture_t gl_capture, int err);
+
 int gl_capture_get_geometry(gl_capture_t gl_capture,
 			    Display *dpy, GLXDrawable drawable, unsigned int *w, unsigned int *h);
 int gl_capture_calc_geometry(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video,
@@ -333,6 +335,21 @@ int gl_capture_stop(gl_capture_t gl_capture)
 
 	gl_capture->flags &= ~GL_CAPTURE_CAPTURING;
 	return 0;
+}
+
+void gl_capture_error(gl_capture_t gl_capture, int err)
+{
+	glc_log(gl_capture->glc, GLC_ERROR, "gl_capture",
+		"%s (%d)", strerror(err), err);
+
+	/* stop capturing */
+	if (gl_capture->flags & GL_CAPTURE_CAPTURING)
+		gl_capture_stop(gl_capture);
+
+	/* cancel glc */
+	glc_state_set(gl_capture->glc, GLC_STATE_CANCEL);
+	if (gl_capture->to)
+		ps_buffer_cancel(gl_capture->to);
 }
 
 int gl_capture_destroy(gl_capture_t gl_capture)
@@ -767,7 +784,8 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 		goto finish;
 
 	/* not really needed until now */
-	gl_capture_update_video_stream(gl_capture, video);
+	if ((ret = gl_capture_update_video_stream(gl_capture, video)))
+		goto finish;
 
 	/* if PBO is not active, just start transfer and finish */
 	if ((gl_capture->flags & GL_CAPTURE_USE_PBO) && (!video->pbo_active)) {
@@ -833,8 +851,7 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 
 finish:
 	if (ret != 0)
-		glc_log(gl_capture->glc, GLC_ERROR, "gl_capture",
-			 "%s (%d)", strerror(ret), ret);
+		gl_capture_error(gl_capture, ret);
 
 	if (gl_capture->flags & GL_CAPTURE_DRAW_INDICATOR)
 		glCallList(video->indicator_list);
