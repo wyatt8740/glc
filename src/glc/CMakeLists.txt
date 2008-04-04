@@ -12,6 +12,7 @@ SET(COMMON_SRC common/core.c
 	       common/util.c)
 
 SET(CORE_HDR core/color.h
+	     core/copy.h
 	     core/file.h
 	     core/info.h
 	     core/pack.h
@@ -19,6 +20,7 @@ SET(CORE_HDR core/color.h
 	     core/scale.h
 	     core/ycbcr.h)
 SET(CORE_SRC core/color.c
+	     core/copy.c
 	     core/file.c
 	     core/info.c
 	     core/pack.c
