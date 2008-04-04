@@ -236,10 +236,10 @@ finish:
 	demux_close(demux);
 	return NULL;
 err:
-	if (ret == EINTR) /* just _cancel() */
-		ret = 0;
-	else
+	if (ret != EINTR) {
 		glc_log(demux->glc, GLC_ERROR, "demux", "%s (%d)", strerror(ret), ret);
+		glc_state_set(demux->glc, GLC_STATE_CANCEL);
+	}
 	goto finish;
 }
 
