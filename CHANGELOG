@@ -1,3 +1,8 @@
+0.5.3 (2008/04/04)
+   New stream format v3. Old v2 files aren't supported any more.
+   Fix 4GiB file size limit in 32-bit environment.
+   Use alsa_ prefix for all ALSA specific parts.
+
 0.5.2 (2008/03/14)
    Implement video playback using power-of-two textures when
     GL_ARB_texture_non_power_of_two extension is not available.

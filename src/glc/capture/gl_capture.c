@@ -797,8 +797,8 @@ int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable
 
 	if (ps_packet_open(&video->packet, ((gl_capture->flags & GL_CAPTURE_LOCK_FPS) |
 					    (gl_capture->flags & GL_CAPTURE_IGNORE_TIME)) ?
-					   PS_PACKET_WRITE :
-					   PS_PACKET_WRITE | PS_PACKET_TRY))
+					   (PS_PACKET_WRITE) :
+					   (PS_PACKET_WRITE | PS_PACKET_TRY)))
 		goto finish;
 	if ((ret = ps_packet_write(&video->packet, &msg, sizeof(glc_message_header_t))))
 		goto cancel;
