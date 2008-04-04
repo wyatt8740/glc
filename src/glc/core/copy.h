@@ -34,7 +34,7 @@ typedef struct copy_s* copy_t;
  * \param glc glc
  * \return 0 on success otherwise an error code
  */
-int copy_init(copy_t *copy, glc_t *glc);
+__PUBLIC int copy_init(copy_t *copy, glc_t *glc);
 
 /**
  * \brief destroy copy object
@@ -42,7 +42,7 @@ int copy_init(copy_t *copy, glc_t *glc);
  * \param glc glc
  * \return 0 on success otherwise an error code
  */
-int copy_destroy(copy_t copy);
+__PUBLIC int copy_destroy(copy_t copy);
 
 /**
  * \brief add copy target
@@ -60,7 +60,7 @@ int copy_destroy(copy_t copy);
  *             into this buffer
  * \return 0 on success otherwise an error code
  */
-int copy_add(copy_t copy, ps_buffer_t *target, glc_message_type_t type);
+__PUBLIC int copy_add(copy_t copy, ps_buffer_t *target, glc_message_type_t type);
 
 /**
  * \brief start copy process
@@ -68,14 +68,14 @@ int copy_add(copy_t copy, ps_buffer_t *target, glc_message_type_t type);
  * \param from source buffer
  * \return 0 on success otherwise an error code
  */
-int copy_process_start(copy_t copy, ps_buffer_t *from);
+__PUBLIC int copy_process_start(copy_t copy, ps_buffer_t *from);
 
 /**
  * \brief block until copy process has finished
  * \param copy copy object
  * \return 0 on success otherwise an error code
  */
-int copy_process_wait(copy_t copy);
+__PUBLIC int copy_process_wait(copy_t copy);
 
 #ifdef __cplusplus
 }
