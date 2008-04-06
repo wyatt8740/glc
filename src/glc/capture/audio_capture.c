@@ -221,7 +221,8 @@ int audio_capture_write_cfg(audio_capture_t audio_capture)
 
 	return 0;
 err:
-	ps_packet_cancel(&audio_capture->packet); /* hopefully we can recover from this */
+	glc_state_set(audio_capture->glc, GLC_STATE_CANCEL);
+	ps_buffer_cancel(audio_capture->target);
 	glc_log(audio_capture->glc, GLC_ERROR, "audio_capture",
 		"can't write audio stream configuration to buffer");
 	glc_log(audio_capture->glc, GLC_ERROR, "audio_capture",
@@ -269,10 +270,13 @@ int audio_capture_data(audio_capture_t audio_capture,
 	if ((ret = ps_packet_write(&audio_capture->packet,
 				   data, size)))
 		goto err;
+	if ((ret = ps_packet_close(&audio_capture->packet)))
+		goto err;
 
 	return 0;
 err:
-	ps_packet_cancel(&audio_capture->packet);
+	ps_buffer_cancel(audio_capture->target);
+	glc_state_set(audio_capture->glc, GLC_STATE_CANCEL);
 	glc_log(audio_capture->glc, GLC_ERROR, "audio_capture",
 		"can't write audio data to buffer");
 	glc_log(audio_capture->glc, GLC_ERROR, "audio_capture",
