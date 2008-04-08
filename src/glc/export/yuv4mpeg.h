@@ -63,7 +63,7 @@ __PUBLIC int yuv4mpeg_set_filename(yuv4mpeg_t yuv4mpeg, const char *filename);
  * Only frames from one video stream will be written. Default
  * stream number is 1.
  * \param yuv4mpeg yuv4mpeg object
- * \param ctx video stream number
+ * \param id video stream id
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int yuv4mpeg_set_stream_id(yuv4mpeg_t yuv4mpeg, glc_stream_id_t id);

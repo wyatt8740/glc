@@ -39,7 +39,6 @@ __PUBLIC int copy_init(copy_t *copy, glc_t *glc);
 /**
  * \brief destroy copy object
  * \param copy copy object
- * \param glc glc
  * \return 0 on success otherwise an error code
  */
 __PUBLIC int copy_destroy(copy_t copy);
