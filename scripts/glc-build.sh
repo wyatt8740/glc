@@ -68,6 +68,8 @@ echo "#include <stdio.h>
 	|| die "Missing ALSA headers (Ubuntu users: apt-get install libasound2-dev)"
 [ -e "/usr/include/png.h" ] \
 	|| die "Missing libpng headers (Ubuntu users: apt-get-install libpng12-dev)"
+[ -x "/usr/bin/cmake" ] \
+	|| die "CMake not installed (Ubuntu users: apt-get install cmake)"
 
 if [ $BUILD64 == 1 ]; then
 	echo "#include <stdio.h>
