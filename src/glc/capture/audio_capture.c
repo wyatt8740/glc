@@ -255,9 +255,9 @@ int audio_capture_data(audio_capture_t audio_capture,
 	audio_hdr.time = audio_capture->time;
 
 	if (audio_capture->flags & AUDIO_CAPTURE_IGNORE_TIME)
-		audio_capture->time += (size * 1000000) /
-					(audio_capture_frames_to_bytes(audio_capture, 1) *
-					 audio_capture->rate);
+		audio_capture->time += ((glc_utime_t) size * (glc_utime_t) 1000000) /
+					(glc_utime_t) (audio_capture_frames_to_bytes(audio_capture, 1) *
+						       audio_capture->rate);
 
 	if ((ret = ps_packet_open(&audio_capture->packet, PS_PACKET_WRITE)))
 		goto err;

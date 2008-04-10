@@ -265,7 +265,8 @@ int alsa_play_play(alsa_play_t alsa_play, glc_audio_data_header_t *audio_hdr, ch
 
 	frames = snd_pcm_bytes_to_frames(alsa_play->pcm, audio_hdr->size);
 	glc_utime_t time = glc_state_time(alsa_play->glc);
-	glc_utime_t duration = (1000000 * frames) / alsa_play->rate;
+	glc_utime_t duration = ((glc_utime_t) 1000000 * (glc_utime_t) frames) /
+			       (glc_utime_t) alsa_play->rate;
 
 	if (time + alsa_play->silence_threshold + duration < audio_hdr->time)
 		usleep(audio_hdr->time - time - duration);

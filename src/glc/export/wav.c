@@ -259,7 +259,7 @@ int wav_write_audio(wav_t wav, glc_audio_data_header_t *audio_hdr, char *data)
 	if (audio_hdr->id != wav->id)
 		return 0;
 	
-	glc_utime_t duration = (audio_hdr->size * 1000000) / wav->bps;
+	glc_utime_t duration = ((glc_utime_t) audio_hdr->size * (glc_utime_t) 1000000) / (glc_utime_t) wav->bps;
 
 	if (!wav->to) {
 		glc_log(wav->glc, GLC_ERROR, "wav", "broken stream %d", audio_hdr->id);
@@ -269,10 +269,10 @@ int wav_write_audio(wav_t wav, glc_audio_data_header_t *audio_hdr, char *data)
 	wav->time += duration;
 
 	if (wav->time + wav->silence_threshold < audio_hdr->time) {
-		need_silence = ((audio_hdr->time - wav->time) * wav->bps) / 1000000;
-		need_silence -= need_silence % (wav->sample_size * wav->channels);
+		need_silence = ((audio_hdr->time - wav->time) * (glc_utime_t) wav->bps) / (glc_utime_t) 1000000;
+		need_silence -= need_silence % ((size_t) wav->sample_size * (size_t) wav->channels);
 
-		wav->time += (need_silence * 1000000) / wav->bps;
+		wav->time += ((glc_utime_t) need_silence * (glc_utime_t) 1000000) / (glc_utime_t) wav->bps;
 		if (wav->interpolate) {
 			glc_log(wav->glc, GLC_WARNING, "wav", "writing %zd bytes of silence", need_silence);
 			while (need_silence > 0) {
