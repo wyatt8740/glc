@@ -1,3 +1,8 @@
+0.5.4 (2008/04/11)
+   Fixed audio duration calculations. Fixes pauses in audio when
+    exporting as WAV.
+   Added generic stream demuxer: copy.
+
 0.5.3 (2008/04/04)
    New stream format v3. Old v2 files aren't supported any more.
    Fix 4GiB file size limit in 32-bit environment.
