@@ -404,6 +404,8 @@ void *wrapped_func(const char *symbol)
 		return &__opengl_glXSwapBuffers;
 	else if (!strcmp(symbol, "glFinish"))
 		return &__opengl_glFinish;
+	else if (!strcmp(symbol, "glXCreateWindow"))
+		return &__opengl_glXCreateWindow;
 	else if (!strcmp(symbol, "snd_pcm_open"))
 		return &__alsa_snd_pcm_open;
 	else if (!strcmp(symbol, "snd_pcm_close"))

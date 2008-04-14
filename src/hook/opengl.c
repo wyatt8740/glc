@@ -41,6 +41,7 @@ struct opengl_private_s {
 	void (*glXSwapBuffers)(Display *dpy, GLXDrawable drawable);
 	void (*glFinish)(void);
 	__GLXextFuncPtr (*glXGetProcAddressARB)(const GLubyte *);
+	GLXWindow (*glXCreateWindow)(Display *, GLXFBConfig, Window, const int *);
 
 	int capture_glfinish;
 	int convert_ycbcr_420jpeg;
@@ -281,8 +282,12 @@ void get_real_opengl()
 	opengl.glXGetProcAddressARB =
 	  (__GLXextFuncPtr (*)(const GLubyte *))
 	    lib.dlsym(opengl.libGL_handle, "glXGetProcAddressARB");
-	if (opengl.glXGetProcAddressARB)
-		return;
+	if (!opengl.glXGetProcAddressARB)
+		goto err;
+	opengl.glXCreateWindow =
+	  (GLXWindow (*)(Display *dpy, GLXFBConfig, Window, const int *))
+	    lib.dlsym(opengl.libGL_handle, "glXCreateWindow");
+	return;
 err:
 	fprintf(stderr, "(glc) can't get real OpenGL\n");
 	exit(1);
@@ -335,6 +340,28 @@ void __opengl_glFinish(void)
 	opengl.glFinish();
 	if (opengl.capture_glfinish)
 		opengl_capture_current();
+}
+
+__PUBLIC GLXWindow glXCreateWindow(Display *dpy, GLXFBConfig config, Window win, const int *attrib_list)
+{
+	return __opengl_glXCreateWindow(dpy, config, win, attrib_list);
+}
+
+GLXWindow __opengl_glXCreateWindow(Display *dpy, GLXFBConfig config, Window win, const int *attrib_list)
+{
+	INIT_GLC
+
+	if (!opengl.glXCreateWindow) {
+		glc_log(opengl.glc, GLC_ERROR, "opengl",
+			"glXCreateWindow() not supported");
+		return (GLXWindow) 0;
+	}
+
+	start_glc(); /* gl_capture must be properly initialized */
+	GLXWindow retWin = opengl.glXCreateWindow(dpy, config, win, attrib_list);
+	if (retWin)
+		gl_capture_set_attribute_window(opengl.gl_capture, dpy, (GLXDrawable) retWin, win);
+	return retWin;
 }
 
 void opengl_capture_current()

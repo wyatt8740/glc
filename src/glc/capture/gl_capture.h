@@ -194,6 +194,29 @@ __PUBLIC int gl_capture_frame(gl_capture_t gl_capture, Display *dpy, GLXDrawable
  */
 __PUBLIC int gl_capture_refresh_color_correction(gl_capture_t gl_capture);
 
+/**
+ * \brief set attribute window for drawable
+ *
+ * Sets window where window attributes (eg. size) are read from.
+ * Use this if drawable doesn't have normal window attributes.
+ *
+ * For example windows created with glXCreateWindow() need this.
+ * \code
+ * GLXWindow glxWin = glXCreateWindow(dpy, config, win, attrib_list);
+ * gl_capture_set_attribute_window(dpy, glxWin, win);
+ * ...
+ * glXSwapBuffers(dpy, glxWin);
+ * gl_capture_frame(gl_capture, dpy, glxWin);
+ * \endcode
+ * \param gl_capture gl_capture object
+ * \param dpy X Display
+ * \param drawable GLX Drawable
+ * \param window attribute window
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int gl_capture_set_attribute_window(gl_capture_t gl_capture, Display *dpy,
+					     GLXDrawable drawable, Window window);
+
 #ifdef __cplusplus
 }
 #endif

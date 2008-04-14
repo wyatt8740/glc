@@ -67,6 +67,7 @@ struct gl_capture_video_stream_s {
 	Display *dpy;
 	int screen;
 	GLXDrawable drawable;
+	Window attribWin;
 	ps_packet_t packet;
 	glc_utime_t last, pbo_time;
 
@@ -124,7 +125,7 @@ int gl_capture_update_video_stream(gl_capture_t gl_capture,
 void gl_capture_error(gl_capture_t gl_capture, int err);
 
 int gl_capture_get_geometry(gl_capture_t gl_capture,
-			    Display *dpy, GLXDrawable drawable, unsigned int *w, unsigned int *h);
+			    Display *dpy, Window win, unsigned int *w, unsigned int *h);
 int gl_capture_calc_geometry(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video,
 			     unsigned int w, unsigned int h);
 int gl_capture_update_screen(gl_capture_t gl_capture, struct gl_capture_video_stream_s *video);
@@ -381,13 +382,13 @@ int gl_capture_destroy(gl_capture_t gl_capture)
 	return 0;
 }
 
-int gl_capture_get_geometry(gl_capture_t gl_capture, Display *dpy, GLXDrawable drawable,
+int gl_capture_get_geometry(gl_capture_t gl_capture, Display *dpy, Window win,
                     unsigned int *w, unsigned int *h)
 {
 	Window rootWindow;
 	int unused;
-	
-	XGetGeometry(dpy, drawable, &rootWindow, &unused, &unused, w, h,
+
+	XGetGeometry(dpy, win, &rootWindow, &unused, &unused, w, h,
 	             (unsigned int *) &unused, (unsigned int *) &unused);
 	
 	return 0;
@@ -683,7 +684,9 @@ int gl_capture_update_video_stream(gl_capture_t gl_capture,
 		pthread_mutex_unlock(&gl_capture->init_pbo_mutex);
 	}
 
-	gl_capture_get_geometry(gl_capture, video->dpy, video->drawable, &w, &h);
+	gl_capture_get_geometry(gl_capture, video->dpy,
+				video->attribWin ? video->attribWin : video->drawable,
+				&w, &h);
 
 	if (!video->format) {
 		/* initialize screen information */
@@ -935,6 +938,18 @@ err:
 		 "can't write gamma correction information to buffer: %s (%d)",
 		 strerror(ret), ret);
 	return ret;
+}
+
+int gl_capture_set_attribute_window(gl_capture_t gl_capture, Display *dpy,
+				    GLXDrawable drawable, Window window)
+{
+	struct gl_capture_video_stream_s *video;
+	gl_capture_get_video_stream(gl_capture, &video, dpy, drawable);
+
+	glc_log(gl_capture->glc, GLC_INFORMATION, "gl_capture",
+		"setting attribute window %p for drawable %p", (void *) window, (void *) drawable);
+	video->attribWin = window;
+	return 0;
 }
 
 /**  \} */

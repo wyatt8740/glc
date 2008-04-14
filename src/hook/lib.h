@@ -99,6 +99,7 @@ __PRIVATE GLXextFuncPtr __opengl_glXGetProcAddressARB(const GLubyte *proc_name);
 __PRIVATE void __opengl_glXSwapBuffers(Display *dpy, GLXDrawable drawable);
 __PRIVATE void __opengl_glFinish(void);
 __PRIVATE void __opengl_glXSwapBuffers(Display *dpy, GLXDrawable drawable);
+__PRIVATE GLXWindow __opengl_glXCreateWindow(Display *dpy, GLXFBConfig config, Window win, const int *attrib_list);
 
 __PRIVATE int __x11_XNextEvent(Display *display, XEvent *event_return);
 __PRIVATE int __x11_XPeekEvent(Display *display, XEvent *event_return);
