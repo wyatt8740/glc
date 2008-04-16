@@ -44,26 +44,22 @@ KEYINT=300
 X264_OPTS="ref=4:mixed_refs:bframes=3:b_pyramid:bime:weightb:direct_pred=auto:filter=-1,0:partitions=all:turbo=1:threads=auto:keyint=${KEYINT}"
 LAME_OPTS="q=4" # TODO configure q, cbr or abr
 
-if [ "${METHOD}" == "crf" ]; then
-	[ "$6" != "" ] && CRF=$6
-	X264_OPTS="crf=${CRF}:${X264_OPTS}"
-	MULTIPASS="no"
-else
-	if [ "${METHOD}" == "bitrate" ]; then
-		[ "$6" != "" ] && BITRATE=$6
+case ${METHOD} in
+	crf)
+		[ "$6" != "" ] && BITRATE=$6 
 		X264_OPTS="bitrate=${BITRATE}:${X264_OPTS}"
+        MULTIPASS="yes"
+		;;
+	qp)
+		[ "$6" != "" ] && QP=$6
+		X264_OPTS="qp=${QP}:${X264_OPTS}"
 		MULTIPASS="yes"
-	else
-		if [ "${METHOD}" == "qp" ]; then
-			[ "$6" != "" ] && QP=$6
-			X264_OPTS="qp=${QP}:${X264_OPTS}"
-			MULTIPASS="yes"
-		else
-			show-help
-			exit 1
-		fi
-	fi
-fi
+		;;
+	*)
+		show-help
+		exit 1
+		;;
+esac
 
 glc-play "${FILE}" -o - -a "${AUDIO}" | lame -hV2 - "${AUDIOTMP}"
 
