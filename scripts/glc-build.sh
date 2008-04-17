@@ -57,25 +57,25 @@ uname -a | grep x86_64 > /dev/null && BUILD64=1
 echo "#include <stdio.h>
 	int main(int argc, char argv[]){printf(\"test\");return 0;}" | \
 	gcc -x c - -o /dev/null 2> /dev/null \
-	|| die "Can't compile (Ubuntu users: apt-get install build-essential)"
+	|| die "Can't compile (Ubuntu users: sudo apt-get install build-essential)"
 [ -e "/usr/include/X11/X.h" -a -e "/usr/include/X11/Xlib.h" ] \
-	|| die "Missing X11 headers (Ubuntu users: apt-get install libx11-dev)"
+	|| die "Missing X11 headers (Ubuntu users: sudo apt-get install libx11-dev)"
 [ -e "/usr/include/X11/extensions/xf86vmode.h" ] \
-	|| die "Missing XF86VidMode headers (Ubuntu users: apt-get install libxxf86vm-dev)"
+	|| die "Missing XF86VidMode headers (Ubuntu users: sudo apt-get install libxxf86vm-dev)"
 [ -e "/usr/include/GL/gl.h" -a -e "/usr/include/GL/glx.h" ] \
-	|| die "Missing OpenGL headers (Ubuntu users: apt-get install libgl1-mesa-dev)"
+	|| die "Missing OpenGL headers (Ubuntu users: sudo apt-get install libgl1-mesa-dev)"
 [ -e "/usr/include/alsa/asoundlib.h" ] \
-	|| die "Missing ALSA headers (Ubuntu users: apt-get install libasound2-dev)"
+	|| die "Missing ALSA headers (Ubuntu users: sudo apt-get install libasound2-dev)"
 [ -e "/usr/include/png.h" ] \
-	|| die "Missing libpng headers (Ubuntu users: apt-get-install libpng12-dev)"
+	|| die "Missing libpng headers (Ubuntu users: sudo apt-get-install libpng12-dev)"
 [ -x "/usr/bin/cmake" ] \
-	|| die "CMake not installed (Ubuntu users: apt-get install cmake)"
+	|| die "CMake not installed (Ubuntu users: sudo apt-get install cmake)"
 
 if [ $BUILD64 == 1 ]; then
 	echo "#include <stdio.h>
 		int main(int argc, char argv[]){printf(\"test\");return 0;}" | \
 		gcc -m32 -x c - -o /dev/null 2> /dev/null \
-		|| die "Can't compile 32-bit code (Ubuntu users: apt-get install gcc-multilib)"
+		|| die "Can't compile 32-bit code (Ubuntu users: sudo apt-get install gcc-multilib)"
 fi
 
 DEFAULT_CFLAGS="-O2 -msse -mmmx -fomit-frame-pointer"
@@ -122,7 +122,7 @@ if [ "${USE_GIT}" == "y" ]; then
 		gitfetch packetstream
 		cd glc && ln -sf ../glc-support ./support && cd ..
 	else
-		die "git-clone not found (Ubuntu users: apt-get install git-core)"
+		die "git-clone not found (Ubuntu users: sudo apt-get install git-core)"
 	fi
 else
 	info "Fetching sources..."
