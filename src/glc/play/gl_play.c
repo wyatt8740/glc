@@ -62,15 +62,12 @@ struct gl_play_s {
 	GLXContext ctx;
 	char name[100];
 
-	GLsizei max_texture_width;
-	GLsizei max_texture_height;
+	GLsizei max_texture_size;
 
-	GLuint *textures;
-	GLint *draw_coord;
-	GLfloat *tex_coord;
-	GLsizei *tex_from;
-	GLsizei texture_w, texture_h;
-	GLsizei texture_x_num, texture_y_num;
+	GLuint *tiles;
+	GLsizei tiles_x, tiles_y;
+
+	GLint *vertices;
 
 	Atom wm_proto_atom;
 	Atom wm_delete_window_atom;
@@ -95,6 +92,8 @@ int gl_play_destroy_textures(gl_play_t gl_play);
 int gl_play_draw_video_frame_messageture(gl_play_t gl_play, char *from);
 
 int gl_play_handle_xevents(gl_play_t gl_play, glc_thread_state_t *state);
+
+int gl_play_next_texture_size(gl_play_t gl_play, unsigned int number);
 
 int gl_play_init(gl_play_t *gl_play, glc_t *glc)
 {
@@ -180,7 +179,7 @@ void gl_play_finish_callback(void *ptr, int err)
 			 "%s (%d)", strerror(err), err);
 
 	if (gl_play->flags & GL_PLAY_INITIALIZED) {
-		if (gl_play->textures)
+		if (gl_play->tiles)
 			gl_play_destroy_textures(gl_play);
 
 		glXDestroyContext(gl_play->dpy, gl_play->ctx);
@@ -193,38 +192,48 @@ void gl_play_finish_callback(void *ptr, int err)
 
 int gl_play_draw_video_frame_messageture(gl_play_t gl_play, char *from)
 {
-	unsigned int x, y, tex_i = 0;
+	unsigned int width_r = gl_play->w;
+	unsigned int height_r = gl_play->h;
+	unsigned int tile_w, tile_h;
+	unsigned int c = 0;
 
-	for (y = 0; y < gl_play->texture_y_num; y++) {
-		for (x = 0; x < gl_play->texture_x_num; x++) {
-			glEnable(GL_TEXTURE_2D);
-			glBindTexture(GL_TEXTURE_2D, gl_play->textures[tex_i]);
+	static GLint tex_coord[] = {
+		0, 0,
+		0, 1,
+		1, 0,
+		1, 1
+	};
 
-			glPixelStorei(GL_UNPACK_ALIGNMENT, gl_play->pack_alignment);
-			glPixelStorei(GL_UNPACK_ROW_LENGTH, gl_play->w);
-			glTexImage2D(GL_TEXTURE_2D, 0, 3,
-				     gl_play->tex_from[tex_i * 3 + 1],
-				     gl_play->tex_from[tex_i * 3 + 2],
+	glEnable(GL_TEXTURE_2D);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, gl_play->pack_alignment);
+	glPixelStorei(GL_UNPACK_ROW_LENGTH, gl_play->w);
+
+	height_r = gl_play->h;
+	while (height_r > 0) {
+		width_r = gl_play->w;
+		tile_h = gl_play_next_texture_size(gl_play, height_r);
+
+		while (width_r > 0) {
+			tile_w = gl_play_next_texture_size(gl_play, width_r);
+
+			glBindTexture(GL_TEXTURE_2D, gl_play->tiles[c]);
+			glTexImage2D(GL_TEXTURE_2D, 0, 3, tile_w, tile_h,
 				     0, gl_play->format, GL_UNSIGNED_BYTE,
-				     &from[gl_play->tex_from[tex_i * 3]]);
+				     &from[gl_play->row * (gl_play->h - height_r) +
+					   gl_play->bpp * (gl_play->w - width_r)]);
 
-			/* coord: [x1][y1][x2][y2] */
-			glBegin(GL_QUADS);
-			glTexCoord2f(gl_play->tex_coord[tex_i * 4], gl_play->tex_coord[tex_i * 4 + 1]);
-			glVertex2i(gl_play->draw_coord[tex_i * 4], gl_play->draw_coord[tex_i * 4 + 1]);
+			glEnableClientState(GL_VERTEX_ARRAY);
+			glVertexPointer(2, GL_INT, 0, &gl_play->vertices[c * 8]);
 
-			glTexCoord2f(gl_play->tex_coord[tex_i * 4 + 2], gl_play->tex_coord[tex_i * 4 + 1]);
-			glVertex2i(gl_play->draw_coord[tex_i * 4 + 2], gl_play->draw_coord[tex_i * 4 + 1]);
+			glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+			glTexCoordPointer(2, GL_INT, 0, tex_coord);
 
-			glTexCoord2f(gl_play->tex_coord[tex_i * 4 + 2], gl_play->tex_coord[tex_i * 4 + 3]);
-			glVertex2i(gl_play->draw_coord[tex_i * 4 + 2], gl_play->draw_coord[tex_i * 4 + 3]);
+			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-			glTexCoord2f(gl_play->tex_coord[tex_i * 4], gl_play->tex_coord[tex_i * 4 + 3]);
-			glVertex2i(gl_play->draw_coord[tex_i * 4], gl_play->draw_coord[tex_i * 4 + 3]);
-			glEnd();
-
-			tex_i++;
+			c++;
+			width_r -= tile_w;
 		}
+		height_r -= tile_h;
 	}
 
 	return 0;
@@ -258,6 +267,9 @@ int gl_play_create_ctx(gl_play_t gl_play)
 	gl_play->ctx = glXCreateContext(gl_play->dpy, visinfo, NULL, True);
 	if (gl_play->ctx == NULL)
 		return EAGAIN;
+
+	glEnable(GL_TEXTURE_2D);
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
 
 	gl_play->flags |= GL_PLAY_INITIALIZED;
 
@@ -307,8 +319,9 @@ int gl_play_update_ctx(gl_play_t gl_play)
 	glXMakeCurrent(gl_play->dpy, gl_play->win, gl_play->ctx);
 
 	/* make sure our textures match */
-	if (!gl_play->textures)
-		gl_play_create_textures(gl_play);
+	if (gl_play->tiles)
+		gl_play_destroy_textures(gl_play);
+	gl_play_create_textures(gl_play);
 
 	return gl_play_update_viewport(gl_play, 0, 0, gl_play->w, gl_play->h);
 }
@@ -349,141 +362,127 @@ int gl_play_init_texture_information(gl_play_t gl_play)
 	}
 
 	/* figure out maximum texture size */
-	gl_play->max_texture_width = 64;
-	gl_play->max_texture_height = 64;
+	gl_play->max_texture_size = 64;
 
-	while ((gl_play->max_texture_width < 4096) &&
-	       (gl_play->max_texture_height < 4096)) {
+	while (gl_play->max_texture_size < 4096) {
 		glTexImage2D(GL_PROXY_TEXTURE_2D, 0, 3,
-			     gl_play->max_texture_width * 2,
-			     gl_play->max_texture_height * 2,
+			     gl_play->max_texture_size * 2,
+			     gl_play->max_texture_size * 2,
 			     0, gl_play->format, GL_UNSIGNED_BYTE,
 			     NULL);
 
 		if (glGetError()) /* we hit maximum value */
 			break;
 
-		gl_play->max_texture_width *= 2;
-		gl_play->max_texture_height *= 2;
+		gl_play->max_texture_size *= 2;
 	}
 
 	glc_log(gl_play->glc, GLC_INFORMATION, "gl_play",
 		"maximum texture size is %ux%u",
-		gl_play->max_texture_width,
-		gl_play->max_texture_height);
+		gl_play->max_texture_size,
+		gl_play->max_texture_size);
 
 	return 0;
 }
 
-int gl_play_create_textures(gl_play_t gl_play)
+int gl_play_next_texture_size(gl_play_t gl_play, unsigned int number)
 {
-	unsigned int x, y; /* texture grid position */
-	unsigned int dx, dy; /* coordinates in output */
-	unsigned int dw, dh; /* draw dimensions */
-	float px1, py1; /* texture coordinates */
-	unsigned int fx, fy; /* source image x, y */
-	unsigned int fw, fh; /* source image w, h */
-	GLsizei i; /* texture array index */
+	unsigned int pot = 1 << 31;
 
-	if (gl_play->textures)
-		return EALREADY;
-
-	/* texture width or height */
 	if (gl_play->flags & GL_PLAY_NON_POWER_OF_TWO) {
-		gl_play->texture_w = (gl_play->w > gl_play->max_texture_width) ?
-				     gl_play->max_texture_width : gl_play->w;
-		gl_play->texture_h = (gl_play->h > gl_play->max_texture_height) ?
-				     gl_play->max_texture_height : gl_play->h;
-	} else {
-		gl_play->texture_w = gl_play->max_texture_width;
-		gl_play->texture_h = gl_play->max_texture_height;
-
-		while ((!(gl_play->flags & GL_PLAY_NON_POWER_OF_TWO)) &&
-		((gl_play->texture_w > gl_play->h) | (gl_play->texture_h > gl_play->w))) {
-			gl_play->texture_w /= 2;
-			gl_play->texture_h /= 2;
-		}
+		if (number > gl_play->max_texture_size)
+			return gl_play->max_texture_size;
+		return number;
 	}
 
-	gl_play->texture_x_num = (gl_play->w / gl_play->texture_w
-				 + ((gl_play->w % gl_play->texture_w) ? 1 : 0));
-	gl_play->texture_y_num = (gl_play->h / gl_play->texture_h +
-				 + ((gl_play->h % gl_play->texture_h) ? 1 : 0));
+	if (!number)
+		return 0;
 
-	glc_log(gl_play->glc, GLC_INFORMATION, "gl_play",
-		"creating %ux%u textures", gl_play->texture_x_num, gl_play->texture_y_num);
+	while ((pot & number) == 0)
+		pot >>= 1;
 
-	gl_play->textures = (GLuint *) malloc(sizeof(GLuint) * gl_play->texture_x_num
-							     * gl_play->texture_y_num);
-	gl_play->draw_coord = (GLint *) malloc(sizeof(GLint) * gl_play->texture_x_num
-							     * gl_play->texture_y_num * 4);
-	gl_play->tex_coord = (GLfloat *) malloc(sizeof(GLfloat) * gl_play->texture_x_num
-								* gl_play->texture_y_num * 4);
-	gl_play->tex_from = (GLsizei *) malloc(sizeof(GLsizei) * gl_play->texture_x_num
-							       * gl_play->texture_y_num * 3);
+	if (pot > gl_play->max_texture_size)
+		return gl_play->max_texture_size;
 
-	glGenTextures(gl_play->texture_x_num * gl_play->texture_y_num, gl_play->textures);
+	return pot;
+}
 
-	dx = dy = i = 0;
-	for (y = 0; y < gl_play->texture_y_num; y++) {
-		for (x = 0; x < gl_play->texture_x_num; x++) {
-			glEnable(GL_TEXTURE_2D);
-			glBindTexture(GL_TEXTURE_2D, gl_play->textures[i]);
-			glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+int gl_play_create_textures(gl_play_t gl_play)
+{
+	/* calculate number of textures needed */
+	unsigned int width_r = gl_play->w;
+	unsigned int height_r = gl_play->h;
+	unsigned int tile_w, tile_h;
+	unsigned int c = 0;
+	GLint *t_vertices;
+
+	gl_play->tiles_x = 0;
+	gl_play->tiles_y = 0;
+
+	while (height_r > 0) {
+		height_r -= gl_play_next_texture_size(gl_play, height_r);
+		gl_play->tiles_y++;
+	}
+
+	while (width_r > 0) {
+		width_r -= gl_play_next_texture_size(gl_play, width_r);
+		gl_play->tiles_x++;
+	}
+
+	/* create textures */
+	gl_play->tiles = (GLuint *) malloc(sizeof(GLuint) * gl_play->tiles_x * gl_play->tiles_y);
+	memset(gl_play->tiles, 0, sizeof(GLuint) * gl_play->tiles_x * gl_play->tiles_y);
+
+	glEnable(GL_TEXTURE_2D);
+	glGenTextures(gl_play->tiles_x * gl_play->tiles_y, gl_play->tiles);
+
+	/* data for vertices 4 x 2 coordinates per each */
+	gl_play->vertices = (GLint *) malloc(sizeof(GLint) * gl_play->tiles_x * gl_play->tiles_y * 8);
+	memset(gl_play->vertices, 0, sizeof(GLint) * gl_play->tiles_x * gl_play->tiles_y * 8);
+
+	/* and init data for drawing */
+	height_r = gl_play->h;
+	while (height_r > 0) {
+		width_r = gl_play->w;
+		tile_h = gl_play_next_texture_size(gl_play, height_r);
+
+		while (width_r > 0) {
+			tile_w = gl_play_next_texture_size(gl_play, width_r);
+			t_vertices = &gl_play->vertices[c * 8];
+
+			glBindTexture(GL_TEXTURE_2D, gl_play->tiles[c]);
 			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
 			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
 
-			dh = (dy + gl_play->texture_h > gl_play->h) ?
-			     (gl_play->h - dy) : (gl_play->texture_h);
-			dw = (dx + gl_play->texture_w > gl_play->w) ?
-			     (gl_play->w - dx) : (gl_play->texture_w);
+			/* (0,0) */
+			t_vertices[0] = gl_play->w - width_r;
+			t_vertices[1] = gl_play->h - height_r;
 
-			if (gl_play->flags & GL_PLAY_NON_POWER_OF_TWO) {
-				px1 = py1 = 0;
-				fh = dh;
-				fw = dw;
-				fx = dx;
-				fy = dy;
-			} else {
-				py1 = (float) (gl_play->texture_h - dh) / (float) gl_play->texture_h;
-				px1 = (float) (gl_play->texture_w - dw) / (float) gl_play->texture_w;
-				fh = gl_play->texture_h;
-				fw = gl_play->texture_w;
-				fx = (dx + fw > gl_play->w) ? (gl_play->w - gl_play->texture_w) : (dx);
-				fy = (dy + fh > gl_play->h) ? (gl_play->h - gl_play->texture_h) : (dy);
-			}
+			/* (0,1) */
+			t_vertices[2] = gl_play->w - width_r;
+			t_vertices[3] = gl_play->h - height_r + tile_h;
+
+			/* (1,0) */
+			t_vertices[4] = gl_play->w - width_r + tile_w;
+			t_vertices[5] = gl_play->h - height_r;
+
+			/* (1,1) */
+			t_vertices[6] = gl_play->w - width_r + tile_w;
+			t_vertices[7] = gl_play->h - height_r + tile_h;
 
 			glc_log(gl_play->glc, GLC_DEBUG, "gl_play",
-				"tex %u: draw coords: x1=%u, y1=%u, x2=%u, y2=%u",
-				i, dx, dy, dx + dw, dy + dh);
-			gl_play->draw_coord[i * 4 + 0] = dx;
-			gl_play->draw_coord[i * 4 + 1] = dy;
-			gl_play->draw_coord[i * 4 + 2] = dx + dw;
-			gl_play->draw_coord[i * 4 + 3] = dy + dh;
+				"tile %u: (%u, %u): %ux%u", c,
+				gl_play->w - width_r,
+				gl_play->h - height_r,
+				tile_w, tile_h);
 
-			glc_log(gl_play->glc, GLC_DEBUG, "gl_play",
-				"tex %u: tex coords: x1=%f, y1=%f, x2=%f, y2=%f",
-				i, px1, py1, 1.0, 1.0);
-			gl_play->tex_coord[i * 4 + 0] = px1;
-			gl_play->tex_coord[i * 4 + 1] = py1;
-			gl_play->tex_coord[i * 4 + 2] = 1.0; /* x2 */
-			gl_play->tex_coord[i * 4 + 3] = 1.0; /* y2 */
-
-			glc_log(gl_play->glc, GLC_DEBUG, "gl_play",
-				"tex %u: source: x=%u, y=%u, w=%u, h=%u",
-				i, fx, fy, fw, fh);
-			gl_play->tex_from[i * 3 + 0] = gl_play->row * fy + gl_play->bpp * fx;
-			gl_play->tex_from[i * 3 + 1] = fw;
-			gl_play->tex_from[i * 3 + 2] = fh;
-
-			i++;
-			dx += gl_play->texture_w;
+			c++;
+			width_r -= tile_w;
 		}
-		dx = 0;
-		dy += gl_play->texture_h;
+		height_r -= tile_h;
 	}
 
 	return 0;
@@ -491,15 +490,16 @@ int gl_play_create_textures(gl_play_t gl_play)
 
 int gl_play_destroy_textures(gl_play_t gl_play)
 {
-	if (!gl_play->textures)
+	if (!gl_play->tiles)
 		return EAGAIN;
 
-	glDeleteTextures(gl_play->texture_x_num * gl_play->texture_y_num, gl_play->textures);
-	free(gl_play->textures);
-	free(gl_play->draw_coord);
-	free(gl_play->tex_coord);
-	free(gl_play->tex_from);
-	gl_play->textures = NULL;
+	glDeleteTextures(gl_play->tiles_x * gl_play->tiles_y, gl_play->tiles);
+
+	free(gl_play->tiles);
+	gl_play->tiles = NULL;
+
+	free(gl_play->vertices);
+	gl_play->vertices = NULL;
 
 	return 0;
 }
