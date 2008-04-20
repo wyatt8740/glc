@@ -191,17 +191,8 @@ int alsa_play_hw(alsa_play_t alsa_play, glc_audio_format_message_t *fmt_msg)
 		access = SND_PCM_ACCESS_RW_NONINTERLEAVED;
 
 	if ((ret = snd_pcm_open(&alsa_play->pcm, alsa_play->device,
-				SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK)) < 0) {
-		if (ret != -ENOENT)
-			goto err;
-
-		/* omg... */
-		glc_log(alsa_play->glc, GLC_WARNING, "alsa_play",
-			"pcm %s not found, trying again...", alsa_play->device);
-		if ((ret = snd_pcm_open(&alsa_play->pcm, alsa_play->device,
-					SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK)) < 0)
-			goto err;
-	}
+				SND_PCM_STREAM_PLAYBACK, 0)) < 0)
+		goto err;
 	if ((ret = snd_pcm_hw_params_malloc(&hw_params)) < 0)
 		goto err;
 	if ((ret = snd_pcm_hw_params_any(alsa_play->pcm, hw_params)) < 0)
@@ -313,12 +304,13 @@ int alsa_play_play(alsa_play_t alsa_play, glc_audio_data_header_t *audio_hdr, ch
 
 int alsa_play_xrun(alsa_play_t alsa_play, int err)
 {
-	glc_log(alsa_play->glc, GLC_DEBUG, "alsa_play", "xrun");
 	if (err == -EPIPE) {
+		glc_log(alsa_play->glc, GLC_DEBUG, "alsa_play", "buffer underrun");
 		if ((err = snd_pcm_prepare(alsa_play->pcm)) < 0)
 			return -err;
 		return 0;
 	} else if (err == -ESTRPIPE) {
+		glc_log(alsa_play->glc, GLC_DEBUG, "alsa_play", "suspended");
 		while ((err = snd_pcm_resume(alsa_play->pcm)) == -EAGAIN)
 			sched_yield();
 		if (err < 0) {
@@ -326,7 +318,8 @@ int alsa_play_xrun(alsa_play_t alsa_play, int err)
 				return -err;
 			return 0;
 		}
-	}
+	} else
+		glc_log(alsa_play->glc, GLC_DEBUG, "alsa_play", "%s (%d)", snd_strerror(err), err);
 	return -err;
 }
 
