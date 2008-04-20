@@ -1,3 +1,9 @@
+0.5.5 (2008/04/20)
+   Fixed glXCreateWindow() related crash.
+   Improved video playback code.
+   Better command line argument parsing in encode.sh.
+   Changed ALSA playback mode to blocking.
+
 0.5.4 (2008/04/11)
    Fixed audio duration calculations. Fixes pauses in audio when
     exporting as WAV.
