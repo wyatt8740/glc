@@ -51,6 +51,7 @@ int main(int argc, char *argv[])
 		{'n', "lock-fps",		"GLC_LOCK_FPS",			 "1"},
 		{ 0 , "no-pbo",			"GLC_TRY_PBO",			 "0"},
 		{'z', "compression",		"GLC_COMPRESS",			NULL},
+		{ 0 , "no-sync",		"GLC_DISABLE_SYNC",		 "1"},
 		{ 0 , "byte-aligned",		"GLC_CAPTURE_DWORD_ALIGNED",	 "0"},
 		{'i', "draw-indicator",		"GLC_INDICATOR",		 "1"},
 		{'v', "log",			"GLC_LOG",			NULL},
@@ -123,6 +124,7 @@ usage:
 	       "  -z, --compression=METHOD   compress stream using METHOD\n"
 	       "                               'none', 'quicklz' and 'lzo' are supported\n"
 	       "                               'quicklz' is used by default\n"
+	       "      --no-sync              disable synchronized write mode\n"
 	       "      --byte-aligned         use GL_PACK_ALIGNMENT 1 instead of 8\n"
 	       "  -i, --draw-indicator       draw indicator when capturing\n"
 	       "                               indicator does not work with -b 'front'\n"
