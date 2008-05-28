@@ -74,6 +74,15 @@ typedef struct file_s* file_t;
 __PUBLIC int file_init(file_t *file, glc_t *glc);
 
 /**
+ * \brief set sync mode
+ * \note this must be set before opening file
+ * \param file file object
+ * \param sync 0 = no forced synchronization, 1 = force writing immediately to device
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int file_set_sync(file_t file, int sync);
+
+/**
  * \brief open file for writing
  * \note this calls file_set_target()
  * \param file file object

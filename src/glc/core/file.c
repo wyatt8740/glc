@@ -46,6 +46,7 @@ struct file_s {
 	glc_flags_t flags;
 	glc_thread_t thread;
 	int fd;
+	int sync;
 };
 
 void file_finish_callback(void *ptr, int err);
@@ -58,6 +59,7 @@ int file_init(file_t *file, glc_t *glc)
 
 	(*file)->glc = glc;
 	(*file)->fd = -1;
+	(*file)->sync = 1;
 
 	(*file)->thread.flags = GLC_THREAD_READ;
 	(*file)->thread.ptr = *file;
@@ -74,6 +76,12 @@ int file_destroy(file_t file)
 	return 0;
 }
 
+int file_set_sync(file_t file, int sync)
+{
+	file->sync = sync;
+	return 0;
+}
+
 int file_open_target(file_t file, const char *filename)
 {
 	int fd, ret = 0;
@@ -83,7 +91,7 @@ int file_open_target(file_t file, const char *filename)
 	glc_log(file->glc, GLC_INFORMATION, "file",
 		 "opening %s for writing stream", filename);
 
-	fd = open(filename, O_CREAT | O_WRONLY | O_SYNC, 0644);
+	fd = open(filename, O_CREAT | O_WRONLY | (file->sync ? O_SYNC : 0), 0644);
 
 	if (fd == -1) {
 		glc_log(file->glc, GLC_ERROR, "file", "can't open %s: %s (%d)",
@@ -244,7 +252,7 @@ int file_open_source(file_t file, const char *filename)
 	glc_log(file->glc, GLC_INFORMATION, "file",
 		 "opening %s for reading stream", filename);
 
-	fd = open(filename, O_SYNC);
+	fd = open(filename, file->sync ? O_SYNC : 0);
 
 	if (fd == -1) {
 		glc_log(file->glc, GLC_ERROR, "file", "can't open %s: %s (%d)",
