@@ -89,7 +89,9 @@ int file_open_target(file_t file, const char *filename)
 		return EBUSY;
 
 	glc_log(file->glc, GLC_INFORMATION, "file",
-		 "opening %s for writing stream", filename);
+		 "opening %s for writing stream (%s)",
+		 filename,
+		 file->sync ? "sync" : "no sync");
 
 	fd = open(filename, O_CREAT | O_WRONLY | (file->sync ? O_SYNC : 0), 0644);
 
