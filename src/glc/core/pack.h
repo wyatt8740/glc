@@ -32,6 +32,8 @@ typedef struct pack_s* pack_t;
 #define PACK_QUICKLZ       0x1
 /** LZO compression */
 #define PACK_LZO           0x2
+/** LZJB compression */
+#define PACK_LZJB          0x3
 
 /**
  * \brief unpack object

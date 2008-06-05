@@ -13,6 +13,9 @@ OPTION(QUICKLZ
 OPTION(LZO
        "LZO support"
        ON)
+OPTION(LZJB
+       "LZJB support"
+       ON)
 OPTION(BINARIES
        "Build and install glc-capture and glc-play"
        ON)

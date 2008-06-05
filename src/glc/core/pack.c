@@ -33,18 +33,20 @@
 # define __lzo_worstcase(size) size + (size / 16) + 64 + 3
 # define __lzo_wrk_mem LZO1X_1_MEM_COMPRESS
 # define __LZO
-#else
-# ifdef __LZO
-#  include <lzo/lzo1x.h>
-#  define __lzo_compress lzo1x_1_11_compress
-#  define __lzo_decompress lzo1x_decompress
-#  define __lzo_worstcase(size) size + (size / 16) + 64 + 3
-#  define __lzo_wrk_mem LZO1X_1_11_MEM_COMPRESS
-# endif
+#elif defined __LZO
+# include <lzo/lzo1x.h>
+# define __lzo_compress lzo1x_1_11_compress
+# define __lzo_decompress lzo1x_decompress
+# define __lzo_worstcase(size) size + (size / 16) + 64 + 3
+# define __lzo_wrk_mem LZO1X_1_11_MEM_COMPRESS
 #endif
 
 #ifdef __QUICKLZ
 # include <quicklz.h>
+#endif
+
+#ifdef __LZJB
+# include <lzjb.h>
 #endif
 
 struct pack_s {
@@ -66,6 +68,7 @@ void pack_thread_finish_callback(void *ptr, void *threadptr, int err);
 int pack_read_callback(glc_thread_state_t *state);
 int pack_quicklz_write_callback(glc_thread_state_t *state);
 int pack_lzo_write_callback(glc_thread_state_t *state);
+int pack_lzjb_write_callback(glc_thread_state_t *state);
 void pack_finish_callback(void *ptr, int err);
 
 int unpack_read_callback(glc_thread_state_t *state);
@@ -89,17 +92,15 @@ int pack_init(pack_t *pack, glc_t *glc)
 	(*pack)->thread.threads = glc_threads_hint(glc);
 
 #ifdef __QUICKLZ
-	(*pack)->thread.write_callback = &pack_quicklz_write_callback;
-	(*pack)->compression = PACK_QUICKLZ;
+	pack_set_compression(*pack, PACK_QUICKLZ);
+#elif defined __LZO
+	pack_set_compression(*pack, PACK_LZO);
+#elif defined __LZJB
+	pack_set_compression(*pack, PACK_LZJB);
 #else
-# ifdef __LZO
-	(*pack)->thread.write_callback = &pack_lzo_write_callback;
-	(*pack)->compression = PACK_LZO;
-# else
 	glc_log((*pack)->glc, GLC_ERROR, "pack",
 		 "no supported compression algorithms found");
 	return ENOTSUP;
-# endif
 #endif
 
 	return 0;
@@ -129,6 +130,16 @@ int pack_set_compression(pack_t pack, int compression)
 #else
 		glc_log(pack->glc, GLC_ERROR, "pack",
 			 "LZO not supported");
+		return ENOTSUP;
+#endif
+	} else if (compression == PACK_LZJB) {
+#ifdef __LZJB
+		pack->thread.write_callback = &pack_lzjb_write_callback;
+		glc_log(pack->glc, GLC_INFORMATION, "pack",
+			"compressing using LZJB");
+#else
+		glc_log(pack->glc, GLC_ERROR, "pack",
+			"LZJB not supported");
 		return ENOTSUP;
 #endif
 	} else {
@@ -239,6 +250,14 @@ int pack_read_callback(glc_thread_state_t *state)
 #else
 			goto copy;
 #endif
+		} else if (pack->compression == PACK_LZJB) {
+#ifdef __LZJB
+			state->write_size = sizeof(glc_container_message_header_t)
+					    + sizeof(glc_lzjb_header_t)
+					    + __lzjb_worstcase(state->read_size);
+#else
+			goto copy;
+#endif
 		} else
 			goto copy;
 
@@ -295,6 +314,32 @@ int pack_quicklz_write_callback(glc_thread_state_t *state)
 
 	container->size = compressed_size + sizeof(glc_quicklz_header_t);
 	container->header.type = GLC_MESSAGE_QUICKLZ;
+
+	state->header.type = GLC_MESSAGE_CONTAINER;
+
+	return 0;
+#else
+	return ENOTSUP;
+#endif
+}
+
+int pack_lzjb_write_callback(glc_thread_state_t *state)
+{
+#ifdef __LZJB
+	glc_container_message_header_t *container = (glc_container_message_header_t *) state->write_data;
+	glc_lzjb_header_t *lzjb_header =
+		(glc_lzjb_header_t *) &state->write_data[sizeof(glc_container_message_header_t)];
+
+	size_t compressed_size = lzjb_compress(state->read_data,
+					       &state->write_data[sizeof(glc_lzjb_header_t) +
+					       			  sizeof(glc_container_message_header_t)],
+					       state->read_size);
+
+	lzjb_header->size = (glc_size_t) state->read_size;
+	memcpy(&lzjb_header->header, &state->header, sizeof(glc_message_header_t));
+
+	container->size = compressed_size + sizeof(glc_lzjb_header_t);
+	container->header.type = GLC_MESSAGE_LZJB;
 
 	state->header.type = GLC_MESSAGE_CONTAINER;
 
@@ -370,7 +415,7 @@ int unpack_read_callback(glc_thread_state_t *state)
 		state->write_size = ((glc_lzo_header_t *) state->read_data)->size;
 		return 0;
 #else
-		glc_log(((struct pack_private_s *) state->ptr)->glc,
+		glc_log(((unpack_t) state->ptr)->glc,
 			 GLC_ERROR, "unpack", "LZO not supported");
 		return ENOTSUP;
 #endif
@@ -379,8 +424,17 @@ int unpack_read_callback(glc_thread_state_t *state)
 		state->write_size = ((glc_quicklz_header_t *) state->read_data)->size;
 		return 0;
 #else
-		glc_log(((struct pack_private_s *) state->ptr)->glc,
-			 GLC_ERROR, "unpack", "unpack: QuickLZ not supported");
+		glc_log(((unpack_t) state->ptr)->glc,
+			 GLC_ERROR, "unpack", "QuickLZ not supported");
+		return ENOTSUP;
+#endif
+	} else if (state->header.type == GLC_MESSAGE_LZJB) {
+#ifdef __LZJB
+		state->write_size = ((glc_lzjb_header_t *) state->read_data)->size;
+		return 0;
+#else
+		glc_log(((unpack_t) state->ptr)->glc,
+			GLC_ERROR, "unpack", "LZJB not supported");
 		return ENOTSUP;
 #endif
 	}
@@ -410,6 +464,17 @@ int unpack_write_callback(glc_thread_state_t *state)
 		quicklz_decompress((const unsigned char *) &state->read_data[sizeof(glc_quicklz_header_t)],
 				   (unsigned char *) state->write_data,
 				   state->write_size);
+#else
+		return ENOTSUP;
+#endif
+	} else if (state->header.type == GLC_MESSAGE_LZJB) {
+#ifdef __LZJB
+		memcpy(&state->header, &((glc_quicklz_header_t *) state->read_data)->header,
+		       sizeof(glc_message_header_t));
+		lzjb_decompress(&state->read_data[sizeof(glc_lzjb_header_t)],
+				state->write_data,
+				state->read_size - sizeof(glc_lzjb_header_t),
+				state->write_size);
 #else
 		return ENOTSUP;
 #endif

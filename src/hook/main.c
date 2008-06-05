@@ -38,6 +38,7 @@
 #define MAIN_COMPRESS_LZO          0x8
 #define MAIN_CUSTOM_LOG           0x10
 #define MAIN_DISABLE_SYNC         0x20
+#define MAIN_COMPRESS_LZJB        0x40
 
 struct main_private_s {
 	glc_t glc;
@@ -209,11 +210,16 @@ int start_glc()
 			pack_set_compression(mpriv.pack, PACK_QUICKLZ);
 		else if (mpriv.flags & MAIN_COMPRESS_LZO)
 			pack_set_compression(mpriv.pack, PACK_LZO);
+		else if (mpriv.flags & MAIN_COMPRESS_LZJB)
+			pack_set_compression(mpriv.pack, PACK_LZJB);
 
 		if ((ret = pack_process_start(mpriv.pack, mpriv.uncompressed, mpriv.compressed)))
 			return ret;
-	} else if ((ret = file_write_process_start(mpriv.file, mpriv.uncompressed)))
-		return ret;
+	} else {
+		glc_log(&mpriv.glc, GLC_WARNING, "main", "compression disabled");
+		if ((ret = file_write_process_start(mpriv.file, mpriv.uncompressed)))
+			return ret;
+	}
 
 	if ((ret = alsa_start(mpriv.uncompressed)))
 		return ret;
@@ -353,6 +359,8 @@ int load_environ()
 			mpriv.flags |= MAIN_COMPRESS_LZO;
 		else if (!strcmp(getenv("GLC_COMPRESS"), "quicklz"))
 			mpriv.flags |= MAIN_COMPRESS_QUICKLZ;
+		else if (!strcmp(getenv("GLC_COMPRESS"), "lzjb"))
+			mpriv.flags |= MAIN_COMPRESS_LZJB;
 		else
 			mpriv.flags |= MAIN_COMPRESS_NONE;
 	}
