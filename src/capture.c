@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <dlfcn.h>
 
 struct glc_opt_s {
 	char short_name;
@@ -38,6 +39,7 @@ int main(int argc, char *argv[])
 	char *program = NULL;
 	char **program_args = NULL;
 	const char *library = "libglc-hook.so";
+	const char *core_library = "libglc-core.so";
 
 	struct glc_opt_s options[] = {
 		{'o', "out",			"GLC_FILE",			NULL},
@@ -78,7 +80,15 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	/* add glc-hook.so library to the LD_PRELOAD environment variable */
+	/* check that libglc-core.so can be loaded */
+	void *handle = dlopen(core_library, RTLD_LAZY);
+	if (handle == NULL) {
+		fprintf(stderr, "Can't find glc libraries\n");
+		return EXIT_FAILURE;
+	}
+	dlclose(handle);
+
+	/* add libglc-hook.so library to the LD_PRELOAD environment variable */
 	env_append("LD_PRELOAD", library, ':');
 
 	if (optind >= argc)
