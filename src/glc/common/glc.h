@@ -48,6 +48,8 @@
 #include <sys/types.h>
 #include <semaphore.h>
 
+#include <glc/common/version.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -67,8 +69,6 @@ extern "C" {
 #define GLC_STREAM_VERSION                  0x3
 /** file signature = "GLC" */
 #define GLC_SIGNATURE                0x00434c47
-/** glc version string */
-#define GLC_VERSION                     "0.5.5"
 
 /** unsigned time in microseconds */
 typedef u_int64_t glc_utime_t;

@@ -1,10 +1,19 @@
 
+IF (NOT EXISTS ${VERSION_HDR})
+  ADD_CUSTOM_COMMAND(OUTPUT ${VERSION_HDR}
+		     COMMAND mkdir -p ${VERSION_HDR_DIR}
+		     COMMAND ${GEN_VERSION} ${PROJECT_SOURCE_DIR} ${VERSION_HDR}
+		     DEPENDS gen_version common/glc.h
+		     COMMENT "Generating version.h")
+ENDIF (NOT EXISTS ${VERSION_HDR})
+
 SET(COMMON_HDR common/glc.h
 	       common/core.h
 	       common/log.h
 	       common/state.h
 	       common/thread.h
-	       common/util.h)
+	       common/util.h
+	       ${VERSION_HDR})
 SET(COMMON_SRC common/core.c
 	       common/log.c
 	       common/state.c
