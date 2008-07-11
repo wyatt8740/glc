@@ -18,7 +18,7 @@ char *extract_version(const char *path)
 {
 	int result;
 
-	const char *cmd_format = "git --git-dir=\"%s/.git\" rev-parse HEAD";
+	const char *cmd_format = "git --git-dir=\"%s\" rev-parse HEAD";
 	size_t cmd_len = strlen(path) + strlen(cmd_format) + 1;
 
 	const char* prefix = "git-";
@@ -83,7 +83,7 @@ int write_version(const char *filename, const char *version)
 int main(int argc, char *argv[])
 {
 	if (argc < 3) {
-		fprintf(stderr, "%s [source dir] [target] [[version]]\n", argv[0]);
+		fprintf(stderr, "%s [git directory] [target] [[version]]\n", argv[0]);
 		return EXIT_FAILURE;
 	}
 
