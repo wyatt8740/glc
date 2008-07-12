@@ -27,6 +27,11 @@ struct glc_core_s {
 	long int threads_hint;
 };
 
+const char *glc_version()
+{
+	return GLC_VERSION;
+}
+
 int glc_init(glc_t *glc)
 {
 	int ret = 0;

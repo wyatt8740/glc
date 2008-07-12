@@ -23,6 +23,12 @@ extern "C" {
 #endif
 
 /**
+ * \brief get glc version
+ * \return glc version string
+ */
+__PUBLIC const char *glc_version();
+
+/**
  * \brief initialize glc
  *
  * This function initializes core, log and util components.

@@ -40,6 +40,7 @@ int main(int argc, char *argv[])
 	char **program_args = NULL;
 	const char *library = "libglc-hook.so";
 	const char *core_library = "libglc-core.so";
+	const char *(*glc_version)();
 
 	struct glc_opt_s options[] = {
 		{'o', "out",			"GLC_FILE",			NULL},
@@ -70,8 +71,27 @@ int main(int argc, char *argv[])
 		{ 0 , NULL,			NULL,				NULL}
 	};
 
+	/* check that libglc-core.so can be loaded */
+	void *handle = dlopen(core_library, RTLD_LAZY);
+	if (handle == NULL) {
+		fprintf(stderr, "Can't find glc libraries\n");
+		return EXIT_FAILURE;
+	}
+	glc_version = (const char*(*)()) dlsym(handle, "glc_version");
+	if (glc_version == NULL) {
+		fprintf(stderr, "Invalid glc libraries\n");
+		return EXIT_FAILURE;
+	}
+
 	/* parse options until we encounter first invalid option or non-option argument */
 	for (optind = 1; optind < argc;) {
+		/* test if this is --version */
+		if ((!strcmp("--version", argv[optind])) | (!strcmp("-V", argv[optind]))) {
+			printf("glc version %s\n", glc_version());
+			dlclose(handle);
+			return EXIT_SUCCESS;
+		}
+
 		if ((ret = parse_arg(options, argc, argv, &optind))) {
 			if (ret == EINVAL)
 				goto usage;
@@ -80,12 +100,6 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	/* check that libglc-core.so can be loaded */
-	void *handle = dlopen(core_library, RTLD_LAZY);
-	if (handle == NULL) {
-		fprintf(stderr, "Can't find glc libraries\n");
-		return EXIT_FAILURE;
-	}
 	dlclose(handle);
 
 	/* add libglc-hook.so library to the LD_PRELOAD environment variable */
@@ -159,6 +173,7 @@ usage:
 	       "                               default is 25 MiB\n"
 	       "      --unscaled=SIZE        unscaled picture stream buffer size in MiB,\n"
 	       "                               default is 25 MiB\n"
+	       "  -V, --version              print glc version and exit\n"
 	       "  -h, --help                 show this help\n");
 	return EXIT_FAILURE;
 }

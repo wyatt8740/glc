@@ -102,6 +102,7 @@ int main(int argc, char *argv[])
 		{"show",		1, NULL, 's'},
 		{"verbosity",		1, NULL, 'v'},
 		{"help",		0, NULL, 'h'},
+		{"version",		0, NULL, 'V'},
 		{0, 0, 0, 0}
 	};
 	option_index = 0;
@@ -135,7 +136,7 @@ int main(int argc, char *argv[])
 	play.green_gamma = 1.0;
 	play.blue_gamma = 1.0;
 
-	while ((opt = getopt_long(argc, argv, "i:a:b:p:y:o:f:r:g:l:td:c:u:s:v:h",
+	while ((opt = getopt_long(argc, argv, "i:a:b:p:y:o:f:r:g:l:td:c:u:s:v:hV",
 				  long_options, &optind)) != -1) {
 		switch (opt) {
 		case 'i':
@@ -220,6 +221,9 @@ int main(int argc, char *argv[])
 			if (play.log_level < 0)
 				goto usage;
 			break;
+		case 'V':
+			printf("glc version %s\n", glc_version());
+			return EXIT_SUCCESS;
 		case 'h':
 		default:
 			goto usage;
