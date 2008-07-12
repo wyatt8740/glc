@@ -29,7 +29,11 @@ OPTION(SCRIPTS
        "Install sample scripts."
        OFF)
 
-SUBDIRS(src)
+IF (NOT GIT_DIR)
+  SET(GIT_DIR ${PROJECT_SOURCE_DIR}/.git)
+ENDIF (NOT GIT_DIR)
+
+ADD_SUBDIRECTORY(src)
 
 IF (SCRIPTS)
   IF (UNIX)

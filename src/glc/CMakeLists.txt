@@ -1,9 +1,23 @@
 
+SET(VERSION_HDR common/version.h)
+
 IF (NOT EXISTS ${VERSION_HDR})
+  SET(VERSION_HDR_DIR ${CMAKE_CURRENT_BINARY_DIR}/common)
+  SET(VERSION_HDR ${VERSION_HDR_DIR}/version.h)
+  INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR}/..)
+  ADD_EXECUTABLE(gen_version ../gen_version.c)
+  GET_TARGET_PROPERTY(GEN_VERSION gen_version LOCATION)
+
+  IF (EXISTS ${GIT_DIR}/index)
+    SET(VER_DEPENDS gen_version ${PROJECT_SOURCE_DIR}/CMakeLists.txt ${GIT_DIR}/index)
+  ELSE (EXISTS ${GIT_DIR}/index)
+    SET(VER_DEPENDS gen_version ${PROJECT_SOURCE_DIR}/CMakeLists.txt)
+  ENDIF (EXISTS ${GIT_DIR}/index)
+
   ADD_CUSTOM_COMMAND(OUTPUT ${VERSION_HDR}
 		     COMMAND mkdir -p ${VERSION_HDR_DIR}
-		     COMMAND ${GEN_VERSION} ${GIT_DIR} ${VERSION_HDR}
-		     DEPENDS gen_version common/glc.h
+		     COMMAND ${GEN_VERSION} "${VERSION_HDR}" "${GLC_VER}-git-" "${GIT_DIR}"
+		     DEPENDS ${VER_DEPENDS}
 		     COMMENT "Generating version.h")
 ENDIF (NOT EXISTS ${VERSION_HDR})
 

@@ -14,15 +14,14 @@
 
 #define SHORTVER_LEN 7
 
-char *extract_version(const char *path)
+char *extract_version(const char *basever, const char *path)
 {
 	int result;
 
-	const char *cmd_format = "git --git-dir=\"%s\" rev-parse HEAD";
-	size_t cmd_len = strlen(path) + strlen(cmd_format) + 1;
+	size_t basever_len = strlen(basever);
 
-	const char* prefix = "git-";
-	size_t prefix_len = strlen(prefix);
+	const char *cmd_format = "git --git-dir=\"%s\" rev-parse HEAD 2> /dev/null";
+	size_t cmd_len = strlen(path) + strlen(cmd_format) + 1;
 
 	char *version, *cmd = malloc(sizeof(char) * cmd_len);
 
@@ -30,24 +29,21 @@ char *extract_version(const char *path)
 
 	FILE *in = popen(cmd, "r");
 	if (!in) {
-		fprintf(stderr, "Can't execute %s: %s (%d)\n", cmd, strerror(errno), errno);
 		free(cmd);
 		return NULL;
 	}
 	free(cmd);
 
-	version = malloc(sizeof(char) * (SHORTVER_LEN + 1 + prefix_len));
-	memcpy(version, prefix, prefix_len);
-	result = fread(&version[prefix_len], 1, SHORTVER_LEN, in);
+	version = malloc(sizeof(char) * (SHORTVER_LEN + 1 + basever_len));
+	memcpy(version, basever, basever_len);
+	result = fread(&version[basever_len], 1, SHORTVER_LEN, in);
 
 	if (result != SHORTVER_LEN) {
-		result = ferror(in);
-		fprintf(stderr, "Can't read commit name: %s (%d)\n", strerror(result), result);
 		free(version);
 		return NULL;
 	}
 
-	version[prefix_len + SHORTVER_LEN] = '\0';
+	version[basever_len + SHORTVER_LEN] = '\0';
 
 	pclose(in);
 
@@ -82,25 +78,26 @@ int write_version(const char *filename, const char *version)
 
 int main(int argc, char *argv[])
 {
-	if (argc < 3) {
-		fprintf(stderr, "%s [git directory] [target] [[version]]\n", argv[0]);
+	if (argc < 4) {
+		fprintf(stderr, "%s [target] [version] [git directory]\n", argv[0]);
 		return EXIT_FAILURE;
 	}
 
-	if (argc > 3) {
-		if (write_version(argv[2], argv[3])) {
+	const char *target = argv[1];
+	const char *version = argv[2];
+	const char *git_dir = argv[3];
+	char *git_version = extract_version(version, git_dir);
+
+	if (git_version != NULL) {
+		if (write_version(target, git_version)) {
+			free(git_version);
 			return EXIT_FAILURE;
 		}
+		free(git_version);
 	} else {
-		char *version = extract_version(argv[1]);
-		if (version == NULL) {
+		if (write_version(target, version)) {
 			return EXIT_FAILURE;
 		}
-		if (write_version(argv[2], version)) {
-			free(version);
-			return EXIT_FAILURE;
-		}
-		free(version);
 	}
 
 	return EXIT_SUCCESS;
