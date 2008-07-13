@@ -1,3 +1,12 @@
+0.5.6 (2008/07/13)
+   Change stream on-disk format to reduce write() calls.
+   Disable forced synchronization by default.
+   Disable PBO by default.
+   Add LZJB compression support.
+   Add --version options to glc-capture and glc-play.
+   Generate version.h based on git HEAD.
+   Some minor scale bug fixes.
+
 0.5.5 (2008/04/20)
    Fixed glXCreateWindow() related crash.
    Improved video playback code.
