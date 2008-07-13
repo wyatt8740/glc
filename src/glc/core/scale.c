@@ -513,7 +513,7 @@ int scale_video_format_message(scale_t scale,
 			   (video->format == GLC_VIDEO_BGRA)) {
 			glc_log(scale->glc, GLC_DEBUG, "scale", "converting BGRA to BGR");
 			video->proc = scale_rgb_convert;
-		} else if (video->scale != 1.0) {
+		} else if ((video->scale != 1.0) | (scale->flags & SCALE_SIZE)) {
 			glc_log(scale->glc, GLC_DEBUG, "scale",
 				 "scaling RGB data with factor %f (from %ux%u to %ux%u)",
 				 video->scale, video->w, video->h, video->sw, video->sh);
