@@ -509,11 +509,12 @@ int scale_video_format_message(scale_t scale,
 				 "scaling RGB data to half-size (from %ux%u to %ux%u)",
 				 video->w, video->h, video->sw, video->sh);
 			video->proc = scale_rgb_half;
-		} else if ((video->scale == 1.0) &&
+		} else if ((video->rw == video->w) &&
+			   (video->rh == video->h) &&
 			   (video->format == GLC_VIDEO_BGRA)) {
 			glc_log(scale->glc, GLC_DEBUG, "scale", "converting BGRA to BGR");
 			video->proc = scale_rgb_convert;
-		} else if ((video->scale != 1.0) | (scale->flags & SCALE_SIZE)) {
+		} else if ((video->rw != video->w) | (video->rh != video->h)) {
 			glc_log(scale->glc, GLC_DEBUG, "scale",
 				 "scaling RGB data with factor %f (from %ux%u to %ux%u)",
 				 video->scale, video->w, video->h, video->sw, video->sh);
@@ -548,7 +549,7 @@ int scale_video_format_message(scale_t scale,
 				 "scaling Y'CbCr data to half-size (from %ux%u to %ux%u)",
 				 video->w, video->h, video->sw, video->sh);
 			video->proc = scale_ycbcr_half;
-		} else if ((video->scale != 1.0) | (scale->flags & SCALE_SIZE)) {
+		} else if ((video->rw != video->w) | (video->rh != video->h)) {
 			glc_log(scale->glc, GLC_DEBUG, "scale",
 				 "scaling Y'CbCr data with factor %f (from %ux%u to %ux%u)",
 				 video->scale, video->w, video->h, video->sw, video->sh);
