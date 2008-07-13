@@ -117,7 +117,7 @@ int opengl_init(glc_t *glc)
 	if (getenv("GLC_SCALE"))
 		opengl.scale_factor = atof(getenv("GLC_SCALE"));
 
-	gl_capture_try_pbo(opengl.gl_capture, 1);
+	gl_capture_try_pbo(opengl.gl_capture, 0);
 	if (getenv("GLC_TRY_PBO"))
 		gl_capture_try_pbo(opengl.gl_capture, atoi(getenv("GLC_TRY_PBO")));
 

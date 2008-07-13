@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
 		{'e', "colorspace",		"GLC_COLORSPACE",		NULL},
 		{'k', "hotkey",			"GLC_HOTKEY",			NULL},
 		{'n', "lock-fps",		"GLC_LOCK_FPS",			 "1"},
-		{ 0 , "no-pbo",			"GLC_TRY_PBO",			 "0"},
+		{ 0 , "pbo",			"GLC_TRY_PBO",			 "1"},
 		{'z', "compression",		"GLC_COMPRESS",			NULL},
 		{ 0 , "no-sync",		"GLC_DISABLE_SYNC",		 "1"},
 		{ 0 , "byte-aligned",		"GLC_CAPTURE_DWORD_ALIGNED",	 "0"},
@@ -144,7 +144,7 @@ usage:
 	       "  -k, --hotkey=HOTKEY        capture hotkey, <Ctrl> and <Shift> modifiers are\n"
 	       "                               supported, default hotkey is '<Shift>F8'\n"
 	       "  -n, --lock-fps             lock fps when capturing\n"
-	       "      --no-pbo               don't try GL_ARB_pixel_buffer_object\n"
+	       "      --pbo                  use GL_ARB_pixel_buffer_object if available\n"
 	       "  -z, --compression=METHOD   compress stream using METHOD\n"
 	       "                               'none', 'quicklz' and 'lzo' are supported\n"
 	       "                               'quicklz' is used by default\n"

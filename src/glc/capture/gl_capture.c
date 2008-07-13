@@ -148,7 +148,6 @@ int gl_capture_init(gl_capture_t *gl_capture, glc_t *glc)
 	(*gl_capture)->glc = glc;
 	(*gl_capture)->fps = 1000000 / 30;		/* default fps is 30 */
 	(*gl_capture)->pack_alignment = 8;		/* read as dword aligned by default */
-	(*gl_capture)->flags |= GL_CAPTURE_TRY_PBO;	/* try pbo by default */
 	(*gl_capture)->format = GL_BGRA;		/* capture as BGRA data by default */
 	(*gl_capture)->bpp = 4;				/* since we use BGRA */
 	(*gl_capture)->capture_buffer = GL_FRONT;	/* front buffer is default */
