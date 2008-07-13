@@ -37,7 +37,7 @@
 #define MAIN_COMPRESS_QUICKLZ      0x4
 #define MAIN_COMPRESS_LZO          0x8
 #define MAIN_CUSTOM_LOG           0x10
-#define MAIN_DISABLE_SYNC         0x20
+#define MAIN_SYNC                 0x20
 #define MAIN_COMPRESS_LZJB        0x40
 
 struct main_private_s {
@@ -188,7 +188,7 @@ int start_glc()
 	glc_util_info_create(&mpriv.glc, &stream_info, &info_name, &info_date);
 	if ((ret = file_init(&mpriv.file, &mpriv.glc)))
 		return ret;
-	if ((ret = file_set_sync(mpriv.file, (mpriv.flags & MAIN_DISABLE_SYNC) ? 0 : 1)))
+	if ((ret = file_set_sync(mpriv.file, (mpriv.flags & MAIN_SYNC) ? 1 : 0)))
 		return ret;
 	if ((ret = file_open_target(mpriv.file, mpriv.stream_file)))
 		return ret;
@@ -341,9 +341,9 @@ int load_environ()
 	if (getenv("GLC_SIGHANDLER"))
 		mpriv.sighandler = atoi(getenv("GLC_SIGHANDLER"));
 
-	if (getenv("GLC_DISABLE_SYNC")) {
-		if (atoi(getenv("GLC_DISABLE_SYNC")))
-			mpriv.flags |= MAIN_DISABLE_SYNC;
+	if (getenv("GLC_SYNC")) {
+		if (atoi(getenv("GLC_SYNC")))
+			mpriv.flags |= MAIN_SYNC;
 	}
 
 	mpriv.uncompressed_size = 1024 * 1024 * 25;

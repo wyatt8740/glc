@@ -59,7 +59,7 @@ int file_init(file_t *file, glc_t *glc)
 
 	(*file)->glc = glc;
 	(*file)->fd = -1;
-	(*file)->sync = 1;
+	(*file)->sync = 0;
 
 	(*file)->thread.flags = GLC_THREAD_READ;
 	(*file)->thread.ptr = *file;
@@ -218,21 +218,16 @@ int file_read_callback(glc_thread_state_t *state)
 
 	if (state->header.type == GLC_MESSAGE_CONTAINER) {
 		container = (glc_container_message_header_t *) state->read_data;
-
-		if (write(file->fd, &container->header, sizeof(glc_message_header_t))
-		    != sizeof(glc_message_header_t))
-			goto err;
-		if (write(file->fd, &container->size, sizeof(glc_size_t)) != sizeof(glc_size_t))
-			goto err;
-		if (write(file->fd, &state->read_data[sizeof(glc_container_message_header_t)], container->size)
-		    != container->size)
+		if (write(file->fd, state->read_data, sizeof(glc_container_message_header_t) + container->size)
+		    != (sizeof(glc_container_message_header_t) + container->size))
 			goto err;
 	} else {
-		if (write(file->fd, &state->header, sizeof(glc_message_header_t))
-		    != sizeof(glc_message_header_t))
-			goto err;
+		/* emulate container message */
 		glc_size = state->read_size;
 		if (write(file->fd, &glc_size, sizeof(glc_size_t)) != sizeof(glc_size_t))
+			goto err;
+		if (write(file->fd, &state->header, sizeof(glc_message_header_t))
+		    != sizeof(glc_message_header_t))
 			goto err;
 		if (write(file->fd, state->read_data, state->read_size) != state->read_size)
 			goto err;
@@ -368,9 +363,10 @@ int file_read(file_t file, ps_buffer_t *to)
 	ps_packet_init(&packet, to);
 
 	do {
-		if (read(file->fd, &header, sizeof(glc_message_header_t)) != sizeof(glc_message_header_t))
-			goto send_eof;
+		/* same header format as in container messages */
 		if (read(file->fd, &glc_ps, sizeof(glc_size_t)) != sizeof(glc_size_t))
+			goto send_eof;
+		if (read(file->fd, &header, sizeof(glc_message_header_t)) != sizeof(glc_message_header_t))
 			goto send_eof;
 
 		packet_size = glc_ps;

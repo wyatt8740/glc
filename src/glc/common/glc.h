@@ -66,7 +66,7 @@ extern "C" {
  */
 
 /** stream version */
-#define GLC_STREAM_VERSION                  0x3
+#define GLC_STREAM_VERSION                  0x4
 /** file signature = "GLC" */
 #define GLC_SIGNATURE                0x00434c47
 
