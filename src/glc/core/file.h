@@ -176,6 +176,13 @@ __PUBLIC int file_read_info(file_t file, glc_stream_info_t *info,
 			    char **info_name, char **info_date);
 
 /**
+ * \brief test if given stream version is supported
+ * \param version version to test
+ * \return 0 if is supported, otherwise ENOTSUP
+ */
+__PUBLIC int file_test_stream_version(u_int32_t version);
+
+/**
  * \brief read stream from file and write it into buffer
  * \param file file object
  * \param to buffer
