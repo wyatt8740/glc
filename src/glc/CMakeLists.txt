@@ -1,7 +1,7 @@
 
-SET(VERSION_HDR common/version.h)
+FIND_FILE(VERSION_HDR version.h PATHS ${PROJECT_SOURCE_DIR}/src/glc/common NO_DEFAULT_PATH)
 
-IF (NOT EXISTS ${VERSION_HDR})
+IF (NOT VERSION_HDR)
   SET(VERSION_HDR_DIR ${CMAKE_CURRENT_BINARY_DIR}/common)
   SET(VERSION_HDR ${VERSION_HDR_DIR}/version.h)
   ADD_EXECUTABLE(gen_version ../gen_version.c)
@@ -18,7 +18,9 @@ IF (NOT EXISTS ${VERSION_HDR})
 		     COMMAND ${GEN_VERSION} "${VERSION_HDR}" "${GLC_VER}-git-" "${GIT_DIR}"
 		     DEPENDS ${VER_DEPENDS}
 		     COMMENT "Generating version.h")
-ENDIF (NOT EXISTS ${VERSION_HDR})
+ENDIF (NOT VERSION_HDR)
+
+MESSAGE(STATUS "version.h: ${VERSION_HDR}")
 
 SET(COMMON_HDR common/glc.h
 	       common/core.h
