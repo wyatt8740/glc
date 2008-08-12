@@ -183,4 +183,51 @@ int glc_util_log_version(glc_t *glc)
 	return 0;
 }
 
+char *glc_util_str_replace(const char *str, const char *find, const char *replace)
+{
+	/* calculate destination string size */
+	size_t replace_len = strlen(replace);
+	size_t find_len = strlen(find);
+	ssize_t copy, add_per_replace = (ssize_t) replace_len - (ssize_t) find_len;
+	ssize_t size = strlen(str) + 1;
+	const char* p = str;
+	while ((p = strstr(p, find)) != NULL) {
+		size += add_per_replace;
+		p = &p[find_len];
+	}
+
+	if (size < 0)
+		return NULL;
+
+	char *result = (char *) malloc(size * sizeof(char));
+	p = str;
+	const char *s = str;
+	char *r = result;
+
+	while ((p = strstr(p, find)) != NULL) {
+		copy = (size_t) p - (size_t) s; /* naughty casts */
+
+		/* copy string before previous replace (or start) */
+		if (copy > 0) {
+			memcpy(r, s, copy * sizeof(char));
+			r = &r[copy];
+		}
+
+		/* copy replace string */
+		memcpy(r, replace, replace_len * sizeof(char));
+		r = &r[replace_len];
+
+		p = &p[find_len];
+		s = p;
+	}
+
+	copy = (size_t) p - (size_t) s;
+	if (copy > 0)
+		memcpy(result, s, copy * sizeof(char));
+
+	result[size-1] = '\0';
+
+	return result;
+}
+
 /**  \} */

@@ -79,6 +79,15 @@ __PUBLIC int glc_util_log_info(glc_t *glc);
  */
 __PUBLIC int glc_util_write_end_of_stream(glc_t *glc, ps_buffer_t *to);
 
+/**
+ * \brief replace all occurences of string with another string
+ * \param str string to manipulate
+ * \param find string to find
+ * \param replace string to replace occurences with
+ * \return new string
+ */
+__PUBLIC char *glc_util_str_replace(const char *str, const char *find, const char *replace);
+
 #ifdef __cplusplus
 }
 #endif
