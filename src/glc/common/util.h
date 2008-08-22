@@ -88,6 +88,25 @@ __PUBLIC int glc_util_write_end_of_stream(glc_t *glc, ps_buffer_t *to);
  */
 __PUBLIC char *glc_util_str_replace(const char *str, const char *find, const char *replace);
 
+/**
+ * \brief create filename based on current date, time, app name, pid etc.
+ *
+ * Available tags in format are:
+ *  %app%	binary name without path
+ *  %pid%	process id
+ *  %capture%	N'th capture (given as argument)
+ *  %year%	4-digit year
+ *  %month%	2-digit month
+ *  %day%	2-digit day
+ *  %hour%	2-digit hour
+ *  %min%	2-digit minute
+ *  %sec%	2-digit second
+ * \param format format string
+ * \param capture N'th capture
+ * \return new filename string
+ */
+__PUBLIC char *glc_util_format_filename(const char *fmt, unsigned int capture);
+
 #ifdef __cplusplus
 }
 #endif
