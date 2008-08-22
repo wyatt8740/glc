@@ -132,7 +132,16 @@ int main(int argc, char *argv[])
 	return EXIT_SUCCESS;
 usage:
 	printf("%s [capture option]... [application] [application argument]...\n", argv[0]);
-	printf("  -o, --out=FILE             write to FILE, pid-%%d.glc by default\n"
+	printf("  -o, --out=FILE             write to FILE, %%app%%-%%pid%%.glc by default\n"
+	       "                               %%app%%:     application name\n"
+	       "                               %%pid%%:     process ID\n"
+	       "                               %%capture%%: counter\n"
+	       "                               %%year%%:    4-digit year\n"
+	       "                               %%month%%:   2-digit month\n"
+	       "                               %%day%%:     2-digit day\n"
+	       "                               %%hour%%:    2-digit hour\n"
+	       "                               %%min%%:     2-digit minute\n"
+	       "                               %%sec%%:     2-digit second\n"
 	       "  -f, --fps=FPS              capture at FPS, default value is 30\n"
 	       "  -r, --resize=FACTOR        resize pictures with scale factor FACTOR\n"
 	       "  -c, --crop=WxH+X+Y         capture only [width]x[height][+[x][+[y]]]\n"

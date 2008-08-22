@@ -320,11 +320,10 @@ int load_environ()
 			lib.flags |= LIB_CAPTURING;
 	}
 
-	mpriv.stream_file = malloc(1024);
 	if (getenv("GLC_FILE"))
-		snprintf(mpriv.stream_file, 1023, getenv("GLC_FILE"), getpid());
+		mpriv.stream_file = glc_util_format_filename(getenv("GLC_FILE"), 0);
 	else
-		snprintf(mpriv.stream_file, 1023, "pid-%d.glc", getpid());
+		mpriv.stream_file = glc_util_format_filename("%app%-%pid%.glc", 0);
 
 	if (getenv("GLC_LOG"))
 		glc_log_set_level(&mpriv.glc, atoi(getenv("GLC_LOG")));
