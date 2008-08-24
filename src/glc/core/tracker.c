@@ -176,6 +176,8 @@ int tracker_iterate_state(tracker_t tracker, tracker_callback_t callback,
 			if ((ret = callback(&header, &audio->format, sizeof(glc_audio_format_message_t), arg)))
 				goto finish;
 		}
+
+		audio = audio->next;
 	}
 
 finish:
