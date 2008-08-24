@@ -165,6 +165,14 @@ void x11_event(Display *dpy, XEvent *event)
 				stop_capture();
 			else /* start */
 				start_capture();
+		} else if (x11_match_key(dpy, event, x11.reload_key, x11.reload_key_mask)) {
+			if (lib.flags & LIB_CAPTURING) /* just stop */
+				stop_capture();
+			else { /* reload and start */
+				/* increment_capture();
+				reload_stream(); */
+				start_capture();
+			}
 		}
 
 		x11.last_event_time = event->xkey.time;

@@ -184,14 +184,15 @@ err:
 int file_write_eof(file_t file)
 {
 	glc_message_header_t hdr;
-	glc_size_t glc_size;
+	glc_size_t glc_size = 0;
 	hdr.type = GLC_MESSAGE_CLOSE;
 
 	if ((file->fd < 0) | (file->flags & FILE_RUNNING) |
-	    (!(file->flags & FILE_WRITING)))
-		return EAGAIN;
+	    (!(file->flags & FILE_WRITING))) {
+	    errno = EAGAIN;
+	    goto err;
+	}
 
-	glc_size = sizeof(glc_message_header_t);
 	if (write(file->fd, &glc_size, sizeof(glc_size_t)) != sizeof(glc_size_t))
 		goto err;
 	if (write(file->fd, &hdr, sizeof(glc_message_header_t))

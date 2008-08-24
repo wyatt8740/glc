@@ -80,6 +80,7 @@ __PRIVATE void lib_close();
 __PRIVATE int load_environ();
 __PRIVATE void signal_handler(int signum);
 __PRIVATE void get_real_libc_dlsym();
+__PRIVATE void reload_stream_callback(void *arg);
 
 void init_glc()
 {
@@ -217,18 +218,35 @@ int close_stream()
 	return 0;
 }
 
-int reload_stream()
+void reload_stream_callback(void *arg)
 {
+	/* this is called when callback request arrives to file object */
 	int ret;
 
-	if ((ret = file_write_eof(mpriv.file)))
-		return ret;
-	if ((ret = close_stream()))
-		return ret;
-	if ((ret = open_stream()))
-		return ret;
+	glc_log(&mpriv.glc, GLC_INFORMATION, "main", "reloading stream");
 
-	return 0;
+	if ((ret = file_write_eof(mpriv.file)))
+		goto err;
+	if ((ret = close_stream()))
+		goto err;
+	if ((ret = open_stream()))
+		goto err;
+
+	return;
+err:
+	glc_log(&mpriv.glc, GLC_ERROR, "main",
+		"can't reload stream: %s (%d)\n", strerror(ret), ret);
+}
+
+int reload_stream()
+{
+	glc_message_header_t hdr;
+	hdr.type = GLC_CALLBACK_REQUEST;
+	glc_callback_request_t callback_req;
+	callback_req.arg = NULL;
+
+	/* synchronize with opengl top buffer */
+	return opengl_push_message(&hdr, &callback_req, sizeof(glc_callback_request_t));
 }
 
 void increment_capture()
@@ -301,6 +319,9 @@ int start_glc()
 
 	/* initialize file & write stream info */
 	if ((ret = file_init(&mpriv.file, &mpriv.glc)))
+		return ret;
+	/* NOTE at the moment only reload is used as callback */
+	if ((ret = file_set_callback(mpriv.file, &reload_stream_callback)))
 		return ret;
 	if ((ret = open_stream()))
 		return ret;

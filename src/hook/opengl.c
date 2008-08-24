@@ -231,6 +231,36 @@ int opengl_close()
 	return 0;
 }
 
+int opengl_push_message(glc_message_header_t *hdr, void *message, size_t message_size)
+{
+	ps_packet_t packet;
+	int ret = 0;
+	ps_buffer_t *to;
+	if (!lib.running)
+		return EAGAIN;
+
+	if (opengl.unscaled)
+		to = opengl.unscaled;
+	else
+		to = opengl.buffer;
+
+	if ((ret = ps_packet_init(&packet, to)))
+		goto finish;
+	if ((ret = ps_packet_open(&packet, PS_PACKET_WRITE)))
+		goto finish;
+	if ((ret = ps_packet_write(&packet, hdr, sizeof(glc_message_header_t))))
+		goto finish;
+	if ((ret = ps_packet_write(&packet, message, message_size)))
+		goto finish;
+	if ((ret = ps_packet_close(&packet)))
+		goto finish;
+	if ((ret = ps_packet_destroy(&packet)))
+		goto finish;
+
+finish:
+	return ret;
+}
+
 int opengl_capture_start()
 {
 	int ret;

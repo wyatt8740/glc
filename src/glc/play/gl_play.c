@@ -184,9 +184,10 @@ void gl_play_finish_callback(void *ptr, int err)
 
 		glXDestroyContext(gl_play->dpy, gl_play->ctx);
 		XDestroyWindow(gl_play->dpy, gl_play->win);
+
+		XCloseDisplay(gl_play->dpy);
 	}
 
-	XCloseDisplay(gl_play->dpy);
 	gl_play->dpy = NULL;
 }
 

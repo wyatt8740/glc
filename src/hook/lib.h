@@ -81,6 +81,7 @@ __PRIVATE int opengl_capture_start();
 __PRIVATE int opengl_capture_stop();
 __PRIVATE int opengl_refresh_color_correction();
 __PRIVATE int opengl_close();
+__PRIVATE int opengl_push_message(glc_message_header_t *hdr, void *message, size_t message_size);
 /**  \} */
 
 /**
