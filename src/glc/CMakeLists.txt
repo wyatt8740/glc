@@ -42,6 +42,7 @@ SET(CORE_HDR core/color.h
 	     core/pack.h
 	     core/rgb.h
 	     core/scale.h
+	     core/tracker.h
 	     core/ycbcr.h)
 SET(CORE_SRC core/color.c
 	     core/copy.c
@@ -50,6 +51,7 @@ SET(CORE_SRC core/color.c
 	     core/pack.c
 	     core/rgb.c
 	     core/scale.c
+	     core/tracker.c
 	     core/ycbcr.c)
 
 SET(CAPTURE_HDR capture/alsa_capture.h
