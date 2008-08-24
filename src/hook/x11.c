@@ -169,8 +169,8 @@ void x11_event(Display *dpy, XEvent *event)
 			if (lib.flags & LIB_CAPTURING) /* just stop */
 				stop_capture();
 			else { /* reload and start */
-				/* increment_capture();
-				reload_stream(); */
+				increment_capture();
+				reload_stream();
 				start_capture();
 			}
 		}

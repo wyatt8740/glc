@@ -231,6 +231,8 @@ void reload_stream_callback(void *arg)
 		goto err;
 	if ((ret = open_stream()))
 		goto err;
+	if ((ret = file_write_state(mpriv.file)))
+		goto err;
 
 	return;
 err:
