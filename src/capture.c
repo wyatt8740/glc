@@ -51,6 +51,7 @@ int main(int argc, char *argv[])
 		{'s', "start",			"GLC_START",			 "1"},
 		{'e', "colorspace",		"GLC_COLORSPACE",		NULL},
 		{'k', "hotkey",			"GLC_HOTKEY",			NULL},
+		{ 0 , "reload",			"GLC_RELOAD_HOTKEY",		NULL},
 		{'n', "lock-fps",		"GLC_LOCK_FPS",			 "1"},
 		{ 0 , "pbo",			"GLC_TRY_PBO",			 "1"},
 		{'z', "compression",		"GLC_COMPRESS",			NULL},
@@ -132,16 +133,18 @@ int main(int argc, char *argv[])
 	return EXIT_SUCCESS;
 usage:
 	printf("%s [capture option]... [application] [application argument]...\n", argv[0]);
-	printf("  -o, --out=FILE             write to FILE, %%app%%-%%pid%%.glc by default\n"
-	       "                               %%app%%:     application name\n"
-	       "                               %%pid%%:     process ID\n"
-	       "                               %%capture%%: counter\n"
-	       "                               %%year%%:    4-digit year\n"
-	       "                               %%month%%:   2-digit month\n"
-	       "                               %%day%%:     2-digit day\n"
-	       "                               %%hour%%:    2-digit hour\n"
-	       "                               %%min%%:     2-digit minute\n"
-	       "                               %%sec%%:     2-digit second\n"
+	printf("  -o, --out=FILE             write to FILE\n"
+	       "                               following tags are available:\n"
+	       "                                 %%app%%:     application name\n"
+	       "                                 %%pid%%:     process ID\n"
+	       "                                 %%capture%%: counter\n"
+	       "                                 %%year%%:    4-digit year\n"
+	       "                                 %%month%%:   2-digit month\n"
+	       "                                 %%day%%:     2-digit day\n"
+	       "                                 %%hour%%:    2-digit hour\n"
+	       "                                 %%min%%:     2-digit minute\n"
+	       "                                 %%sec%%:     2-digit second\n"
+	       "                               default value is %%app%%-%%pid%%-%%capture%%.glc\n"
 	       "  -f, --fps=FPS              capture at FPS, default value is 30\n"
 	       "  -r, --resize=FACTOR        resize pictures with scale factor FACTOR\n"
 	       "  -c, --crop=WxH+X+Y         capture only [width]x[height][+[x][+[y]]]\n"
@@ -152,6 +155,8 @@ usage:
 	       "                               default value is '420jpeg'\n"
 	       "  -k, --hotkey=HOTKEY        capture hotkey, <Ctrl> and <Shift> modifiers are\n"
 	       "                               supported, default hotkey is '<Shift>F8'\n"
+	       "      --reload=HOTKEY        reload hotkey, switches to next capture file\n"
+	       "                               default reload key is '<Shift>F9'\n"
 	       "  -n, --lock-fps             lock fps when capturing\n"
 	       "      --pbo                  use GL_ARB_pixel_buffer_object if available\n"
 	       "  -z, --compression=METHOD   compress stream using METHOD\n"

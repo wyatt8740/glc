@@ -39,6 +39,7 @@
 #define MAIN_CUSTOM_LOG           0x10
 #define MAIN_SYNC                 0x20
 #define MAIN_COMPRESS_LZJB        0x40
+#define MAIN_START                0x80
 
 struct main_private_s {
 	glc_t glc;
@@ -59,6 +60,8 @@ struct main_private_s {
 	void (*sigint_handler)(int);
 	void (*sighup_handler)(int);
 	void (*sigterm_handler)(int);
+
+	glc_utime_t stop_time;
 };
 
 __PRIVATE glc_lib_t lib = {NULL, /* dlopen */
@@ -84,8 +87,9 @@ void init_glc()
 	int ret;
 	mpriv.flags = 0;
 	mpriv.capture = 0;
+	mpriv.stop_time = 0;
 	mpriv.stream_file = NULL;
-	mpriv.stream_file_fmt = "%app%-%pid%.glc";
+	mpriv.stream_file_fmt = "%app%-%pid%-%capture%.glc";
 
 	if ((ret = pthread_mutex_lock(&lib.init_lock)))
 		goto err;
@@ -111,16 +115,15 @@ void init_glc()
 	if ((ret = x11_init(&mpriv.glc)))
 		goto err;
 
+	/* get current time for correct timediff */
+	mpriv.stop_time = glc_state_time(&mpriv.glc);
+
 	glc_util_log_info(&mpriv.glc);
 
 	lib.initialized = 1; /* we've technically done */
 
-	if (lib.flags & LIB_CAPTURING) {
-		if ((ret = start_glc()))
-			goto err;
-		alsa_capture_start_all();
-		opengl_capture_start();
-	}
+	if (mpriv.flags & MAIN_START)
+		start_capture();
 
 	atexit(lib_close);
 
@@ -231,6 +234,57 @@ int reload_stream()
 void increment_capture()
 {
 	mpriv.capture++;
+	mpriv.stop_time = 0;
+}
+
+int start_capture()
+{
+	int ret;
+	if (lib.flags & LIB_CAPTURING)
+		return EAGAIN;
+
+	if (!lib.running) {
+		if ((ret = start_glc()))
+			goto err;
+	}
+
+	if ((ret = alsa_capture_start_all()))
+		goto err;
+	if ((ret = opengl_capture_start()))
+		goto err;
+
+	glc_state_time_add_diff(&mpriv.glc, glc_state_time(&mpriv.glc) - mpriv.stop_time);
+	lib.flags |= LIB_CAPTURING;
+	glc_log(&mpriv.glc, GLC_INFORMATION, "main", "started capturing");
+
+	return 0;
+err:
+	glc_log(&mpriv.glc, GLC_ERROR, "main",
+		"can't start capturing: %s (%d)", strerror(ret), ret);
+	return ret;
+}
+
+int stop_capture()
+{
+	int ret;
+
+	if (!(lib.flags & LIB_CAPTURING))
+		return EAGAIN;
+
+	if ((ret = alsa_capture_stop_all()))
+		goto err;
+	if ((ret = opengl_capture_stop()))
+		goto err;
+
+	lib.flags &= ~LIB_CAPTURING;
+	mpriv.stop_time = glc_state_time(&mpriv.glc);
+	glc_log(&mpriv.glc, GLC_INFORMATION, "main", "stopped capturing");
+
+	return 0;
+err:
+	glc_log(&mpriv.glc, GLC_ERROR, "main",
+		"can't stop capturing: %s (%d)", strerror(ret), ret);
+	return ret;
 }
 
 int start_glc()
@@ -369,7 +423,7 @@ int load_environ()
 
 	if (getenv("GLC_START")) {
 		if (atoi(getenv("GLC_START")))
-			lib.flags |= LIB_CAPTURING;
+			mpriv.flags |= MAIN_START;
 	}
 
 	if (getenv("GLC_FILE"))

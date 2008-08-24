@@ -28,7 +28,6 @@
 
 struct x11_private_s {
 	glc_t *glc;
-	int capturing;
 
 	void *libX11_handle;
 	int (*XNextEvent)(Display *, XEvent *);
@@ -47,11 +46,15 @@ struct x11_private_s {
 	void *libXxf86vm_handle;
 	Bool (*XF86VidModeSetGamma)(Display *, int, XF86VidModeGamma *);
 
-	unsigned int key_mask;
-	KeySym capture;
-	Time last_event_time;
+	/* capture start/stop */
+	unsigned int capture_key_mask;
+	KeySym capture_key;
 
-	glc_utime_t stop;
+	/* start capturing to different file */
+	unsigned int reload_key_mask;
+	KeySym reload_key;
+
+	Time last_event_time;
 };
 
 #define X11_KEY_CTRL               1
@@ -61,48 +64,60 @@ struct x11_private_s {
 __PRIVATE struct x11_private_s x11;
 __PRIVATE void get_real_x11();
 __PRIVATE void x11_event(Display *dpy, XEvent *event);
-__PRIVATE int x11_parse_hotkey(const char *hotkey);
+__PRIVATE int x11_parse_key(const char *str, KeySym *key, unsigned int *mask);
+__PRIVATE int x11_match_key(Display *dpy, XEvent *event, KeySym key, unsigned int mask);
 
 int x11_init(glc_t *glc)
 {
 	x11.glc = glc;
-	x11.capturing = 0;
 
 	get_real_x11();
 
 	if (getenv("GLC_HOTKEY")) {
-		if (x11_parse_hotkey(getenv("GLC_HOTKEY"))) {
+		if (x11_parse_key(getenv("GLC_HOTKEY"), &x11.capture_key, &x11.capture_key_mask)) {
 			glc_log(x11.glc, GLC_WARNING, "x11",
 				 "invalid hotkey '%s'", getenv("GLC_HOTKEY"));
 			glc_log(x11.glc, GLC_WARNING, "x11",
 				 "using default <Shift>F8\n");
-			x11.key_mask = X11_KEY_SHIFT;
-			x11.capture = XK_F8;
+			x11.capture_key_mask = X11_KEY_SHIFT;
+			x11.capture_key = XK_F8;
 		}
 	} else {
-		x11.key_mask = X11_KEY_SHIFT;
-		x11.capture = XK_F8;
+		x11.capture_key_mask = X11_KEY_SHIFT;
+		x11.capture_key = XK_F8;
 	}
 
-	x11.stop = glc_state_time(x11.glc);
+	if (getenv("GLC_RELOAD_HOTKEY")) {
+		if (x11_parse_key(getenv("GLC_RELOAD_HOTKEY"), &x11.reload_key, &x11.reload_key_mask)) {
+			glc_log(x11.glc, GLC_WARNING, "x11",
+				 "invalid reload hotkey '%s'", getenv("GLC_HOTKEY"));
+			glc_log(x11.glc, GLC_WARNING, "x11",
+				 "using default <Shift>F9\n");
+			x11.reload_key_mask = X11_KEY_SHIFT;
+			x11.reload_key = XK_F9;
+		}
+	} else {
+		x11.reload_key_mask = X11_KEY_SHIFT;
+		x11.reload_key = XK_F9;
+	}
 
 	return 0;
 }
 
-int x11_parse_hotkey(const char *hotkey)
+int x11_parse_key(const char *str, KeySym *key, unsigned int *mask)
 {
 	/** \todo better parsing */
 	int c, s;
-	x11.key_mask = 0;
+	*mask = 0;
 	c = s = 0;
-	while (hotkey[c] != '\0') {
-		if (hotkey[c] == '<')
+	while (str[c] != '\0') {
+		if (str[c] == '<')
 			s = c;
-		else if (hotkey[c] == '>') {
-			if (!strncmp(&hotkey[s], "<Ctrl>", c - s))
-				x11.key_mask |= X11_KEY_CTRL;
-			else if (!strncmp(&hotkey[s], "<Shift>", c - s))
-				x11.key_mask |= X11_KEY_SHIFT;
+		else if (str[c] == '>') {
+			if (!strncmp(&str[s], "<Ctrl>", c - s))
+				*mask |= X11_KEY_CTRL;
+			else if (!strncmp(&str[s], "<Shift>", c - s))
+				*mask |= X11_KEY_SHIFT;
 			else
 				return EINVAL;
 			s = c + 1;
@@ -110,9 +125,9 @@ int x11_parse_hotkey(const char *hotkey)
 		c++;
 	}
 
-	x11.capture = XStringToKeysym(&hotkey[s]);
+	*key = XStringToKeysym(&str[s]);
 
-	if (!x11.capture)
+	if (!(*key))
 		return EINVAL;
 	return 0;
 }
@@ -122,52 +137,37 @@ int x11_close()
 	return 0;
 }
 
+int x11_match_key(Display *dpy, XEvent *event, KeySym key, unsigned int mask)
+{
+	if (event->xkey.keycode != XKeysymToKeycode(dpy, key))
+		return 0;
+
+	if ((mask & X11_KEY_CTRL) && (!(event->xkey.state & ControlMask)))
+		return 0;
+
+	if ((mask & X11_KEY_SHIFT) && (!(event->xkey.state & ShiftMask)))
+		return 0;
+
+	return 1;
+}
+
 void x11_event(Display *dpy, XEvent *event)
 {
-	int ret;
 	if (!event)
 		return;
 
 	if (event->type == KeyPress) {
-		if (event->xkey.keycode == XKeysymToKeycode(dpy, x11.capture)) {
-			if (event->xkey.time == x11.last_event_time)
-				return; /* handle duplicates */
-
-			if ((x11.key_mask & X11_KEY_CTRL) && (!(event->xkey.state & ControlMask)))
-				return;
-
-			if ((x11.key_mask & X11_KEY_SHIFT) && (!(event->xkey.state & ShiftMask)))
-				return;
-
-			if (lib.flags & LIB_CAPTURING) { /* stop */
-				alsa_capture_stop_all();
-				opengl_capture_stop();
-
-				lib.flags &= ~LIB_CAPTURING;
-				x11.stop = glc_state_time(x11.glc);
-				glc_log(x11.glc, GLC_INFORMATION, "x11", "stopped capturing");
-			} else { /* start */
-				if (!lib.running) {
-					if ((ret = start_glc())) {
-						glc_log(x11.glc, GLC_ERROR, "x11",
-							 "can't start capturing: %s (%d)",
-							 strerror(ret), ret);
-						return; /* don't set GLC_CAPTURE flag */
-					}
-					alsa_capture_start_all();
-					opengl_capture_start();
-				} else {
-					alsa_capture_start_all();
-					opengl_capture_start();
-				}
-
-				glc_state_time_add_diff(x11.glc, glc_state_time(x11.glc) - x11.stop);
-				lib.flags |= LIB_CAPTURING;
-				glc_log(x11.glc, GLC_INFORMATION, "x11", "started capturing");
-
-			}
-			x11.last_event_time = event->xkey.time;
+		if (event->xkey.time == x11.last_event_time)
+			return; /* handle duplicates */
+	
+		if (x11_match_key(dpy, event, x11.capture_key, x11.capture_key_mask)) {
+			if (lib.flags & LIB_CAPTURING) /* stop */
+				stop_capture();
+			else /* start */
+				start_capture();
 		}
+
+		x11.last_event_time = event->xkey.time;
 	}
 }
 
