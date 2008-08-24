@@ -72,7 +72,7 @@ typedef struct {
 /** thread does write operations */
 #define GLC_THREAD_WRITE                      2
 /**
- * \brief thread
+ * \brief thread vtable
  *
  * glc_thread_t holds information about thread callbacks
  * and features. Mandatory values are flags, and threads.

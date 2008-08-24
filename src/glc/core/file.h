@@ -83,6 +83,16 @@ __PUBLIC int file_init(file_t *file, glc_t *glc);
 __PUBLIC int file_set_sync(file_t file, int sync);
 
 /**
+ * \brief set callback function
+ * Callback is called when callback_request message is encountered
+ * in stream.
+ * \param file file object
+ * \param callback callback function address
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int file_set_callback(file_t file, callback_request_func_t callback);
+
+/**
  * \brief open file for writing
  * \note this calls file_set_target()
  * \param file file object
@@ -119,6 +129,13 @@ __PUBLIC int file_close_target(file_t file);
  */
 __PUBLIC int file_write_info(file_t file, glc_stream_info_t *info,
 			     const char *info_name, const char *info_date);
+
+/**
+ * \brief write EOF message to file
+ * \param file file object
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int file_write_eof(file_t file);
 
 /**
  * \brief start writing process

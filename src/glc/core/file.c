@@ -48,6 +48,7 @@ struct file_s {
 	int fd;
 	int sync;
 	u_int32_t stream_version;
+	callback_request_func_t callback;
 };
 
 void file_finish_callback(void *ptr, int err);
@@ -80,6 +81,12 @@ int file_destroy(file_t file)
 int file_set_sync(file_t file, int sync)
 {
 	file->sync = sync;
+	return 0;
+}
+
+int file_set_callback(file_t file, callback_request_func_t callback)
+{
+	file->callback = callback;
 	return 0;
 }
 
@@ -174,6 +181,31 @@ err:
 	return errno;
 }
 
+int file_write_eof(file_t file)
+{
+	glc_message_header_t hdr;
+	glc_size_t glc_size;
+	hdr.type = GLC_MESSAGE_CLOSE;
+
+	if ((file->fd < 0) | (file->flags & FILE_RUNNING) |
+	    (!(file->flags & FILE_WRITING)))
+		return EAGAIN;
+
+	glc_size = sizeof(glc_message_header_t);
+	if (write(file->fd, &glc_size, sizeof(glc_size_t)) != sizeof(glc_size_t))
+		goto err;
+	if (write(file->fd, &hdr, sizeof(glc_message_header_t))
+		!= sizeof(glc_message_header_t))
+		goto err;
+
+	return 0;
+err:
+	glc_log(file->glc, GLC_ERROR, "file",
+		 "can't write eof: %s (%d)",
+		 strerror(errno), errno);
+	return errno;
+}
+
 int file_write_process_start(file_t file, ps_buffer_t *from)
 {
 	int ret;
@@ -216,8 +248,18 @@ int file_read_callback(glc_thread_state_t *state)
 	file_t file = (file_t) state->ptr;
 	glc_container_message_header_t *container;
 	glc_size_t glc_size;
+	glc_callback_request_t *callback_req;
 
-	if (state->header.type == GLC_MESSAGE_CONTAINER) {
+	if (state->header.type == GLC_CALLBACK_REQUEST) {
+		/* callback request messages are never written to disk */
+		if (file->callback != NULL) {
+			/* callbacks may manipulate target file so remove FILE_RUNNING flag */
+			file->flags &= ~FILE_RUNNING;
+			callback_req = (glc_callback_request_t *) state->read_data;
+			file->callback(callback_req->arg);
+			file->flags |= FILE_RUNNING;
+		}
+	} else if (state->header.type == GLC_MESSAGE_CONTAINER) {
 		container = (glc_container_message_header_t *) state->read_data;
 		if (write(file->fd, state->read_data, sizeof(glc_container_message_header_t) + container->size)
 		    != (sizeof(glc_container_message_header_t) + container->size))
