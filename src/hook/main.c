@@ -51,6 +51,8 @@ struct main_private_s {
 	file_t file;
 	pack_t pack;
 
+	unsigned int capture;
+	const char *stream_file_fmt;
 	char *stream_file;
 
 	int sighandler;
@@ -66,7 +68,8 @@ __PRIVATE glc_lib_t lib = {NULL, /* dlopen */
 			   0, /* initialized */
 			   0, /* running */
 			   PTHREAD_MUTEX_INITIALIZER, /* init_lock */
-			   0, /* flags */ };
+			   0, /* flags */
+			   };
 __PRIVATE struct main_private_s mpriv;
 
 __PRIVATE int init_buffers();
@@ -80,6 +83,9 @@ void init_glc()
 	struct sigaction new_sighandler, old_sighandler;
 	int ret;
 	mpriv.flags = 0;
+	mpriv.capture = 0;
+	mpriv.stream_file = NULL;
+	mpriv.stream_file_fmt = "%app%-%pid%.glc";
 
 	if ((ret = pthread_mutex_lock(&lib.init_lock)))
 		goto err;
@@ -170,10 +176,65 @@ int init_buffers()
 	return 0;
 }
 
-int start_glc()
+int open_stream()
 {
 	glc_stream_info_t *stream_info;
 	char *info_name, *info_date;
+	int ret;
+
+	glc_util_info_create(&mpriv.glc, &stream_info, &info_name, &info_date);
+	mpriv.stream_file = glc_util_format_filename(mpriv.stream_file_fmt, mpriv.capture);
+
+	if ((ret = file_set_sync(mpriv.file, (mpriv.flags & MAIN_SYNC) ? 1 : 0)))
+		return ret;
+	if ((ret = file_open_target(mpriv.file, mpriv.stream_file)))
+		return ret;
+	if ((ret = file_write_info(mpriv.file, stream_info,
+				   info_name, info_date)))
+		return ret;
+	free(stream_info);
+	free(info_name);
+	free(info_date);
+
+	return 0;
+}
+
+int close_stream()
+{
+	int ret;
+
+	if (mpriv.stream_file != NULL) {
+		free(mpriv.stream_file);
+		mpriv.stream_file = NULL;
+	}
+
+	if ((ret = file_close_target(mpriv.file)))
+		return ret;
+
+	return 0;
+}
+
+int reload_stream()
+{
+	int ret;
+
+	if ((ret = file_write_eof(mpriv.file)))
+		return ret;
+	if ((ret = close_stream()))
+		return ret;
+	if ((ret = open_stream()))
+		return ret;
+
+	return 0;
+}
+
+void increment_capture()
+{
+	mpriv.capture++;
+}
+
+int start_glc()
+{
 	int ret;
 
 	if (lib.running)
@@ -185,19 +246,10 @@ int start_glc()
 	glc_log(&mpriv.glc, GLC_INFORMATION, "main", "starting glc");
 
 	/* initialize file & write stream info */
-	glc_util_info_create(&mpriv.glc, &stream_info, &info_name, &info_date);
 	if ((ret = file_init(&mpriv.file, &mpriv.glc)))
 		return ret;
-	if ((ret = file_set_sync(mpriv.file, (mpriv.flags & MAIN_SYNC) ? 1 : 0)))
+	if ((ret = open_stream()))
 		return ret;
-	if ((ret = file_open_target(mpriv.file, mpriv.stream_file)))
-		return ret;
-	if ((ret = file_write_info(mpriv.file, stream_info,
-				   info_name, info_date)))
-		return ret;
-	free(stream_info);
-	free(info_name);
-	free(info_date);
 
 	if (!(mpriv.flags & MAIN_COMPRESS_NONE)) {
 		if ((ret = file_write_process_start(mpriv.file, mpriv.compressed)))
@@ -286,7 +338,7 @@ void lib_close()
 			pack_destroy(mpriv.pack);
 		}
 		file_write_process_wait(mpriv.file);
-		file_close_target(mpriv.file);
+		close_stream();
 		file_destroy(mpriv.file);
 	}
 
@@ -321,9 +373,7 @@ int load_environ()
 	}
 
 	if (getenv("GLC_FILE"))
-		mpriv.stream_file = glc_util_format_filename(getenv("GLC_FILE"), 0);
-	else
-		mpriv.stream_file = glc_util_format_filename("%app%-%pid%.glc", 0);
+		mpriv.stream_file_fmt = getenv("GLC_FILE");
 
 	if (getenv("GLC_LOG"))
 		glc_log_set_level(&mpriv.glc, atoi(getenv("GLC_LOG")));
