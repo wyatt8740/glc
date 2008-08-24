@@ -138,6 +138,13 @@ __PUBLIC int file_write_info(file_t file, glc_stream_info_t *info,
 __PUBLIC int file_write_eof(file_t file);
 
 /**
+ * \brief write current stream state to file
+ * \param file file object
+ * \return 0 on success otherwise an error code
+ */
+__PUBLIC int file_write_state(file_t file);
+
+/**
  * \brief start writing process
  *
  * file will write all data from source buffer to target file

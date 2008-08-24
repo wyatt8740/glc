@@ -32,6 +32,8 @@
 #include <glc/common/thread.h>
 #include <glc/common/util.h>
 
+#include <glc/core/tracker.h>
+
 #include "file.h"
 
 #define FILE_READING       0x1
@@ -49,10 +51,13 @@ struct file_s {
 	int sync;
 	u_int32_t stream_version;
 	callback_request_func_t callback;
+	tracker_t state_tracker;
 };
 
 void file_finish_callback(void *ptr, int err);
 int file_read_callback(glc_thread_state_t *state);
+int file_write_message(file_t file, glc_message_header_t *header, void *message, size_t message_size);
+int file_write_state_callback(glc_message_header_t *header, void *message, size_t message_size, void *arg);
 
 int file_init(file_t *file, glc_t *glc)
 {
@@ -69,11 +74,14 @@ int file_init(file_t *file, glc_t *glc)
 	(*file)->thread.finish_callback = &file_finish_callback;
 	(*file)->thread.threads = 1;
 
+	tracker_init(&(*file)->state_tracker, (*file)->glc);
+
 	return 0;
 }
 
 int file_destroy(file_t file)
 {
+	tracker_destroy(file->state_tracker);
 	free(file);
 	return 0;
 }
@@ -181,30 +189,72 @@ err:
 	return errno;
 }
 
+int file_write_message(file_t file, glc_message_header_t *header, void *message, size_t message_size)
+{
+	glc_size_t glc_size = (glc_size_t) message_size;
+
+	if (write(file->fd, &glc_size, sizeof(glc_size_t)) != sizeof(glc_size_t))
+		goto err;
+	if (write(file->fd, header, sizeof(glc_message_header_t))
+		!= sizeof(glc_message_header_t))
+		goto err;
+	if (message_size > 0) {
+		if (write(file->fd, message, message_size) != message_size)
+			goto err;
+	}
+
+	return 0;
+err:
+	return errno;
+}
+
 int file_write_eof(file_t file)
 {
+	int ret;
 	glc_message_header_t hdr;
-	glc_size_t glc_size = 0;
 	hdr.type = GLC_MESSAGE_CLOSE;
 
 	if ((file->fd < 0) | (file->flags & FILE_RUNNING) |
 	    (!(file->flags & FILE_WRITING))) {
-	    errno = EAGAIN;
+	    ret = EAGAIN;
 	    goto err;
 	}
 
-	if (write(file->fd, &glc_size, sizeof(glc_size_t)) != sizeof(glc_size_t))
-		goto err;
-	if (write(file->fd, &hdr, sizeof(glc_message_header_t))
-		!= sizeof(glc_message_header_t))
+	if ((ret = file_write_message(file, &hdr, NULL, 0)))
 		goto err;
 
 	return 0;
 err:
 	glc_log(file->glc, GLC_ERROR, "file",
 		 "can't write eof: %s (%d)",
-		 strerror(errno), errno);
-	return errno;
+		 strerror(ret), ret);
+	return ret;
+}
+
+int file_write_state_callback(glc_message_header_t *header, void *message, size_t message_size, void *arg)
+{
+	file_t file = arg;
+	return file_write_message(file, header, message, message_size);
+}
+
+int file_write_state(file_t file)
+{
+	int ret;
+	if ((file->fd < 0) | (file->flags & FILE_RUNNING) |
+	    (!(file->flags & FILE_WRITING))) {
+	    ret = EAGAIN;
+	    goto err;
+	}
+
+	if ((ret = tracker_iterate_state(file->state_tracker, &file_write_state_callback, file)))
+		goto err;
+
+	return 0;
+err:
+	glc_log(file->glc, GLC_ERROR, "file",
+		 "can't write state: %s (%d)",
+		 strerror(ret), ret);
+	return ret;
 }
 
 int file_write_process_start(file_t file, ps_buffer_t *from)
@@ -250,6 +300,9 @@ int file_read_callback(glc_thread_state_t *state)
 	glc_container_message_header_t *container;
 	glc_size_t glc_size;
 	glc_callback_request_t *callback_req;
+
+	/* let state tracker to process this message */
+	tracker_submit(file->state_tracker, &state->header, state->read_data, state->read_size);
 
 	if (state->header.type == GLC_CALLBACK_REQUEST) {
 		/* callback request messages are never written to disk */
