@@ -6,7 +6,7 @@
  */
 
 /* glc.h -- ALSA & OpenGL video capture tool
-  version 0.5.5, April 20th, 2008
+  version 0.5.7, August 25th, 2008
 
   Copyright (C) 2007-2008 Pyry Haulos <pyry.haulos@gmail.com>
 
@@ -237,6 +237,8 @@ typedef u_int8_t glc_video_format_t;
 #define GLC_VIDEO_BGRA                  0x2
 /** planar YV12 420jpeg */
 #define GLC_VIDEO_YCBCR_420JPEG         0x3
+/** 24bit RGB, last row first */
+#define GLC_VIDEO_RGB                   0x4
 
 /**
  * \brief video format message
