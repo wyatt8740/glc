@@ -163,6 +163,7 @@ int alsa_start(ps_buffer_t *buffer)
 	/* start capture streams */
 	while (stream != NULL) {
 		alsa_capture_init(&stream->capture, alsa.glc);
+		alsa_capture_set_buffer(stream->capture, buffer);
 		alsa_capture_set_device(stream->capture, stream->device);
 		alsa_capture_set_rate(stream->capture, stream->rate);
 		alsa_capture_set_channels(stream->capture, stream->channels);
@@ -184,6 +185,7 @@ int alsa_close()
 	glc_log(alsa.glc, GLC_DEBUG, "alsa", "closing");
 
 	if (alsa.capture) {
+		alsa.capture = 0; /* disable capturing */
 		if (alsa.capturing)
 			alsa_hook_stop(alsa.alsa_hook);
 		alsa_hook_destroy(alsa.alsa_hook);

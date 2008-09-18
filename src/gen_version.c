@@ -17,6 +17,7 @@
 char *extract_version(const char *basever, const char *path)
 {
 	int result;
+	FILE *in;
 
 	size_t basever_len = strlen(basever);
 
@@ -27,7 +28,7 @@ char *extract_version(const char *basever, const char *path)
 
 	snprintf(cmd, cmd_len, cmd_format, path);
 
-	FILE *in = popen(cmd, "r");
+	in = popen(cmd, "r");
 	if (!in) {
 		free(cmd);
 		return NULL;
@@ -78,15 +79,18 @@ int write_version(const char *filename, const char *version)
 
 int main(int argc, char *argv[])
 {
+	const char *target, *version, *git_dir;
+	char *git_version;
+
 	if (argc < 4) {
 		fprintf(stderr, "%s [target] [version] [git directory]\n", argv[0]);
 		return EXIT_FAILURE;
 	}
 
-	const char *target = argv[1];
-	const char *version = argv[2];
-	const char *git_dir = argv[3];
-	char *git_version = extract_version(version, git_dir);
+	target = argv[1];
+	version = argv[2];
+	git_dir = argv[3];
+	git_version = extract_version(version, git_dir);
 
 	if (git_version != NULL) {
 		if (write_version(target, git_version)) {

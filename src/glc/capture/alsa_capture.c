@@ -55,6 +55,7 @@ struct alsa_capture_s {
 	sem_t capture;
 	int skip_data;
 	int stop_capture;
+	int thread_running;
 };
 
 int alsa_capture_open(alsa_capture_t alsa_capture);
@@ -73,7 +74,6 @@ int alsa_capture_init(alsa_capture_t *alsa_capture, glc_t *glc)
 {
 	*alsa_capture = (alsa_capture_t) malloc(sizeof(struct alsa_capture_s));
 	memset(*alsa_capture, 0, sizeof(struct alsa_capture_s));
-	pthread_attr_t attr;
 
 	(*alsa_capture)->glc = glc;
 	(*alsa_capture)->device = "default";
@@ -85,11 +85,6 @@ int alsa_capture_init(alsa_capture_t *alsa_capture, glc_t *glc)
 	(*alsa_capture)->skip_data = 1;
 
 	sem_init(&(*alsa_capture)->capture, 0, 0);
-
-	pthread_attr_init(&attr);
-	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-	pthread_create(&(*alsa_capture)->capture_thread, &attr, alsa_capture_thread, (void *) *alsa_capture);
-	pthread_attr_destroy(&attr);
 
 	return 0;
 }
@@ -105,9 +100,17 @@ int alsa_capture_destroy(alsa_capture_t alsa_capture)
 
 	alsa_capture->stop_capture = 1;
 	sem_post(&alsa_capture->capture);
-	pthread_join(alsa_capture->capture_thread, NULL);
+
+	if (alsa_capture->thread_running)
+		pthread_join(alsa_capture->capture_thread, NULL);
 
 	free(alsa_capture);
+	return 0;
+}
+
+int alsa_capture_set_buffer(alsa_capture_t alsa_capture, ps_buffer_t *buffer)
+{
+	alsa_capture->to = buffer;
 	return 0;
 }
 
@@ -141,10 +144,22 @@ int alsa_capture_set_channels(alsa_capture_t alsa_capture, unsigned int channels
 int alsa_capture_start(alsa_capture_t alsa_capture)
 {
 	int ret;
+	pthread_attr_t attr;
 	if (alsa_capture == NULL)
 		return EINVAL;
 
-	if (alsa_capture->skip_data)
+	if (alsa_capture->to == NULL)
+		return EAGAIN;
+
+	if (!alsa_capture->thread_running) {
+		pthread_attr_init(&attr);
+		pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+		pthread_create(&alsa_capture->capture_thread, &attr, alsa_capture_thread, (void *) alsa_capture);
+		pthread_attr_destroy(&attr);
+		alsa_capture->thread_running = 1;
+	}
+
+	if (alsa_capture->skip_data != 0)
 		glc_log(alsa_capture->glc, GLC_WARNING, "alsa_capture",
 			 "device %s already started", alsa_capture->device);
 	else
@@ -165,7 +180,7 @@ int alsa_capture_stop(alsa_capture_t alsa_capture)
 	if (alsa_capture == NULL)
 		return EINVAL;
 
-	if (alsa_capture->skip_data)
+	if (alsa_capture->skip_data == 0)
 		glc_log(alsa_capture->glc, GLC_INFORMATION, "alsa_capture",
 			 "stopping device %s", alsa_capture->device);
 	else
