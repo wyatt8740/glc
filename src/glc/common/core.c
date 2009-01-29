@@ -86,7 +86,7 @@ glc_utime_t glc_time(glc_t *glc)
 		tv.tv_usec += 1000000;
 	}
 
-	return (glc_utime_t) tv.tv_sec * (glc_utime_t) 100000000 + (glc_utime_t) tv.tv_usec;
+	return (glc_utime_t) tv.tv_sec * (glc_utime_t) 1000000 + (glc_utime_t) tv.tv_usec;
 }
 
 long int glc_threads_hint(glc_t *glc)
