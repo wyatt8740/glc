@@ -43,7 +43,7 @@ showhelp () {
 	echo "  -h, --help           show this help"
 }
 
-OPT_TMP=`getopt -o o:v:a:m:q:f:x:h --long out:video:audio:method:quality:outfmt:addopts \
+OPT_TMP=`getopt -o o:v:a:m:q:f:x:h -l out:,video:,audio:,method:,quality:,outfmt:,addopts: \
 	-n "$0" -- "$@"`
 if [ $? != 0 ]; then showhelp; exit 1; fi
 
@@ -75,7 +75,7 @@ while true; do
 			OUTFMT="$2"
 			shift 2
 			;;
-		-a|--addopts)
+		-x|--addopts)
 			ADDOPTS="$2"
 			shift 2
 			;;
@@ -89,6 +89,7 @@ while true; do
 			break
 			;;
 		*)
+			echo "Unrecognized option: $1"
 			showhelp
 			exit 1
 			;;
