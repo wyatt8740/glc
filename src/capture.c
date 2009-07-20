@@ -84,6 +84,12 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	/* Always set GLC_FILE in order to route it into $PWD.
+	 * If -o is set, it will just silently override default one.
+	 */
+	/* \note Assumes that GLC_FILE exists at [0]. */
+	set_opt(&options[0], "%app%-%pid%-%capture%.glc");
+
 	/* parse options until we encounter first invalid option or non-option argument */
 	for (optind = 1; optind < argc;) {
 		/* test if this is --version */
