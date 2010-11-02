@@ -214,7 +214,7 @@ int alsa_capture_stop_all()
 
 	while (stream != NULL) {
 		if (stream->capture)
-			alsa_capture_start(stream->capture);
+			alsa_capture_stop(stream->capture);
 		stream = stream->next;
 	}
 
