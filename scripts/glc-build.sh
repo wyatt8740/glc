@@ -43,7 +43,7 @@ gitfetch () {
 		$GIT pull origin || die "Can't update $1"
 		cd ..
 	else
-		$GIT clone "git://nullkey.ath.cx/~pyry/$1" \
+		$GIT clone "git://github.com/nullkey/$1.git" \
 			|| die "Can't clone $1"
 	fi
 }
