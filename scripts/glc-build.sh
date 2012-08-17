@@ -66,7 +66,7 @@ echo "#include <stdio.h>
 [ -e "/usr/include/alsa/asoundlib.h" ] \
 	|| die "Missing ALSA headers (Ubuntu users: sudo apt-get install libasound2-dev)"
 [ -e "/usr/include/png.h" ] \
-	|| die "Missing libpng headers (Ubuntu users: sudo apt-get-install libpng12-dev)"
+	|| die "Missing libpng headers (Ubuntu users: sudo apt-get install libpng12-dev)"
 [ -x "/usr/bin/cmake" ] \
 	|| die "CMake not installed (Ubuntu users: sudo apt-get install cmake)"
 
